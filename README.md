@@ -33,11 +33,6 @@ Plateforme unique combinant **e-commerce de produits recyclés**, **collecte de 
 - **Medium Priority** : 1
 - **Low Priority** : 2
 
-### Liens directs :
-- [📋 Voir toutes les User Stories](/issues)
-- [📁 Voir le Project Board](/projects/1)
-- [🏷️ Voir les labels](/labels)
-
 ## 🗺️ Structure du backlog
 | Module | Nombre d'US | Priorité |
 |--------|-------------|----------|
@@ -46,18 +41,3 @@ Plateforme unique combinant **e-commerce de produits recyclés**, **collecte de 
 | Event | 3 | HIGH |
 | Global | 2 | HIGH/LOW |
 
-## 🔄 Workflow
-1. **Backlog** → Toutes les User Stories
-2. **En attente de validation** → Items nécessitant approbation Admin
-3. **En développement** → En cours de réalisation
-4. **En test** → Validation et tests
-5. **Terminé** → Livraison complète
-
-## 📈 Prochaines étapes
-1. Prioriser les User Stories HIGH
-2. Assigner aux développeurs
-3. Démarrer le Sprint 1 - Gestion Boutique
-4. Revue hebdomadaire du backlog
-
----
-*Dernière mise à jour : [date]*
