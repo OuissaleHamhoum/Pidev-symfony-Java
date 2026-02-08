@@ -9,14 +9,13 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import edu.Loopi.view.CollectionView;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
 public class OrganizerDashboard {
     private User currentUser;
-    private BorderPane root; // Added as a field to allow content swapping
+    private BorderPane root;
 
     public OrganizerDashboard(User user) {
         this.currentUser = user;
@@ -37,7 +36,7 @@ public class OrganizerDashboard {
         VBox sidebar = createSidebar(stage);
         root.setLeft(sidebar);
 
-        // Contenu principal
+        // Contenu principal (Accueil par défaut)
         VBox content = createMainContent();
         root.setCenter(content);
 
@@ -78,6 +77,7 @@ public class OrganizerDashboard {
         sidebar.setPrefWidth(220);
         sidebar.setPadding(new Insets(20, 0, 0, 0));
 
+        // BOUTON MES PRODUITS (MODIFIÉ)
         Button productsBtn = createMenuButton("📦 Mes produits");
         productsBtn.setOnAction(e -> showMyProducts());
 
@@ -90,7 +90,7 @@ public class OrganizerDashboard {
         Button addEventBtn = createMenuButton("➕ Créer événement");
         addEventBtn.setOnAction(e -> createEvent());
 
-        // UPDATED: Now swaps the center content to the CollectionView
+        // BOUTON CAMPAGNES
         Button donationsBtn = createMenuButton("💰 Campagnes");
         donationsBtn.setOnAction(e -> {
             CollectionView collectionView = new CollectionView(currentUser);
@@ -143,7 +143,6 @@ public class OrganizerDashboard {
         subtitle.setTextFill(Color.web("#666"));
         subtitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
-        // Cartes de statistiques
         HBox statsBox = new HBox(20);
         statsBox.setAlignment(Pos.CENTER);
 
@@ -154,7 +153,6 @@ public class OrganizerDashboard {
 
         statsBox.getChildren().addAll(productsCard, salesCard, eventsCard, donationsCard);
 
-        // Actions rapides
         VBox quickActions = new VBox(10);
         quickActions.setAlignment(Pos.CENTER);
 
@@ -165,11 +163,14 @@ public class OrganizerDashboard {
         HBox actionsBox = new HBox(15);
         actionsBox.setAlignment(Pos.CENTER);
 
-        Button addProductBtn = createQuickActionButton("➕ Ajouter un produit");
-        Button createEventBtn = createQuickActionButton("📅 Créer un événement");
-        Button viewProductsBtn = createQuickActionButton("📦 Voir mes produits");
+        Button addProductQuickBtn = createQuickActionButton("➕ Ajouter un produit");
+        Button createEventQuickBtn = createQuickActionButton("📅 Créer un événement");
 
-        actionsBox.getChildren().addAll(addProductBtn, createEventBtn, viewProductsBtn);
+        // Bouton rapide pour voir les produits aussi
+        Button viewProductsQuickBtn = createQuickActionButton("📦 Voir mes produits");
+        viewProductsQuickBtn.setOnAction(e -> showMyProducts());
+
+        actionsBox.getChildren().addAll(addProductQuickBtn, createEventQuickBtn, viewProductsQuickBtn);
         quickActions.getChildren().addAll(actionsTitle, actionsBox);
 
         content.getChildren().addAll(welcome, subtitle, statsBox, quickActions);
@@ -203,15 +204,22 @@ public class OrganizerDashboard {
     private Button createQuickActionButton(String text) {
         Button btn = new Button(text);
         btn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;");
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;");
         btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;"));
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;"));
         btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;"));
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;"));
         return btn;
     }
 
-    private void showMyProducts() { showAlert("Info", "Mes produits - En développement"); }
+    // --- C'EST ICI QUE LA MAGIE OPÈRE ---
+    private void showMyProducts() {
+        // On crée l'instance de la vue Galerie
+        GalerieView galerieView = new GalerieView();
+        // On change le centre du BorderPane pour afficher la galerie
+        root.setCenter(galerieView.getView());
+    }
+
     private void addProduct() { showAlert("Info", "Ajouter produit - En développement"); }
     private void showMyEvents() { showAlert("Info", "Mes événements - En développement"); }
     private void createEvent() { showAlert("Info", "Créer événement - En développement"); }

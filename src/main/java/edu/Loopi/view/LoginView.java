@@ -19,7 +19,6 @@ public class LoginView extends Application {
     private AuthService authService = new AuthService();
     private Stage primaryStage;
 
-    // Composants UI
     private TextField emailField;
     private PasswordField passwordField;
     private CheckBox rememberMeCheck;
@@ -30,7 +29,6 @@ public class LoginView extends Application {
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
 
-        // Vérifier la connexion à la base de données
         if (!MyConnection.testConnection()) {
             showAlert("Erreur de connexion",
                     "Impossible de se connecter à la base de données.\n" +
@@ -41,27 +39,22 @@ public class LoginView extends Application {
         primaryStage.setTitle("LOOPI - Connexion");
         primaryStage.setResizable(false);
 
-        // Créer le layout principal
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: linear-gradient(to bottom right, #2E7D32, #4CAF50);");
 
-        // Header avec logo
         HBox headerBox = createHeader();
         root.setTop(headerBox);
 
-        // Formulaire de connexion au centre
         VBox loginForm = createLoginForm();
         StackPane centerPane = new StackPane(loginForm);
         centerPane.setPadding(new Insets(20));
         root.setCenter(centerPane);
 
-        // Footer
         HBox footerBox = createFooter();
         root.setBottom(footerBox);
 
         Scene scene = new Scene(root, 900, 700);
 
-        // Charger le CSS si disponible
         try {
             scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
         } catch (Exception e) {
@@ -71,7 +64,6 @@ public class LoginView extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        // Vérifier si l'utilisateur a déjà des identifiants enregistrés
         checkRememberedCredentials();
     }
 
@@ -103,7 +95,6 @@ public class LoginView extends Application {
         formContainer.setAlignment(Pos.CENTER);
         formContainer.setMaxWidth(450);
 
-        // Card container
         VBox card = new VBox(25);
         card.setAlignment(Pos.CENTER);
         card.setPadding(new Insets(40, 30, 30, 30));
@@ -111,22 +102,18 @@ public class LoginView extends Application {
                 "-fx-border-color: rgba(0,0,0,0.1); -fx-border-radius: 20; " +
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 25, 0, 0, 5);");
 
-        // Title
         Label titleLabel = new Label("CONNEXION");
         titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 28));
         titleLabel.setTextFill(Color.web("#2E7D32"));
 
-        // Subtitle
         Label subtitleLabel = new Label("Connectez-vous à votre compte LOOPI");
         subtitleLabel.setFont(Font.font("Arial", 14));
         subtitleLabel.setTextFill(Color.web("#666"));
         subtitleLabel.setWrapText(true);
         subtitleLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
-        // Form fields
         VBox formFields = new VBox(15);
 
-        // Email field
         VBox emailBox = new VBox(5);
         Label emailLabel = new Label("Adresse Email");
         emailLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
@@ -137,7 +124,6 @@ public class LoginView extends Application {
         emailField.setPrefHeight(45);
         styleTextField(emailField);
 
-        // Add email icon
         HBox emailContainer = new HBox();
         emailContainer.setAlignment(Pos.CENTER_LEFT);
         emailContainer.setStyle("-fx-background-color: #f8f9fa; -fx-background-radius: 10; " +
@@ -151,7 +137,6 @@ public class LoginView extends Application {
 
         emailBox.getChildren().addAll(emailLabel, emailContainer);
 
-        // Password field
         VBox passwordBox = new VBox(5);
         Label passwordLabel = new Label("Mot de passe");
         passwordLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
@@ -170,21 +155,18 @@ public class LoginView extends Application {
         Label passwordIcon = new Label("🔒");
         passwordIcon.setPadding(new Insets(0, 15, 0, 15));
 
-        // Show password toggle
         Button showPasswordBtn = new Button("👁");
         showPasswordBtn.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
                 "-fx-cursor: hand; -fx-font-size: 16px;");
         showPasswordBtn.setTooltip(new Tooltip("Afficher le mot de passe"));
         showPasswordBtn.setPadding(new Insets(0, 15, 0, 0));
 
-        // Champ texte pour afficher le mot de passe en clair
         TextField visiblePasswordField = new TextField();
         visiblePasswordField.setPromptText("••••••••");
         visiblePasswordField.setPrefHeight(45);
         visiblePasswordField.setVisible(false);
         styleTextField(visiblePasswordField);
 
-        // Synchroniser les champs de mot de passe
         passwordField.textProperty().bindBidirectional(visiblePasswordField.textProperty());
 
         showPasswordBtn.setOnAction(e -> {
@@ -200,7 +182,6 @@ public class LoginView extends Application {
 
         passwordBox.getChildren().addAll(passwordLabel, passwordContainer);
 
-        // Options row
         HBox optionsRow = new HBox();
         optionsRow.setAlignment(Pos.CENTER_LEFT);
         optionsRow.setSpacing(10);
@@ -217,14 +198,12 @@ public class LoginView extends Application {
         HBox.setHgrow(forgotPasswordLink, Priority.ALWAYS);
         optionsRow.getChildren().addAll(rememberMeCheck, forgotPasswordLink);
 
-        // Error label
         errorLabel = new Label();
         errorLabel.setFont(Font.font("Arial", 12));
         errorLabel.setTextFill(Color.RED);
         errorLabel.setWrapText(true);
         errorLabel.setVisible(false);
 
-        // Login button
         loginButton = new Button("SE CONNECTER");
         loginButton.setPrefHeight(50);
         loginButton.setPrefWidth(350);
@@ -233,7 +212,6 @@ public class LoginView extends Application {
                 "-fx-cursor: hand;");
         loginButton.setOnAction(e -> handleLogin());
 
-        // Hover effect pour le bouton
         loginButton.setOnMouseEntered(e -> {
             loginButton.setStyle("-fx-background-color: #388E3C; -fx-text-fill: white; " +
                     "-fx-font-weight: bold; -fx-font-size: 16px; -fx-background-radius: 10; " +
@@ -246,12 +224,10 @@ public class LoginView extends Application {
                     "-fx-cursor: hand;");
         });
 
-        // Add enter key support
         emailField.setOnAction(e -> passwordField.requestFocus());
         passwordField.setOnAction(e -> handleLogin());
         visiblePasswordField.setOnAction(e -> handleLogin());
 
-        // Divider
         HBox divider = new HBox();
         divider.setPrefHeight(20);
 
@@ -275,7 +251,6 @@ public class LoginView extends Application {
 
         orContainer.getChildren().addAll(line1, orLabel, line2);
 
-        // Social login options (simplifié)
         VBox socialLoginBox = new VBox(10);
         socialLoginBox.setAlignment(Pos.CENTER);
 
@@ -286,7 +261,6 @@ public class LoginView extends Application {
         HBox socialButtons = new HBox(15);
         socialButtons.setAlignment(Pos.CENTER);
 
-        // Créer des boutons sociaux simplifiés
         Button googleButton = createSocialButton("G", "#DB4437");
         Button facebookButton = createSocialButton("f", "#4267B2");
         Button twitterButton = createSocialButton("𝕏", "#1DA1F2");
@@ -294,7 +268,6 @@ public class LoginView extends Application {
         socialButtons.getChildren().addAll(googleButton, facebookButton, twitterButton);
         socialLoginBox.getChildren().addAll(socialLabel, socialButtons);
 
-        // Register section
         VBox registerSection = new VBox(10);
         registerSection.setAlignment(Pos.CENTER);
 
@@ -302,7 +275,6 @@ public class LoginView extends Application {
         noAccountLabel.setFont(Font.font("Arial", 12));
         noAccountLabel.setTextFill(Color.web("#666"));
 
-        // Utiliser une méthode simple pour créer le bouton d'inscription
         Button registerButton = new Button("S'INSCRIRE");
         registerButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #4CAF50; " +
                 "-fx-font-weight: bold; -fx-border-color: #4CAF50; -fx-border-radius: 8; " +
@@ -323,7 +295,6 @@ public class LoginView extends Application {
 
         registerSection.getChildren().addAll(noAccountLabel, registerButton);
 
-        // Assemble form
         formFields.getChildren().addAll(
                 emailBox, passwordBox, optionsRow, errorLabel, loginButton
         );
@@ -390,7 +361,6 @@ public class LoginView extends Application {
         String email = emailField.getText().trim();
         String password = passwordField.getText().trim();
 
-        // Validation
         if (email.isEmpty() || password.isEmpty()) {
             showError("Veuillez remplir tous les champs");
             return;
@@ -401,14 +371,12 @@ public class LoginView extends Application {
             return;
         }
 
-        // Désactiver le bouton pendant la vérification
         loginButton.setDisable(true);
         loginButton.setText("Connexion en cours...");
 
-        // Simuler un délai réseau (pour l'UI)
         new Thread(() -> {
             try {
-                Thread.sleep(800); // Simulation de délai réseau
+                Thread.sleep(800);
 
                 javafx.application.Platform.runLater(() -> {
                     User user = authService.login(email, password);
@@ -416,12 +384,10 @@ public class LoginView extends Application {
                     if (user != null) {
                         System.out.println("✅ Connexion réussie pour: " + user.getEmail());
 
-                        // Sauvegarder les identifiants si "Se souvenir de moi" est coché
                         if (rememberMeCheck.isSelected()) {
                             saveCredentials(email, password);
                         }
 
-                        // Ouvrir le dashboard approprié
                         openDashboard(user);
                     } else {
                         showError("Email ou mot de passe incorrect");
@@ -441,7 +407,6 @@ public class LoginView extends Application {
     }
 
     private boolean isValidEmail(String email) {
-        // Validation simple d'email
         return email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
     }
 
@@ -449,7 +414,6 @@ public class LoginView extends Application {
         errorLabel.setText(message);
         errorLabel.setVisible(true);
 
-        // Auto-hide error after 5 seconds
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
@@ -463,12 +427,9 @@ public class LoginView extends Application {
     }
 
     private void saveCredentials(String email, String password) {
-        // Note: En production, utilisez un stockage sécurisé
-        // Pour la démo, on utilise simplement les préférences
         try {
             java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(LoginView.class);
             prefs.put("remembered_email", email);
-            // Attention: Ne jamais stocker les mots de passe en clair en production!
             prefs.put("remembered_password", password);
         } catch (Exception e) {
             System.out.println("⚠️ Impossible de sauvegarder les identifiants");
@@ -492,10 +453,8 @@ public class LoginView extends Application {
     }
 
     private void openDashboard(User user) {
-        // Fermer la fenêtre de login
         primaryStage.close();
 
-        // Ouvrir la fenêtre de dashboard
         Stage dashboardStage = new Stage();
 
         try {
@@ -508,22 +467,25 @@ public class LoginView extends Application {
                     break;
 
                 case "organisateur":
-                    // OrganizerDashboard organizerDashboard = new OrganizerDashboard(user);
-                    // organizerDashboard.start(dashboardStage);
-                    showAlert("Dashboard Organisateur", "Le dashboard organisateur n'est pas encore implémenté.");
-                    new LoginView().start(new Stage());
+                    try {
+                        // Mise à jour pour appeler ton OrganizerDashboard avec l'utilisateur connecté
+                        OrganizerDashboard organizerDashboard = new OrganizerDashboard(user);
+                        organizerDashboard.start(dashboardStage);
+                    } catch (Exception e) {
+                        System.err.println("❌ Erreur lors de l'ouverture du dashboard organisateur: " + e.getMessage());
+                        e.printStackTrace();
+                        showAlert("Erreur", "Impossible d'ouvrir le dashboard organisateur");
+                        new LoginView().start(new Stage());
+                    }
                     break;
 
                 case "participant":
-                    // UserDashboard userDashboard = new UserDashboard(user);
-                    // userDashboard.start(dashboardStage);
                     showAlert("Dashboard Participant", "Le dashboard participant n'est pas encore implémenté.");
                     new LoginView().start(new Stage());
                     break;
 
                 default:
                     showAlert("Erreur", "Rôle non reconnu: " + role);
-                    // Revenir au login
                     new LoginView().start(new Stage());
             }
         } catch (Exception e) {
@@ -535,13 +497,11 @@ public class LoginView extends Application {
     }
 
     private void openForgotPassword() {
-        // Cette méthode peut être implémentée plus tard
         showAlert("Mot de passe oublié",
                 "Veuillez contacter l'administrateur pour réinitialiser votre mot de passe.");
     }
 
     private void openRegister() {
-        // Créer une fenêtre d'inscription simplifiée directement
         Stage registerStage = new Stage();
         registerStage.setTitle("LOOPI - Inscription");
 
@@ -550,7 +510,6 @@ public class LoginView extends Application {
         root.setAlignment(Pos.CENTER);
         root.setStyle("-fx-background-color: linear-gradient(to bottom right, #2E7D32, #4CAF50);");
 
-        // Card
         VBox card = new VBox(20);
         card.setAlignment(Pos.CENTER);
         card.setPadding(new Insets(30));
