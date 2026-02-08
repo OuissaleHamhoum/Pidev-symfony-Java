@@ -3,6 +3,7 @@ package edu.Loopi.view;
 import edu.Loopi.entities.User;
 import edu.Loopi.services.AuthService;
 import edu.Loopi.tools.MyConnection;
+import edu.Loopi.view.AdminDashboard.AdminDashboard;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -507,13 +508,17 @@ public class LoginView extends Application {
                     break;
 
                 case "organisateur":
-                    OrganizerDashboard organizerDashboard = new OrganizerDashboard(user);
-                    organizerDashboard.start(dashboardStage);
+                    // OrganizerDashboard organizerDashboard = new OrganizerDashboard(user);
+                    // organizerDashboard.start(dashboardStage);
+                    showAlert("Dashboard Organisateur", "Le dashboard organisateur n'est pas encore implémenté.");
+                    new LoginView().start(new Stage());
                     break;
 
                 case "participant":
-                    UserDashboard userDashboard = new UserDashboard(user);
-                    userDashboard.start(dashboardStage);
+                    // UserDashboard userDashboard = new UserDashboard(user);
+                    // userDashboard.start(dashboardStage);
+                    showAlert("Dashboard Participant", "Le dashboard participant n'est pas encore implémenté.");
+                    new LoginView().start(new Stage());
                     break;
 
                 default:
@@ -530,8 +535,9 @@ public class LoginView extends Application {
     }
 
     private void openForgotPassword() {
-        ForgotPasswordView forgotView = new ForgotPasswordView();
-        forgotView.start(primaryStage);
+        // Cette méthode peut être implémentée plus tard
+        showAlert("Mot de passe oublié",
+                "Veuillez contacter l'administrateur pour réinitialiser votre mot de passe.");
     }
 
     private void openRegister() {
