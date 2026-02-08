@@ -15,6 +15,7 @@ import javafx.stage.Stage;
 
 public class OrganizerDashboard {
     private User currentUser;
+    private BorderPane root; // Added as a field to allow content swapping
 
     public OrganizerDashboard(User user) {
         this.currentUser = user;
@@ -24,7 +25,7 @@ public class OrganizerDashboard {
     public void start(Stage stage) {
         stage.setTitle("LOOPI - Espace Organisateur");
 
-        BorderPane root = new BorderPane();
+        root = new BorderPane();
         root.setStyle("-fx-background-color: #f5f5f5;");
 
         // Header
@@ -88,8 +89,12 @@ public class OrganizerDashboard {
         Button addEventBtn = createMenuButton("➕ Créer événement");
         addEventBtn.setOnAction(e -> createEvent());
 
+        // UPDATED: Now swaps the center content to the CollectionView
         Button donationsBtn = createMenuButton("💰 Campagnes");
-        donationsBtn.setOnAction(e -> showDonationCampaigns());
+        donationsBtn.setOnAction(e -> {
+            CollectionView collectionView = new CollectionView(currentUser);
+            root.setCenter(collectionView.getView());
+        });
 
         Button statsBtn = createMenuButton("📊 Statistiques");
         statsBtn.setOnAction(e -> showStatistics());
@@ -205,33 +210,12 @@ public class OrganizerDashboard {
         return btn;
     }
 
-    private void showMyProducts() {
-        showAlert("Info", "Mes produits - En développement");
-    }
-
-    private void addProduct() {
-        showAlert("Info", "Ajouter produit - En développement");
-    }
-
-    private void showMyEvents() {
-        showAlert("Info", "Mes événements - En développement");
-    }
-
-    private void createEvent() {
-        showAlert("Info", "Créer événement - En développement");
-    }
-
-    private void showDonationCampaigns() {
-        showAlert("Info", "Campagnes de dons - En développement");
-    }
-
-    private void showStatistics() {
-        showAlert("Info", "Statistiques - En développement");
-    }
-
-    private void showProfile() {
-        showAlert("Info", "Mon profil - En développement");
-    }
+    private void showMyProducts() { showAlert("Info", "Mes produits - En développement"); }
+    private void addProduct() { showAlert("Info", "Ajouter produit - En développement"); }
+    private void showMyEvents() { showAlert("Info", "Mes événements - En développement"); }
+    private void createEvent() { showAlert("Info", "Créer événement - En développement"); }
+    private void showStatistics() { showAlert("Info", "Statistiques - En développement"); }
+    private void showProfile() { showAlert("Info", "Mon profil - En développement"); }
 
     private void logout(Stage stage) {
         SessionManager.logout();

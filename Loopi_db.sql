@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `collection` (
   `id_collection` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
   `material_type` varchar(255) NOT NULL,
+    `image_collection` varchar(255) NOT NULL,
   `goal_amount` double NOT NULL,
   `current_amount` double DEFAULT '0',
   `unit` varchar(50) NOT NULL,
