@@ -1428,7 +1428,7 @@ public class AdminDashboard {
         TableColumn<User, Integer> idCol = new TableColumn<>("ID");
         idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
         idCol.setPrefWidth(70);
-        idCol.setStyle("-fx-alignment: CENTER;");
+        idCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: #000000;");
         idCol.setSortable(true);
 
         // Colonne Avatar
@@ -1480,11 +1480,13 @@ public class AdminDashboard {
             return new javafx.beans.property.SimpleStringProperty(fullName);
         });
         nameCol.setPrefWidth(200);
+        nameCol.setStyle("-fx-text-fill: #000000;");
 
         // Colonne Email
         TableColumn<User, String> emailCol = new TableColumn<>("Email");
         emailCol.setCellValueFactory(new PropertyValueFactory<>("email"));
         emailCol.setPrefWidth(250);
+        emailCol.setStyle("-fx-text-fill: #000000;");
 
         // Colonne Rôle
         TableColumn<User, String> roleCol = new TableColumn<>("Role");
@@ -1532,7 +1534,7 @@ public class AdminDashboard {
             return new javafx.beans.property.SimpleStringProperty(gender);
         });
         genderCol.setPrefWidth(100);
-        genderCol.setStyle("-fx-alignment: CENTER;");
+        genderCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: #000000;");
 
         // Colonne Date d'inscription
         TableColumn<User, String> dateCol = new TableColumn<>("Registration Date");
@@ -1545,7 +1547,7 @@ public class AdminDashboard {
             return new javafx.beans.property.SimpleStringProperty("");
         });
         dateCol.setPrefWidth(150);
-        dateCol.setStyle("-fx-alignment: CENTER;");
+        dateCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: #000000;");
 
         // Colonne Statut
         TableColumn<User, String> statusCol = new TableColumn<>("Status");
@@ -2063,6 +2065,21 @@ public class AdminDashboard {
         }
         styleFormComboBox(genreCombo);
 
+        // Champ pour télécharger une nouvelle photo
+        HBox photoBox = new HBox(10);
+        photoBox.setAlignment(Pos.CENTER_LEFT);
+
+        Button changePhotoBtn = new Button("📷 Change Photo");
+        changePhotoBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 6; -fx-cursor: hand;");
+        changePhotoBtn.setOnAction(e -> changeUserProfilePicture(user, dialogStage));
+
+        Label photoInfo = new Label("Current: " + (user.getPhoto() != null ? user.getPhoto() : "default.jpg"));
+        photoInfo.setFont(Font.font("Arial", 11));
+        photoInfo.setTextFill(Color.web("#64748b"));
+
+        photoBox.getChildren().addAll(changePhotoBtn, photoInfo);
+
         formGrid.add(new Label("Last Name *:"), 0, 0);
         formGrid.add(nomField, 1, 0);
         formGrid.add(new Label("First Name *:"), 0, 1);
@@ -2075,6 +2092,8 @@ public class AdminDashboard {
         formGrid.add(roleCombo, 1, 4);
         formGrid.add(new Label("Gender:"), 0, 5);
         formGrid.add(genreCombo, 1, 5);
+        formGrid.add(new Label("Profile Photo:"), 0, 6);
+        formGrid.add(photoBox, 1, 6);
 
         // Error label
         Label errorLabel = new Label();
@@ -2106,9 +2125,52 @@ public class AdminDashboard {
         buttonBox.getChildren().addAll(cancelBtn, saveBtn);
         mainLayout.getChildren().addAll(header, formGrid, errorLabel, buttonBox);
 
-        Scene scene = new Scene(mainLayout, 500, 550);
+        Scene scene = new Scene(mainLayout, 550, 600);
         dialogStage.setScene(scene);
         dialogStage.showAndWait();
+    }
+
+    private void changeUserProfilePicture(User user, Stage parentStage) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Choose Profile Picture");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"),
+                new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+
+        File selectedFile = fileChooser.showOpenDialog(parentStage);
+        if (selectedFile != null) {
+            try {
+                // Créer un dossier pour les photos de profil si nécessaire
+                File profileDir = new File("profiles");
+                if (!profileDir.exists()) {
+                    profileDir.mkdir();
+                }
+
+                // Générer un nom de fichier unique
+                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+                String fileExtension = getFileExtension(selectedFile.getName());
+                String newFileName = "profile_" + user.getId() + "_" + timestamp + fileExtension;
+                Path destPath = new File("profiles/" + newFileName).toPath();
+
+                // Copier le fichier
+                Files.copy(selectedFile.toPath(), destPath, StandardCopyOption.REPLACE_EXISTING);
+
+                // Mettre à jour le chemin de la photo dans l'utilisateur
+                user.setPhoto(destPath.toString());
+
+                // Mettre à jour dans la base de données
+                if (userService.updateUser(user)) {
+                    showAlert("Success", "Profile picture updated successfully!");
+                } else {
+                    showAlert("Error", "Error updating profile picture");
+                }
+
+            } catch (Exception e) {
+                showAlert("Error", "Error loading image: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
     }
 
     private boolean validateAndUpdateUser(User user, TextField nomField, TextField prenomField,
@@ -2204,13 +2266,13 @@ public class AdminDashboard {
     // ============ MÉTHODES UTILITAIRES ============
     private void styleFormTextField(TextField field) {
         field.setStyle("-fx-background-color: white; -fx-border-color: #e2e8f0; " +
-                "-fx-border-radius: 8; -fx-padding: 10 14; -fx-font-size: 14px;");
+                "-fx-border-radius: 8; -fx-padding: 10 14; -fx-font-size: 14px; -fx-text-fill: #000000;");
         field.setPrefWidth(300);
     }
 
     private void styleFormTextField(PasswordField field) {
         field.setStyle("-fx-background-color: white; -fx-border-color: #e2e8f0; " +
-                "-fx-border-radius: 8; -fx-padding: 10 14; -fx-font-size: 14px;");
+                "-fx-border-radius: 8; -fx-padding: 10 14; -fx-font-size: 14px; -fx-text-fill: #000000;");
         field.setPrefWidth(300);
     }
 
