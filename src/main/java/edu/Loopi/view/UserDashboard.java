@@ -13,6 +13,11 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
+// Ensure these views exist in your package
+import edu.Loopi.view.ProductGalleryView;
+import edu.Loopi.view.ParticipantCampaignView;
+import edu.Loopi.view.DonationHistoryView;
+
 public class UserDashboard {
     private User currentUser;
     private BorderPane root;
@@ -67,11 +72,12 @@ public class UserDashboard {
         // MENU BUTTONS
         sidebar.getChildren().addAll(
                 createMenuButton("🏠 Accueil", e -> root.setCenter(createMainContent())),
-                createMenuButton("🛒 Boutique", e -> showAlert("Boutique", "Bientôt...")),
+                // UPDATED: Navigation to ProductGalleryView
+                createMenuButton("🖼️ Galerie", e -> root.setCenter(new ProductGalleryView().getView())),
                 createMenuButton("📋 Mes commandes", e -> showAlert("Commandes", "Bientôt...")),
                 createMenuButton("📅 Événements", e -> showAlert("Événements", "Bientôt...")),
                 createMenuButton("🌿 Les Campagnes", e -> root.setCenter(new ParticipantCampaignView(currentUser).getView())),
-                createMenuButton("💰 Mes Dons", e -> root.setCenter(new DonationHistoryView(currentUser).getView())), // CHANGED BUTTON
+                createMenuButton("💰 Mes Dons", e -> root.setCenter(new DonationHistoryView(currentUser).getView())),
                 createMenuButton("👤 Mon profil", e -> showAlert("Profil", "Bientôt..."))
         );
 
@@ -81,7 +87,7 @@ public class UserDashboard {
         Button logoutBtn = new Button("🚪 Déconnexion");
         logoutBtn.setPrefWidth(240);
         logoutBtn.setPrefHeight(50);
-        logoutBtn.setStyle("-fx-background-color: #dc2626; -fx-text-fill: white; -fx-alignment: center-left; -fx-padding: 0 20;");
+        logoutBtn.setStyle("-fx-background-color: #dc2626; -fx-text-fill: white; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
         logoutBtn.setOnAction(e -> logout(stage));
 
         sidebar.getChildren().addAll(spacer, logoutBtn);
@@ -90,10 +96,13 @@ public class UserDashboard {
 
     private Button createMenuButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> event) {
         Button btn = new Button(text);
-        btn.setPrefWidth(240); btn.setPrefHeight(50);
+        btn.setPrefWidth(240);
+        btn.setPrefHeight(50);
         btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ecfdf5; -fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
+
         btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: #065f46; -fx-text-fill: white; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;"));
         btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ecfdf5; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;"));
+
         btn.setOnAction(event);
         return btn;
     }
@@ -105,10 +114,13 @@ public class UserDashboard {
 
         Label l = new Label("Espace Eco-Citoyen");
         l.setFont(Font.font("System", FontWeight.BOLD, 24));
-        content.getChildren().add(l);
+
+        Label sub = new Label("Utilisez le menu à gauche pour naviguer dans la galerie ou vos campagnes.");
+        sub.setTextFill(Color.GRAY);
+
+        content.getChildren().addAll(l, sub);
         return content;
     }
-
 
     private void logout(Stage stage) {
         SessionManager.logout();
@@ -118,6 +130,9 @@ public class UserDashboard {
 
     private void showAlert(String title, String msg) {
         javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
-        a.setTitle(title); a.setHeaderText(null); a.setContentText(msg); a.showAndWait();
+        a.setTitle(title);
+        a.setHeaderText(null);
+        a.setContentText(msg);
+        a.showAndWait();
     }
 }

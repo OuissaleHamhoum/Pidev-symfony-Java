@@ -15,11 +15,11 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import javafx.scene.Parent;
 
 public class ProductGalleryView {
     private ProduitService ps = new ProduitService();
 
-    // Synchronized with your GalerieView categories
     private final Map<Integer, String> categoryNames = new HashMap<>() {{
         put(1, "Objets décoratifs");
         put(2, "Art mural");
@@ -27,29 +27,31 @@ public class ProductGalleryView {
         put(4, "Installations artistiques");
     }};
 
-    public void show() {
-        Stage stage = new Stage();
-        stage.setTitle("LOOPI - Boutique Participant");
-
-        BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #f4f7f6;");
+    /**
+     * This method is called by UserDashboard to display the gallery
+     * inside the main window's center area.
+     */
+    public Parent getView() {
+        BorderPane layout = new BorderPane();
+        layout.setStyle("-fx-background-color: #f4f7f6;");
 
         // --- Header ---
         VBox header = new VBox(10);
         header.setPadding(new Insets(25));
         header.setAlignment(Pos.CENTER);
-        header.setStyle("-fx-background-color: #27ae60;"); // Green brand color
+        header.setStyle("-fx-background-color: #27ae60;");
 
         Label title = new Label("DÉCOUVREZ NOS TRÉSORS");
         title.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: white;");
         header.getChildren().add(title);
-        root.setTop(header);
+        layout.setTop(header);
 
-        // --- Gallery ---
+        // --- Gallery Grid ---
         FlowPane flowPane = new FlowPane(25, 25);
         flowPane.setPadding(new Insets(30));
         flowPane.setAlignment(Pos.TOP_CENTER);
 
+        // Fetch products - ensure ps.getAll() or ps.getAllProduits() is correct
         for (Produit p : ps.getAll()) {
             flowPane.getChildren().add(createEnhancedCard(p));
         }
@@ -57,9 +59,18 @@ public class ProductGalleryView {
         ScrollPane scroll = new ScrollPane(flowPane);
         scroll.setFitToWidth(true);
         scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
-        root.setCenter(scroll);
+        layout.setCenter(scroll);
 
-        Scene scene = new Scene(root, 1200, 800);
+        return layout;
+    }
+
+    /**
+     * Keeps the original functionality to open in a standalone window if needed.
+     */
+    public void show() {
+        Stage stage = new Stage();
+        stage.setTitle("LOOPI - Boutique Participant");
+        Scene scene = new Scene((Region)getView(), 1200, 800);
         stage.setScene(scene);
         stage.setMaximized(true);
         stage.show();
@@ -72,7 +83,6 @@ public class ProductGalleryView {
         card.setStyle("-fx-background-color: white; -fx-padding: 0; -fx-background-radius: 15; " +
                 "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 5); -fx-cursor: hand;");
 
-        // --- Image Area ---
         StackPane imgContainer = new StackPane();
         imgContainer.setPrefSize(260, 180);
 
@@ -80,7 +90,6 @@ public class ProductGalleryView {
         iv.setFitWidth(260);
         iv.setFitHeight(180);
 
-        // Rounded corners for the image top
         Rectangle clip = new Rectangle(260, 180);
         clip.setArcWidth(30); clip.setArcHeight(30);
         iv.setClip(clip);
@@ -99,11 +108,11 @@ public class ProductGalleryView {
         }
         imgContainer.getChildren().add(iv);
 
-        // --- Info Area ---
         VBox info = new VBox(5);
         info.setPadding(new Insets(12));
         info.setAlignment(Pos.CENTER_LEFT);
 
+        // Note: Using p.getNom() to match your entity
         Label name = new Label(p.getNom().toUpperCase());
         name.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #2c3e50;");
 
@@ -119,11 +128,10 @@ public class ProductGalleryView {
         info.getChildren().addAll(name, category, desc);
         card.getChildren().addAll(imgContainer, info);
 
-        // Hover Effect
         card.setOnMouseEntered(e -> card.setStyle(card.getStyle() + "-fx-scale-x: 1.03; -fx-scale-y: 1.03;"));
         card.setOnMouseExited(e -> card.setStyle(card.getStyle().replace("-fx-scale-x: 1.03; -fx-scale-y: 1.03;", "")));
 
-        // Click to open Detail View
+        // This triggers your feedback popup
         card.setOnMouseClicked(e -> new ProductDetailView(p).show());
 
         return card;
