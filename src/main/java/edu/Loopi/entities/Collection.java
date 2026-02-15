@@ -9,6 +9,7 @@ public class Collection {
     private double current_amount;
     private String unit;
     private String status;
+    private String userName;
     private String image_collection;
     private int id_user;
     private Timestamp created_at; // Added field
@@ -29,6 +30,8 @@ public class Collection {
     }
 
     // Getters and Setters
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
     public int getId_collection() { return id_collection; }
     public void setId_collection(int id_collection) { this.id_collection = id_collection; }
     public String getTitle() { return title; }

@@ -2,10 +2,10 @@
 -- version 4.1.14
 -- http://www.phpmyadmin.net
 --
--- Host: 127.0.0.1
--- Generation Time: Feb 08, 2026 at 03:20 PM
--- Server version: 5.6.17
--- PHP Version: 5.5.12
+-- Client :  127.0.0.1
+-- Généré le :  Mer 11 Février 2026 à 13:08
+-- Version du serveur :  5.6.17
+-- Version de PHP :  5.5.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
@@ -17,45 +17,43 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8 */;
 
 --
--- Database: `loopi_db`
+-- Base de données :  `loopi_db`
 --
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `category_produit`
+-- Structure de la table `category_produit`
 --
 
 CREATE TABLE IF NOT EXISTS `category_produit` (
   `id_cat` int(11) NOT NULL AUTO_INCREMENT,
   `nom_cat` varchar(100) NOT NULL,
-  `description` text,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_cat`),
   UNIQUE KEY `nom_cat` (`nom_cat`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=5 ;
 
 --
--- Dumping data for table `category_produit`
+-- Contenu de la table `category_produit`
 --
 
-INSERT INTO `category_produit` (`id_cat`, `nom_cat`, `description`, `created_at`) VALUES
-(1, 'Mobilier recyclé', 'Meubles fabriqués à partir de matériaux recyclés', '2026-02-08 13:08:00'),
-(2, 'Décorations écologiques', 'Objets décoratifs respectueux de l''environnement', '2026-02-08 13:08:00'),
-(3, 'Accessoires durables', 'Accessoires mode et utilitaires écologiques', '2026-02-08 13:08:00'),
-(4, 'Jouets éducatifs', 'Jouets fabriqués à partir de matériaux recyclés', '2026-02-08 13:08:00');
+INSERT INTO `category_produit` (`id_cat`, `nom_cat`) VALUES
+(2, 'Art mural '),
+(4, 'Installations artistiques'),
+(3, 'Mobilier artistique'),
+(1, 'Objets décoratifs');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `collection`
+-- Structure de la table `collection`
 --
 
 CREATE TABLE IF NOT EXISTS `collection` (
   `id_collection` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
   `material_type` varchar(255) NOT NULL,
-    `image_collection` varchar(255) NOT NULL,
+  `image_collection` varchar(255) NOT NULL,
   `goal_amount` double NOT NULL,
   `current_amount` double DEFAULT '0',
   `unit` varchar(50) NOT NULL,
@@ -70,7 +68,7 @@ CREATE TABLE IF NOT EXISTS `collection` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `commande`
+-- Structure de la table `commande`
 --
 
 CREATE TABLE IF NOT EXISTS `commande` (
@@ -85,7 +83,7 @@ CREATE TABLE IF NOT EXISTS `commande` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=3 ;
 
 --
--- Dumping data for table `commande`
+-- Contenu de la table `commande`
 --
 
 INSERT INTO `commande` (`id_feedback`, `id_user`, `note`, `commentaire`, `date_commentaire`) VALUES
@@ -95,7 +93,7 @@ INSERT INTO `commande` (`id_feedback`, `id_user`, `note`, `commentaire`, `date_c
 -- --------------------------------------------------------
 
 --
--- Table structure for table `content`
+-- Structure de la table `content`
 --
 
 CREATE TABLE IF NOT EXISTS `content` (
@@ -110,7 +108,7 @@ CREATE TABLE IF NOT EXISTS `content` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=4 ;
 
 --
--- Dumping data for table `content`
+-- Contenu de la table `content`
 --
 
 INSERT INTO `content` (`id_content`, `id_commande`, `id_produit`, `quantite`, `prix_unitaire`) VALUES
@@ -121,7 +119,7 @@ INSERT INTO `content` (`id_content`, `id_commande`, `id_produit`, `quantite`, `p
 -- --------------------------------------------------------
 
 --
--- Table structure for table `coupon`
+-- Structure de la table `coupon`
 --
 
 CREATE TABLE IF NOT EXISTS `coupon` (
@@ -144,7 +142,7 @@ CREATE TABLE IF NOT EXISTS `coupon` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=3 ;
 
 --
--- Dumping data for table `coupon`
+-- Contenu de la table `coupon`
 --
 
 INSERT INTO `coupon` (`id_coupon`, `code`, `discount_percent`, `donation_date`, `used`, `id_user`, `id_donation`, `expiration_date`, `min_amount`, `created_at`) VALUES
@@ -154,7 +152,7 @@ INSERT INTO `coupon` (`id_coupon`, `code`, `discount_percent`, `donation_date`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donation`
+-- Structure de la table `donation`
 --
 
 CREATE TABLE IF NOT EXISTS `donation` (
@@ -172,7 +170,7 @@ CREATE TABLE IF NOT EXISTS `donation` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `evenement`
+-- Structure de la table `evenement`
 --
 
 CREATE TABLE IF NOT EXISTS `evenement` (
@@ -190,7 +188,7 @@ CREATE TABLE IF NOT EXISTS `evenement` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=3 ;
 
 --
--- Dumping data for table `evenement`
+-- Contenu de la table `evenement`
 --
 
 INSERT INTO `evenement` (`id_evenement`, `titre`, `description`, `date_evenement`, `lieu`, `id_organisateur`, `capacite_max`, `image_evenement`, `created_at`) VALUES
@@ -200,7 +198,7 @@ INSERT INTO `evenement` (`id_evenement`, `titre`, `description`, `date_evenement
 -- --------------------------------------------------------
 
 --
--- Table structure for table `genre`
+-- Structure de la table `genre`
 --
 
 CREATE TABLE IF NOT EXISTS `genre` (
@@ -211,7 +209,7 @@ CREATE TABLE IF NOT EXISTS `genre` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=4 ;
 
 --
--- Dumping data for table `genre`
+-- Contenu de la table `genre`
 --
 
 INSERT INTO `genre` (`id_genre`, `sexe`) VALUES
@@ -222,7 +220,7 @@ INSERT INTO `genre` (`id_genre`, `sexe`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `participation`
+-- Structure de la table `participation`
 --
 
 CREATE TABLE IF NOT EXISTS `participation` (
@@ -239,7 +237,7 @@ CREATE TABLE IF NOT EXISTS `participation` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=4 ;
 
 --
--- Dumping data for table `participation`
+-- Contenu de la table `participation`
 --
 
 INSERT INTO `participation` (`id`, `id_user`, `id_evenement`, `contact`, `age`, `date_inscription`, `statut`) VALUES
@@ -250,39 +248,40 @@ INSERT INTO `participation` (`id`, `id_user`, `id_evenement`, `contact`, `age`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `produit`
+-- Structure de la table `produit`
 --
 
 CREATE TABLE IF NOT EXISTS `produit` (
   `id_produit` int(11) NOT NULL AUTO_INCREMENT,
   `nom_produit` varchar(200) NOT NULL,
   `description` text,
-  `prix` decimal(10,2) NOT NULL,
   `image_produit` varchar(255) DEFAULT NULL,
   `id_cat` int(11) NOT NULL,
   `id_user` int(11) DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT '1',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_produit`),
   KEY `id_user` (`id_user`),
   KEY `idx_categorie` (`id_cat`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=5 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=11 ;
 
 --
--- Dumping data for table `produit`
+-- Contenu de la table `produit`
 --
 
-INSERT INTO `produit` (`id_produit`, `nom_produit`, `description`, `prix`, `image_produit`, `id_cat`, `id_user`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'Table basse en palette', 'Table basse design en palettes recyclées', '120.50', 'table.jpg', 1, 2, 1, '2026-02-08 13:08:00', '2026-02-08 13:08:00'),
-(2, 'Lampes en bouteilles', 'Lampes créatives en bouteilles recyclées', '45.99', 'lampe.jpg', 2, 2, 1, '2026-02-08 13:08:00', '2026-02-08 13:08:00'),
-(3, 'Sac en pneus recyclés', 'Sac à main en pneus recyclés', '65.00', 'sac.jpg', 3, 2, 1, '2026-02-08 13:08:00', '2026-02-08 13:08:00'),
-(4, 'Jouets en bois', 'Jouets éducatifs en bois recyclé', '22.99', 'jouet.jpg', 4, 2, 1, '2026-02-08 13:08:00', '2026-02-08 13:08:00');
+INSERT INTO `produit` (`id_produit`, `nom_produit`, `description`, `image_produit`, `id_cat`, `id_user`, `created_at`, `updated_at`) VALUES
+(1, 'chaise artisanale', 'Cette photographie met en avant une série de chaises artisanales au design unique et audacieux. La structure principale est constituée d''un cadre en métal noir minimaliste, mais c''est le revêtement qui attire immédiatement l''œil :', 'C:\\Users\\MSI\\Pictures\\image_de_produit_loopi\\chaise artisanale.png', 3, 2, '2026-02-08 13:08:00', '2026-02-10 14:39:25'),
+(2, 'glass artwork', 'Much of the glass we throw out is not recycled. To reuse your old glass, all you need is access to a kiln and some glass bottles.', 'C:\\Users\\MSI\\Pictures\\image_de_produit_loopi\\glass artwork.png', 4, 2, '2026-02-08 13:08:00', '2026-02-10 14:40:15'),
+(3, 'Mushrooms Sculpture', 'Hand Crafted Copper Mushrooms Sculpture Wood Base Recycled Art Unique', 'C:\\Users\\MSI\\Pictures\\image_de_produit_loopi\\Hand Crafted Copper Mushrooms.png', 1, 2, '2026-02-08 13:08:00', '2026-02-10 14:47:25'),
+(5, '3D Mosaic', 'These 3D Wood, Metal, and Stone Mosaics have been Daniel Potampa''s tribute to natural beauty and a way to responsibly use these rare and precious materials. No artificial dyes or stains have been used, each piece remains it''s natural color.', 'C:\\Users\\MSI\\Pictures\\image_de_produit_loopi\\3D Mosaic.png', 2, 2, '2026-02-08 17:46:58', '2026-02-10 16:03:27'),
+(8, 'Tin Fish', 'Look at the intricate detail of this tin fish. Each scale is made from recycled metal and carefully placed to replicate natural patterns.', 'C:\\Users\\MSI\\Pictures\\image_de_produit_loopi\\Tin Fish.png', 1, 2, '2026-02-08 20:18:19', '2026-02-10 14:43:10'),
+(9, 'side table', 'Metal end or side table made with a twist of art can be used for steampunk, industrial or artsy flair, a great conversation item will definitely be one of a kind. This one has been sold tell me what you are wanting or let me design one for you.', 'C:\\Users\\MSI\\Pictures\\image_de_produit_loopi\\side table.jpg', 3, 2, '2026-02-10 00:14:42', '2026-02-10 14:44:28'),
+(10, 'org THENI', 'theni organizateur yhabat', 'C:\\Users\\MSI\\Pictures\\Screenshots\\Capture d''écran 2026-01-21 141734.png', 4, 6, '2026-02-10 00:19:25', '2026-02-10 00:19:25');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `users`
+-- Structure de la table `users`
 --
 
 CREATE TABLE IF NOT EXISTS `users` (
@@ -304,7 +303,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=7 ;
 
 --
--- Dumping data for table `users`
+-- Contenu de la table `users`
 --
 
 INSERT INTO `users` (`id`, `nom`, `prenom`, `email`, `password`, `photo`, `role`, `id_genre`, `created_at`, `updated_at`) VALUES
@@ -313,12 +312,12 @@ INSERT INTO `users` (`id`, `nom`, `prenom`, `email`, `password`, `photo`, `role`
 (3, 'Participant', 'Test', 'participant@loopi.tn', 'part123', 'default.jpg', 'participant', 2, '2026-02-08 13:08:00', '2026-02-08 13:08:00'),
 (4, 'Ben', 'Ali', 'ben.ali@email.com', 'ben123', 'default.jpg', 'participant', 1, '2026-02-08 13:08:00', '2026-02-08 13:08:00'),
 (5, 'Dupont', 'Marie', 'marie.dupont@email.com', 'marie123', 'default.jpg', 'participant', 2, '2026-02-08 13:08:00', '2026-02-08 13:08:00'),
-(6, 'Martin', 'Pierre', 'pierre@email.com', 'pierre123', 'default.jpg', 'participant', 1, '2026-02-08 13:08:00', '2026-02-08 13:08:00');
+(6, 'Martin', 'Pierre', 'pierre@email.com', 'pierre123', 'default.jpg', 'organisateur', 1, '2026-02-08 13:08:00', '2026-02-10 00:16:58');
 
 -- --------------------------------------------------------
 
 --
--- Stand-in structure for view `v_users_passwords`
+-- Doublure de structure pour la vue `v_users_passwords`
 --
 CREATE TABLE IF NOT EXISTS `v_users_passwords` (
 `id` int(11)
@@ -333,74 +332,34 @@ CREATE TABLE IF NOT EXISTS `v_users_passwords` (
 -- --------------------------------------------------------
 
 --
--- Structure for view `v_users_passwords`
+-- Structure de la vue `v_users_passwords`
 --
 DROP TABLE IF EXISTS `v_users_passwords`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_users_passwords` AS select `users`.`id` AS `id`,`users`.`nom` AS `nom`,`users`.`prenom` AS `prenom`,`users`.`email` AS `email`,`users`.`password` AS `password`,`users`.`role` AS `role`,`users`.`photo` AS `photo`,`users`.`created_at` AS `created_at` from `users`;
 
 --
--- Constraints for dumped tables
+-- Contraintes pour les tables exportées
 --
 
 --
--- Constraints for table `collection`
+-- Contraintes pour la table `collection`
 --
 ALTER TABLE `collection`
   ADD CONSTRAINT `collection_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `commande`
+-- Contraintes pour la table `commande`
 --
 ALTER TABLE `commande`
   ADD CONSTRAINT `commande_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `content`
+-- Contraintes pour la table `content`
 --
 ALTER TABLE `content`
   ADD CONSTRAINT `content_ibfk_1` FOREIGN KEY (`id_commande`) REFERENCES `commande` (`id_feedback`) ON DELETE CASCADE,
   ADD CONSTRAINT `content_ibfk_2` FOREIGN KEY (`id_produit`) REFERENCES `produit` (`id_produit`) ON DELETE CASCADE;
-
---
--- Constraints for table `coupon`
---
-ALTER TABLE `coupon`
-  ADD CONSTRAINT `coupon_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `coupon_ibfk_2` FOREIGN KEY (`id_donation`) REFERENCES `donation` (`id_donation`) ON DELETE SET NULL;
-
---
--- Constraints for table `donation`
---
-ALTER TABLE `donation`
-  ADD CONSTRAINT `fk_donation_user` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_donation_collection` FOREIGN KEY (`id_collection`) REFERENCES `collection` (`id_collection`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Constraints for table `evenement`
---
-ALTER TABLE `evenement`
-  ADD CONSTRAINT `evenement_ibfk_1` FOREIGN KEY (`id_organisateur`) REFERENCES `users` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `participation`
---
-ALTER TABLE `participation`
-  ADD CONSTRAINT `participation_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `participation_ibfk_2` FOREIGN KEY (`id_evenement`) REFERENCES `evenement` (`id_evenement`) ON DELETE CASCADE;
-
---
--- Constraints for table `produit`
---
-ALTER TABLE `produit`
-  ADD CONSTRAINT `produit_ibfk_1` FOREIGN KEY (`id_cat`) REFERENCES `category_produit` (`id_cat`) ON DELETE CASCADE,
-  ADD CONSTRAINT `produit_ibfk_2` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE SET NULL;
-
---
--- Constraints for table `users`
---
-ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`id_genre`) REFERENCES `genre` (`id_genre`) ON DELETE SET NULL;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

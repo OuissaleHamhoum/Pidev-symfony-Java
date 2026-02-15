@@ -9,6 +9,29 @@ import java.util.List;
 public class ProduitService {
     private Connection cnx = MyConnection.getInstance().getConnection();
 
+    // --- ADD THIS METHOD ---
+    public List<Produit> getAll() {
+        List<Produit> list = new ArrayList<>();
+        String query = "SELECT * FROM produit";
+        try (Statement st = cnx.createStatement();
+             ResultSet rs = st.executeQuery(query)) {
+            while (rs.next()) {
+                list.add(new Produit(
+                        rs.getInt("id_produit"),
+                        rs.getString("nom_produit"),
+                        rs.getString("description"),
+                        rs.getString("image_produit"),
+                        rs.getInt("id_cat"),
+                        rs.getInt("id_user")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur getAll: " + e.getMessage());
+        }
+        return list;
+    }
+
+    // Your existing methods...
     public void ajouterProduit(Produit p) {
         String query = "INSERT INTO produit (nom_produit, description, image_produit, id_cat, id_user) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement pst = cnx.prepareStatement(query)) {
