@@ -1,12 +1,12 @@
 package edu.Loopi.view;
 
 import edu.Loopi.entities.User;
+import edu.Loopi.services.ParticipationService;
 import edu.Loopi.tools.SessionManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -15,36 +15,82 @@ import javafx.stage.Stage;
 
 public class UserDashboard {
     private User currentUser;
+    private BorderPane root;
+    private ParticipationService participationService;
+    private EventViewParticipant eventView;
 
     public UserDashboard(User user) {
         this.currentUser = user;
+        this.participationService = new ParticipationService();
         SessionManager.login(user);
     }
 
     public void start(Stage stage) {
-        stage.setTitle("LOOPI - Espace Participant");
+        try {
+            stage.setTitle("LOOPI - Espace Participant");
 
-        BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #f5f5f5;");
+            root = new BorderPane();
+            root.setStyle("-fx-background-color: #f5f5f5;");
 
-        // Header
-        HBox header = createHeader();
-        root.setTop(header);
+            HBox header = createHeader();
+            root.setTop(header);
 
-        // Menu latéral
-        VBox sidebar = createSidebar(stage);
-        root.setLeft(sidebar);
+            VBox sidebar = createSidebar(stage);
+            root.setLeft(sidebar);
 
-        // Contenu principal
-        VBox content = createMainContent();
-        root.setCenter(content);
+            showEvents();
 
-        Scene scene = new Scene(root, 1200, 700);
-        stage.setScene(scene);
-        stage.setMaximized(true);
+            Scene scene = new Scene(root, 1300, 800);
+            stage.setScene(scene);
+            stage.setMaximized(true);
+            stage.show();
+
+            SessionManager.printSessionInfo();
+            System.out.println("✅ Dashboard participant affiché avec succès");
+
+        } catch (Exception e) {
+            System.err.println("❌ ERREUR: " + e.getMessage());
+            e.printStackTrace();
+            showFallbackUI(stage);
+        }
+    }
+
+    private void showFallbackUI(Stage stage) {
+        BorderPane fallbackRoot = new BorderPane();
+        fallbackRoot.setStyle("-fx-background-color: #f5f5f5;");
+
+        VBox fallbackContent = new VBox(20);
+        fallbackContent.setAlignment(Pos.CENTER);
+        fallbackContent.setPadding(new Insets(40));
+
+        Label errorTitle = new Label("⚠️ Erreur d'affichage");
+        errorTitle.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        errorTitle.setTextFill(Color.RED);
+
+        Label errorMsg = new Label("L'interface n'a pas pu être chargée correctement.\n" +
+                "Cause: Veuillez vérifier les fichiers de vue.");
+        errorMsg.setFont(Font.font("Arial", 14));
+        errorMsg.setTextFill(Color.web("#666"));
+        errorMsg.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        errorMsg.setWrapText(true);
+
+        Button retryBtn = new Button("🔄 Réessayer");
+        retryBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;");
+        retryBtn.setOnAction(ev -> {
+            try {
+                start(stage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        fallbackContent.getChildren().addAll(errorTitle, errorMsg, retryBtn);
+        fallbackRoot.setCenter(fallbackContent);
+
+        Scene fallbackScene = new Scene(fallbackRoot, 1200, 700);
+        stage.setScene(fallbackScene);
         stage.show();
-
-        SessionManager.printSessionInfo();
     }
 
     private HBox createHeader() {
@@ -56,40 +102,96 @@ public class UserDashboard {
         title.setFont(Font.font("Arial", FontWeight.BOLD, 24));
         title.setTextFill(Color.WHITE);
 
-        HBox userBox = new HBox(10);
-        userBox.setAlignment(Pos.CENTER_RIGHT);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Label welcome = new Label("Bienvenue, " + currentUser.getPrenom());
+        VBox userInfo = new VBox(2);
+        userInfo.setAlignment(Pos.CENTER_RIGHT);
+
+        Label welcome = new Label(currentUser.getNomComplet());
         welcome.setTextFill(Color.WHITE);
         welcome.setFont(Font.font("Arial", FontWeight.BOLD, 14));
 
-        userBox.getChildren().add(welcome);
-        HBox.setHgrow(userBox, Priority.ALWAYS);
+        Label role = new Label(currentUser.getRole().toUpperCase());
+        role.setTextFill(Color.web("#e0e0e0"));
+        role.setFont(Font.font("Arial", 11));
 
-        header.getChildren().addAll(title, userBox);
+        userInfo.getChildren().addAll(welcome, role);
+
+        header.getChildren().addAll(title, spacer, userInfo);
         return header;
     }
 
     private VBox createSidebar(Stage stage) {
         VBox sidebar = new VBox(5);
-        sidebar.setStyle("-fx-background-color: #333;");
-        sidebar.setPrefWidth(220);
+        sidebar.setStyle("-fx-background-color: #2c3e50;");
+        sidebar.setPrefWidth(250);
         sidebar.setPadding(new Insets(20, 0, 0, 0));
 
-        Button browseBtn = createMenuButton("🛒 Boutique");
-        browseBtn.setOnAction(e -> showProducts());
+        HBox profileBox = new HBox(15);
+        profileBox.setPadding(new Insets(0, 15, 20, 15));
+        profileBox.setAlignment(Pos.CENTER_LEFT);
+        profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0;");
 
-        Button ordersBtn = createMenuButton("📋 Mes commandes");
-        ordersBtn.setOnAction(e -> showOrders());
+        Label avatar = new Label("👤");
+        avatar.setFont(Font.font("Arial", 32));
+        avatar.setTextFill(Color.WHITE);
 
-        Button eventsBtn = createMenuButton("📅 Événements");
+        VBox profileInfo = new VBox(2);
+        Label profileName = new Label(currentUser.getPrenom());
+        profileName.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        profileName.setTextFill(Color.WHITE);
+
+        Label profileEmail = new Label(currentUser.getEmail());
+        profileEmail.setFont(Font.font("Arial", 11));
+        profileEmail.setTextFill(Color.web("#bdc3c7"));
+
+        profileInfo.getChildren().addAll(profileName, profileEmail);
+        profileBox.getChildren().addAll(avatar, profileInfo);
+
+        VBox menuItems = new VBox(5);
+        menuItems.setPadding(new Insets(10, 10, 10, 10));
+
+        Label eventsSection = new Label("  ÉVÉNEMENTS");
+        eventsSection.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        eventsSection.setTextFill(Color.web("#bdc3c7"));
+        eventsSection.setPadding(new Insets(10, 0, 5, 10));
+
+        Button eventsBtn = createMenuButton("📅 Tous les événements");
         eventsBtn.setOnAction(e -> showEvents());
 
-        Button donationsBtn = createMenuButton("💰 Mes dons");
-        donationsBtn.setOnAction(e -> showDonations());
+        Button myParticipationsBtn = createMenuButton("👥 Mes participations");
+        myParticipationsBtn.setOnAction(e -> showMyParticipations());
 
-        Button couponsBtn = createMenuButton("🎫 Mes coupons");
-        couponsBtn.setOnAction(e -> showCoupons());
+        Label shopSection = new Label("  BOUTIQUE");
+        shopSection.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        shopSection.setTextFill(Color.web("#bdc3c7"));
+        shopSection.setPadding(new Insets(20, 0, 5, 10));
+
+        Button browseBtn = createMenuButton("🛒 Explorer");
+        browseBtn.setOnAction(e -> showProducts());
+
+        Button ordersBtn = createMenuButton("📦 Mes commandes");
+        ordersBtn.setOnAction(e -> showOrders());
+
+        Label donationsSection = new Label("  COLLECTES");
+        donationsSection.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        donationsSection.setTextFill(Color.web("#bdc3c7"));
+        donationsSection.setPadding(new Insets(20, 0, 5, 10));
+
+        Button campaignsBtn = createMenuButton("💰 Campagnes");
+        campaignsBtn.setOnAction(e -> showCampaigns());
+
+        Button myDonationsBtn = createMenuButton("❤️ Mes dons");
+        myDonationsBtn.setOnAction(e -> showDonations());
+
+        Button myCouponsBtn = createMenuButton("🎫 Mes coupons");
+        myCouponsBtn.setOnAction(e -> showCoupons());
+
+        Label profileSection = new Label("  PROFIL");
+        profileSection.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        profileSection.setTextFill(Color.web("#bdc3c7"));
+        profileSection.setPadding(new Insets(20, 0, 5, 10));
 
         Button profileBtn = createMenuButton("👤 Mon profil");
         profileBtn.setOnAction(e -> showProfile());
@@ -101,146 +203,140 @@ public class UserDashboard {
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
         Button logoutBtn = createMenuButton("🚪 Déconnexion");
-        logoutBtn.setStyle("-fx-background-color: #d32f2f;");
+        logoutBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; " +
+                "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
         logoutBtn.setOnAction(e -> logout(stage));
 
-        sidebar.getChildren().addAll(browseBtn, ordersBtn, eventsBtn, donationsBtn,
-                couponsBtn, profileBtn, settingsBtn, spacer, logoutBtn);
+        menuItems.getChildren().addAll(
+                eventsSection, eventsBtn, myParticipationsBtn,
+                shopSection, browseBtn, ordersBtn,
+                donationsSection, campaignsBtn, myDonationsBtn, myCouponsBtn,
+                profileSection, profileBtn, settingsBtn
+        );
+
+        sidebar.getChildren().addAll(profileBox, menuItems, spacer, logoutBtn);
         return sidebar;
     }
 
     private Button createMenuButton(String text) {
         Button btn = new Button(text);
-        btn.setPrefWidth(220);
-        btn.setPrefHeight(50);
+        btn.setPrefWidth(250);
+        btn.setPrefHeight(45);
         btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20;");
-        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: #444; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20;"));
-        btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20;"));
+                "-fx-font-size: 13px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
+
+        btn.setOnMouseEntered(e ->
+                btn.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; " +
+                        "-fx-font-size: 13px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;"));
+
+        btn.setOnMouseExited(e ->
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
+                        "-fx-font-size: 13px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;"));
+
         return btn;
     }
 
-    private VBox createMainContent() {
-        VBox content = new VBox(30);
-        content.setPadding(new Insets(40));
-        content.setAlignment(Pos.CENTER);
+    // ============ MÉTHODES DE NAVIGATION ============
 
-        Label welcome = new Label("Bienvenue dans votre espace Participant!");
-        welcome.setFont(Font.font("Arial", FontWeight.BOLD, 28));
-        welcome.setTextFill(Color.web("#4CAF50"));
-
-        Label subtitle = new Label("Découvrez les produits recyclés, participez à des événements écologiques\n" +
-                "et contribuez à l'économie circulaire");
-        subtitle.setFont(Font.font("Arial", 16));
-        subtitle.setTextFill(Color.web("#666"));
-        subtitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-
-        // Cartes de statistiques
-        HBox statsBox = new HBox(20);
-        statsBox.setAlignment(Pos.CENTER);
-
-        VBox ordersCard = createInfoCard("📦", "Mes commandes", "0 commandes");
-        VBox eventsCard = createInfoCard("📅", "Événements", "0 participations");
-        VBox donationsCard = createInfoCard("💰", "Mes dons", "0.00 DT donnés");
-        VBox couponsCard = createInfoCard("🎫", "Coupons", "0 coupons actifs");
-
-        statsBox.getChildren().addAll(ordersCard, eventsCard, donationsCard, couponsCard);
-
-        // Actions rapides
-        VBox quickActions = new VBox(10);
-        quickActions.setAlignment(Pos.CENTER);
-
-        Label actionsTitle = new Label("Que souhaitez-vous faire ?");
-        actionsTitle.setFont(Font.font("Arial", FontWeight.BOLD, 18));
-        actionsTitle.setTextFill(Color.web("#333"));
-
-        HBox actionsBox = new HBox(15);
-        actionsBox.setAlignment(Pos.CENTER);
-
-        Button browseBtn = createQuickActionButton("🛒 Explorer la boutique");
-        Button eventsBtn = createQuickActionButton("📅 Voir les événements");
-        Button donateBtn = createQuickActionButton("❤️ Faire un don");
-
-        actionsBox.getChildren().addAll(browseBtn, eventsBtn, donateBtn);
-        quickActions.getChildren().addAll(actionsTitle, actionsBox);
-
-        content.getChildren().addAll(welcome, subtitle, statsBox, quickActions);
-        return content;
+    private void showEvents() {
+        try {
+            if (eventView == null) {
+                eventView = new EventViewParticipant(currentUser);
+            }
+            root.setCenter(eventView.getView());
+            System.out.println("✅ EventViewParticipant chargée");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement EventViewParticipant: " + e.getMessage());
+            e.printStackTrace();
+            showComingSoon("Événements", "📅");
+        }
     }
 
-    private VBox createInfoCard(String icon, String title, String value) {
-        VBox card = new VBox(10);
-        card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(20));
-        card.setStyle("-fx-background-color: white; -fx-background-radius: 10; " +
-                "-fx-border-color: #e0e0e0; -fx-border-radius: 10; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
-        card.setPrefSize(200, 150);
-
-        Label iconLabel = new Label(icon);
-        iconLabel.setFont(Font.font("Arial", 36));
-
-        Label titleLabel = new Label(title);
-        titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        titleLabel.setTextFill(Color.web("#333"));
-
-        Label valueLabel = new Label(value);
-        valueLabel.setFont(Font.font("Arial", 14));
-        valueLabel.setTextFill(Color.web("#666"));
-
-        card.getChildren().addAll(iconLabel, titleLabel, valueLabel);
-        return card;
-    }
-
-    private Button createQuickActionButton(String text) {
-        Button btn = new Button(text);
-        btn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;");
-        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: #388E3C; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;"));
-        btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;"));
-        return btn;
+    private void showMyParticipations() {
+        try {
+            if (eventView != null) {
+                eventView.showMyParticipations();
+            } else {
+                eventView = new EventViewParticipant(currentUser);
+                eventView.showMyParticipations();
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Erreur affichage participations: " + e.getMessage());
+            e.printStackTrace();
+            showComingSoon("Mes participations", "👥");
+        }
     }
 
     private void showProducts() {
-        showAlert("Info", "Boutique - En développement");
+        showComingSoon("Boutique", "🛒");
     }
 
     private void showOrders() {
-        showAlert("Info", "Mes commandes - En développement");
+        showComingSoon("Mes commandes", "📦");
     }
 
-    private void showEvents() {
-        showAlert("Info", "Événements - En développement");
+    private void showCampaigns() {
+        showComingSoon("Campagnes", "💰");
     }
 
     private void showDonations() {
-        showAlert("Info", "Mes dons - En développement");
+        showComingSoon("Mes dons", "❤️");
     }
 
     private void showCoupons() {
-        showAlert("Info", "Mes coupons - En développement");
+        showComingSoon("Mes coupons", "🎫");
     }
 
     private void showProfile() {
-        showAlert("Info", "Mon profil - En développement");
+        showComingSoon("Mon profil", "👤");
     }
 
     private void showSettings() {
-        showAlert("Info", "Paramètres - En développement");
+        showComingSoon("Paramètres", "⚙️");
+    }
+
+    private void showComingSoon(String title, String icon) {
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(40));
+        content.setAlignment(Pos.CENTER);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
+
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 48));
+
+        Label titleLabel = new Label(title);
+        titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        titleLabel.setTextFill(Color.web("#2c3e50"));
+
+        Label comingSoon = new Label("Module en cours de développement...");
+        comingSoon.setFont(Font.font("Arial", 14));
+        comingSoon.setTextFill(Color.web("#7f8c8d"));
+
+        VBox wrapper = new VBox(20);
+        wrapper.setAlignment(Pos.CENTER);
+        wrapper.setMaxWidth(600);
+        wrapper.getChildren().addAll(iconLabel, titleLabel, comingSoon);
+
+        content.getChildren().add(wrapper);
+        root.setCenter(content);
     }
 
     private void logout(Stage stage) {
         SessionManager.logout();
         stage.close();
-        new LoginView().start(new Stage());
+        try {
+            LoginView loginView = new LoginView();
+            Stage loginStage = new Stage();
+            loginView.start(loginStage);
+        } catch (Exception e) {
+            System.err.println("❌ Erreur retour login: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void showAlert(String title, String message) {
-        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);

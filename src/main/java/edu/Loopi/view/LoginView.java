@@ -29,10 +29,14 @@ public class LoginView extends Application {
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
 
+        // Test de connexion à la base de données
         if (!MyConnection.testConnection()) {
             showAlert("Erreur de connexion",
                     "Impossible de se connecter à la base de données.\n" +
-                            "Vérifiez que MySQL est en cours d'exécution.");
+                            "Vérifiez que MySQL est en cours d'exécution.\n\n" +
+                            "URL: jdbc:mysql://localhost:3306/loopi_db\n" +
+                            "User: root\n" +
+                            "Password: (vide)");
             System.exit(1);
         }
 
@@ -54,17 +58,13 @@ public class LoginView extends Application {
         root.setBottom(footerBox);
 
         Scene scene = new Scene(root, 900, 700);
-
-        try {
-            scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
-        } catch (Exception e) {
-            System.out.println("CSS non trouvé, utilisation des styles inline");
-        }
-
         primaryStage.setScene(scene);
         primaryStage.show();
 
+        // Charger les identifiants sauvegardés
         checkRememberedCredentials();
+
+        System.out.println("✅ LoginView démarré avec succès");
     }
 
     private HBox createHeader() {
@@ -114,6 +114,7 @@ public class LoginView extends Application {
 
         VBox formFields = new VBox(15);
 
+        // Champ Email
         VBox emailBox = new VBox(5);
         Label emailLabel = new Label("Adresse Email");
         emailLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
@@ -137,6 +138,7 @@ public class LoginView extends Application {
 
         emailBox.getChildren().addAll(emailLabel, emailContainer);
 
+        // Champ Mot de passe
         VBox passwordBox = new VBox(5);
         Label passwordLabel = new Label("Mot de passe");
         passwordLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
@@ -167,6 +169,7 @@ public class LoginView extends Application {
         visiblePasswordField.setVisible(false);
         styleTextField(visiblePasswordField);
 
+        // Lier les deux champs de mot de passe
         passwordField.textProperty().bindBidirectional(visiblePasswordField.textProperty());
 
         showPasswordBtn.setOnAction(e -> {
@@ -174,6 +177,13 @@ public class LoginView extends Application {
             visiblePasswordField.setVisible(show);
             passwordField.setVisible(!show);
             showPasswordBtn.setText(show ? "👁‍🗨" : "👁");
+
+            // Transférer le focus
+            if (show) {
+                visiblePasswordField.requestFocus();
+            } else {
+                passwordField.requestFocus();
+            }
         });
 
         passwordContainer.getChildren().addAll(passwordIcon, passwordField, visiblePasswordField, showPasswordBtn);
@@ -182,6 +192,7 @@ public class LoginView extends Application {
 
         passwordBox.getChildren().addAll(passwordLabel, passwordContainer);
 
+        // Options (Se souvenir de moi + Mot de passe oublié)
         HBox optionsRow = new HBox();
         optionsRow.setAlignment(Pos.CENTER_LEFT);
         optionsRow.setSpacing(10);
@@ -192,18 +203,23 @@ public class LoginView extends Application {
 
         Hyperlink forgotPasswordLink = new Hyperlink("Mot de passe oublié ?");
         forgotPasswordLink.setFont(Font.font("Arial", 12));
-        forgotPasswordLink.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
+        forgotPasswordLink.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold; -fx-underline: true;");
         forgotPasswordLink.setOnAction(e -> openForgotPassword());
 
-        HBox.setHgrow(forgotPasswordLink, Priority.ALWAYS);
-        optionsRow.getChildren().addAll(rememberMeCheck, forgotPasswordLink);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        optionsRow.getChildren().addAll(rememberMeCheck, spacer, forgotPasswordLink);
 
+        // Label d'erreur
         errorLabel = new Label();
         errorLabel.setFont(Font.font("Arial", 12));
         errorLabel.setTextFill(Color.RED);
         errorLabel.setWrapText(true);
         errorLabel.setVisible(false);
+        errorLabel.setAlignment(Pos.CENTER);
+        errorLabel.setMaxWidth(350);
 
+        // Bouton de connexion
         loginButton = new Button("SE CONNECTER");
         loginButton.setPrefHeight(50);
         loginButton.setPrefWidth(350);
@@ -224,10 +240,12 @@ public class LoginView extends Application {
                     "-fx-cursor: hand;");
         });
 
+        // Actions des touches Entrée
         emailField.setOnAction(e -> passwordField.requestFocus());
         passwordField.setOnAction(e -> handleLogin());
         visiblePasswordField.setOnAction(e -> handleLogin());
 
+        // Séparateur "OU"
         HBox divider = new HBox();
         divider.setPrefHeight(20);
 
@@ -251,6 +269,7 @@ public class LoginView extends Application {
 
         orContainer.getChildren().addAll(line1, orLabel, line2);
 
+        // Connexion sociale
         VBox socialLoginBox = new VBox(10);
         socialLoginBox.setAlignment(Pos.CENTER);
 
@@ -268,6 +287,7 @@ public class LoginView extends Application {
         socialButtons.getChildren().addAll(googleButton, facebookButton, twitterButton);
         socialLoginBox.getChildren().addAll(socialLabel, socialButtons);
 
+        // Section inscription
         VBox registerSection = new VBox(10);
         registerSection.setAlignment(Pos.CENTER);
 
@@ -295,13 +315,23 @@ public class LoginView extends Application {
 
         registerSection.getChildren().addAll(noAccountLabel, registerButton);
 
+        // Assemblage du formulaire
         formFields.getChildren().addAll(
-                emailBox, passwordBox, optionsRow, errorLabel, loginButton
+                emailBox,
+                passwordBox,
+                optionsRow,
+                errorLabel,
+                loginButton
         );
 
         card.getChildren().addAll(
-                titleLabel, subtitleLabel, formFields,
-                orContainer, socialLoginBox, divider, registerSection
+                titleLabel,
+                subtitleLabel,
+                formFields,
+                orContainer,
+                socialLoginBox,
+                divider,
+                registerSection
         );
 
         formContainer.getChildren().add(card);
@@ -313,26 +343,30 @@ public class LoginView extends Application {
         button.setPrefSize(45, 45);
         button.setStyle(String.format(
                 "-fx-background-color: %s; -fx-text-fill: white; -fx-font-weight: bold; " +
-                        "-fx-background-radius: 50%%; -fx-font-size: 16px; -fx-cursor: hand;",
+                        "-fx-background-radius: 50%%; -fx-font-size: 18px; -fx-cursor: hand;",
                 color
         ));
 
         button.setOnMouseEntered(e -> button.setStyle(String.format(
                 "-fx-background-color: %s; -fx-text-fill: white; -fx-font-weight: bold; " +
-                        "-fx-background-radius: 50%%; -fx-font-size: 16px; -fx-cursor: hand; " +
+                        "-fx-background-radius: 50%%; -fx-font-size: 18px; -fx-cursor: hand; " +
                         "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 5, 0, 0, 2);",
                 color
         )));
 
         button.setOnMouseExited(e -> button.setStyle(String.format(
                 "-fx-background-color: %s; -fx-text-fill: white; -fx-font-weight: bold; " +
-                        "-fx-background-radius: 50%%; -fx-font-size: 16px; -fx-cursor: hand;",
+                        "-fx-background-radius: 50%%; -fx-font-size: 18px; -fx-cursor: hand;",
                 color
         )));
 
         button.setOnAction(e -> {
             showAlert("Connexion sociale",
-                    "La connexion avec les réseaux sociaux sera disponible prochainement.");
+                    "La connexion avec les réseaux sociaux sera disponible prochainement.\n\n" +
+                            "Pour le moment, utilisez les comptes de test:\n" +
+                            "• Admin: admin@loopi.tn / admin123\n" +
+                            "• Organisateur: organisateur@loopi.tn / org123\n" +
+                            "• Participant: participant@loopi.tn / part123");
         });
 
         return button;
@@ -353,7 +387,7 @@ public class LoginView extends Application {
 
     private void styleTextField(TextField field) {
         field.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
-                "-fx-font-size: 14px; -fx-padding: 0 10;");
+                "-fx-font-size: 14px; -fx-padding: 0 10; -fx-text-fill: #333;");
         field.setPrefWidth(300);
     }
 
@@ -361,6 +395,7 @@ public class LoginView extends Application {
         String email = emailField.getText().trim();
         String password = passwordField.getText().trim();
 
+        // Validation
         if (email.isEmpty() || password.isEmpty()) {
             showError("Veuillez remplir tous les champs");
             return;
@@ -371,49 +406,72 @@ public class LoginView extends Application {
             return;
         }
 
+        // Désactiver le bouton pendant la connexion
         loginButton.setDisable(true);
         loginButton.setText("Connexion en cours...");
 
+        // Simuler un délai de chargement (optionnel)
         new Thread(() -> {
             try {
-                Thread.sleep(800);
+                Thread.sleep(500);
 
                 javafx.application.Platform.runLater(() -> {
-                    User user = authService.login(email, password);
+                    try {
+                        User user = authService.login(email, password);
 
-                    if (user != null) {
-                        System.out.println("✅ Connexion réussie pour: " + user.getEmail());
+                        if (user != null) {
+                            System.out.println("✅ Connexion réussie pour: " + user.getEmail());
+                            System.out.println("   Rôle: " + user.getRole());
+                            System.out.println("   ID: " + user.getId());
 
-                        if (rememberMeCheck.isSelected()) {
-                            saveCredentials(email, password);
+                            // Sauvegarder les identifiants si "Se souvenir de moi" est coché
+                            if (rememberMeCheck.isSelected()) {
+                                saveCredentials(email, password);
+                            } else {
+                                clearSavedCredentials();
+                            }
+
+                            // Ouvrir le dashboard approprié
+                            openDashboard(user);
+
+                        } else {
+                            showError("Email ou mot de passe incorrect");
+                            resetLoginButton();
                         }
-
-                        openDashboard(user);
-                    } else {
-                        showError("Email ou mot de passe incorrect");
-                        loginButton.setDisable(false);
-                        loginButton.setText("SE CONNECTER");
+                    } catch (Exception ex) {
+                        System.err.println("❌ Erreur lors de la connexion: " + ex.getMessage());
+                        ex.printStackTrace();
+                        showError("Erreur de connexion: " + ex.getMessage());
+                        resetLoginButton();
                     }
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 javafx.application.Platform.runLater(() -> {
                     showError("Erreur lors de la connexion");
-                    loginButton.setDisable(false);
-                    loginButton.setText("SE CONNECTER");
+                    resetLoginButton();
                 });
             }
         }).start();
     }
 
+    private void resetLoginButton() {
+        loginButton.setDisable(false);
+        loginButton.setText("SE CONNECTER");
+    }
+
     private boolean isValidEmail(String email) {
-        return email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
+        return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     }
 
     private void showError(String message) {
         errorLabel.setText(message);
         errorLabel.setVisible(true);
 
+        // Animation pour attirer l'attention
+        errorLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+
+        // Masquer automatiquement après 5 secondes
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
@@ -431,8 +489,20 @@ public class LoginView extends Application {
             java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(LoginView.class);
             prefs.put("remembered_email", email);
             prefs.put("remembered_password", password);
+            System.out.println("💾 Identifiants sauvegardés");
         } catch (Exception e) {
-            System.out.println("⚠️ Impossible de sauvegarder les identifiants");
+            System.err.println("⚠️ Impossible de sauvegarder les identifiants: " + e.getMessage());
+        }
+    }
+
+    private void clearSavedCredentials() {
+        try {
+            java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(LoginView.class);
+            prefs.remove("remembered_email");
+            prefs.remove("remembered_password");
+            System.out.println("🗑️ Identifiants effacés");
+        } catch (Exception e) {
+            System.err.println("⚠️ Impossible d'effacer les identifiants: " + e.getMessage());
         }
     }
 
@@ -446,9 +516,10 @@ public class LoginView extends Application {
                 emailField.setText(savedEmail);
                 passwordField.setText(savedPassword);
                 rememberMeCheck.setSelected(true);
+                System.out.println("🔑 Identifiants sauvegardés chargés pour: " + savedEmail);
             }
         } catch (Exception e) {
-            System.out.println("⚠️ Impossible de charger les identifiants sauvegardés");
+            System.err.println("⚠️ Impossible de charger les identifiants sauvegardés: " + e.getMessage());
         }
     }
 
@@ -462,43 +533,101 @@ public class LoginView extends Application {
 
             switch (role) {
                 case "admin":
-                    AdminDashboard adminDashboard = new AdminDashboard(user);
-                    adminDashboard.start(dashboardStage);
+                    try {
+                        // Vérifier que la classe AdminDashboard existe
+                        Class.forName("edu.Loopi.view.AdminDashboard.AdminDashboard");
+                        AdminDashboard adminDashboard = new AdminDashboard(user);
+                        adminDashboard.start(dashboardStage);
+                        System.out.println("✅ Dashboard Admin ouvert");
+                    } catch (ClassNotFoundException e) {
+                        System.err.println("❌ Classe AdminDashboard non trouvée!");
+                        showAlert("Erreur", "Le module administrateur n'est pas installé correctement.");
+                        returnToLogin();
+                    }
                     break;
 
                 case "organisateur":
                     try {
-                        // Mise à jour pour appeler ton OrganizerDashboard avec l'utilisateur connecté
+                        // Vérifier que la classe OrganizerDashboard existe
+                        Class.forName("edu.Loopi.view.OrganizerDashboard");
                         OrganizerDashboard organizerDashboard = new OrganizerDashboard(user);
                         organizerDashboard.start(dashboardStage);
+                        System.out.println("✅ Dashboard Organisateur ouvert");
+                    } catch (ClassNotFoundException e) {
+                        System.err.println("❌ Classe OrganizerDashboard non trouvée!");
+                        System.err.println("   Assurez-vous que le fichier OrganizerDashboard.java existe dans edu.Loopi.view");
+
+                        // Solution de secours: essayer avec le nom alternatif
+                        try {
+                            Class.forName("edu.Loopi.view.OrganizerDashboard");
+                            // Si on arrive ici, c'est que la classe existe
+                            OrganizerDashboard organizerDashboard = new OrganizerDashboard(user);
+                            organizerDashboard.start(dashboardStage);
+                        } catch (ClassNotFoundException ex2) {
+                            showAlert("Erreur",
+                                    "Le module organisateur n'est pas installé correctement.\n\n" +
+                                            "Veuillez créer la classe OrganizerDashboard.java dans le package edu.Loopi.view\n" +
+                                            "ou contacter le développeur.");
+                            returnToLogin();
+                        } catch (Exception ex2) {
+                            showAlert("Erreur", "Erreur lors de l'ouverture du dashboard: " + ex2.getMessage());
+                            returnToLogin();
+                        }
                     } catch (Exception e) {
-                        System.err.println("❌ Erreur lors de l'ouverture du dashboard organisateur: " + e.getMessage());
+                        System.err.println("❌ Erreur lors de l'ouverture du dashboard organisateur:");
                         e.printStackTrace();
-                        showAlert("Erreur", "Impossible d'ouvrir le dashboard organisateur");
-                        new LoginView().start(new Stage());
+                        showAlert("Erreur", "Impossible d'ouvrir le dashboard organisateur:\n" + e.getMessage());
+                        returnToLogin();
                     }
                     break;
 
+                // Dans la méthode openDashboard(User user), remplacer le bloc case "participant":
+
                 case "participant":
-                    showAlert("Dashboard Participant", "Le dashboard participant n'est pas encore implémenté.");
-                    new LoginView().start(new Stage());
+                    try {
+                        Class.forName("edu.Loopi.view.UserDashboard");
+                        UserDashboard userDashboard = new UserDashboard(user);
+                        userDashboard.start(dashboardStage);
+                        System.out.println("✅ Dashboard Participant ouvert avec gestion des événements");
+                    } catch (ClassNotFoundException e) {
+                        System.err.println("❌ Classe UserDashboard non trouvée!");
+                        showAlert("Erreur", "Le module participant n'est pas installé correctement.");
+                        returnToLogin();
+                    }
                     break;
 
                 default:
                     showAlert("Erreur", "Rôle non reconnu: " + role);
-                    new LoginView().start(new Stage());
+                    returnToLogin();
             }
         } catch (Exception e) {
-            System.err.println("❌ Erreur lors de l'ouverture du dashboard: " + e.getMessage());
+            System.err.println("❌ Erreur générale lors de l'ouverture du dashboard:");
             e.printStackTrace();
-            showAlert("Erreur", "Impossible d'ouvrir le dashboard");
+            showAlert("Erreur", "Impossible d'ouvrir le dashboard:\n" + e.getMessage());
+            returnToLogin();
+        }
+    }
+
+    private void returnToLogin() {
+        try {
             new LoginView().start(new Stage());
+        } catch (Exception e) {
+            System.err.println("❌ Erreur lors du retour à la page de connexion: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
     private void openForgotPassword() {
-        showAlert("Mot de passe oublié",
-                "Veuillez contacter l'administrateur pour réinitialiser votre mot de passe.");
+        try {
+            Class.forName("edu.Loopi.view.ForgotPasswordView");
+            ForgotPasswordView forgotView = new ForgotPasswordView();
+            forgotView.start(primaryStage);
+        } catch (ClassNotFoundException e) {
+            showAlert("Mot de passe oublié",
+                    "Fonctionnalité en cours de développement.\n\n" +
+                            "Pour réinitialiser votre mot de passe, veuillez contacter l'administrateur:\n" +
+                            "admin@loopi.tn");
+        }
     }
 
     private void openRegister() {
@@ -513,35 +642,53 @@ public class LoginView extends Application {
         VBox card = new VBox(20);
         card.setAlignment(Pos.CENTER);
         card.setPadding(new Insets(30));
-        card.setStyle("-fx-background-color: white; -fx-background-radius: 15;");
-        card.setMaxWidth(400);
+        card.setStyle("-fx-background-color: white; -fx-background-radius: 15; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 25, 0, 0, 5);");
+        card.setMaxWidth(450);
 
         Label title = new Label("Inscription");
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
         title.setTextFill(Color.web("#2E7D32"));
 
-        Label message = new Label("L'inscription complète sera disponible bientôt.\n\n" +
-                "Pour le moment, vous pouvez utiliser ces comptes de test:\n\n" +
-                "👑 Admin: admin@loopi.tn / admin123\n" +
-                "🎯 Organisateur: organisateur@loopi.tn / org123\n" +
-                "😊 Participant: participant@loopi.tn / part123");
+        Label message = new Label(
+                "L'inscription complète sera disponible prochainement.\n\n" +
+                        "📋 Pour le moment, vous pouvez utiliser ces comptes de test:\n\n" +
+                        "👑 ADMIN\n" +
+                        "   Email: admin@loopi.tn\n" +
+                        "   Mot de passe: admin123\n\n" +
+                        "🎯 ORGANISATEUR\n" +
+                        "   Email: organisateur@loopi.tn\n" +
+                        "   Mot de passe: org123\n\n" +
+                        "😊 PARTICIPANT\n" +
+                        "   Email: participant@loopi.tn\n" +
+                        "   Mot de passe: part123"
+        );
         message.setFont(Font.font("Arial", 14));
-        message.setTextFill(Color.web("#666"));
+        message.setTextFill(Color.web("#333"));
         message.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         message.setWrapText(true);
 
         Button backButton = new Button("Retour à la connexion");
         backButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 5;");
-        backButton.setOnAction(e -> {
-            registerStage.close();
-        });
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;");
+        backButton.setPrefWidth(250);
+
+        backButton.setOnMouseEntered(e -> backButton.setStyle(
+                "-fx-background-color: #388E3C; -fx-text-fill: white; " +
+                        "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;"));
+
+        backButton.setOnMouseExited(e -> backButton.setStyle(
+                "-fx-background-color: #4CAF50; -fx-text-fill: white; " +
+                        "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;"));
+
+        backButton.setOnAction(e -> registerStage.close());
 
         card.getChildren().addAll(title, message, backButton);
         root.getChildren().add(card);
 
-        Scene scene = new Scene(root, 500, 450);
+        Scene scene = new Scene(root, 550, 550);
         registerStage.setScene(scene);
+        registerStage.initOwner(primaryStage);
         registerStage.show();
     }
 
@@ -550,6 +697,7 @@ public class LoginView extends Application {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+        alert.initOwner(primaryStage);
         alert.showAndWait();
     }
 

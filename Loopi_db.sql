@@ -405,3 +405,23 @@ ALTER TABLE `users`
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+-- Ajouter cette table à votre base de données loopi_db
+
+CREATE TABLE IF NOT EXISTS `notifications` (
+                                               `id` int(11) NOT NULL AUTO_INCREMENT,
+    `id_user` int(11) NOT NULL,
+    `type` varchar(50) NOT NULL,
+    `titre` varchar(200) NOT NULL,
+    `message` text NOT NULL,
+    `is_read` tinyint(1) DEFAULT '0',
+    `id_evenement` int(11) DEFAULT NULL,
+    `id_participation` int(11) DEFAULT NULL,
+    `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `id_user` (`id_user`),
+    KEY `id_evenement` (`id_evenement`),
+    KEY `idx_user_read` (`id_user`,`is_read`),
+    KEY `idx_created` (`created_at`),
+    CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`id_evenement`) REFERENCES `evenement` (`id_evenement`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
