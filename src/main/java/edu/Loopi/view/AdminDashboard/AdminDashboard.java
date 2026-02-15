@@ -17,7 +17,11 @@ import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+
 import java.io.File;
+import java.io.FileInputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 public class AdminDashboard {
     private User currentUser;
@@ -25,27 +29,55 @@ public class AdminDashboard {
     private Stage primaryStage;
     private BorderPane root;
     private StackPane mainContentArea;
-    private boolean sidebarCollapsed = false;
     private String currentView = "dashboard";
 
-    // Références aux vues
     private DashboardView dashboardView;
     private UserManagementView userManagementView;
     private UserProfileView userProfileView;
     private AnalyticsView analyticsView;
     private SettingsView settingsView;
 
-    // Composants du header qui seront mis à jour
     private StackPane headerProfileContainer;
     private VBox headerProfileInfo;
-    private StackPane footerAvatarContainer;
+    private Label headerProfileName;
+    private Label headerProfileRole;
+
+    private VBox sidebar;
+    private Map<String, Button> sidebarButtons = new HashMap<>();
+    private boolean isDarkMode = false;
+    private Button themeToggleBtn;
+
+    // Couleurs professionnelles
+    private static final String LIGHT_BG = "#F3F4F6";
+    private static final String LIGHT_SIDEBAR = "#FFFFFF";
+    private static final String LIGHT_HEADER = "#FFFFFF";
+    private static final String LIGHT_TEXT = "#1F2937";
+    private static final String LIGHT_TEXT_SECONDARY = "#4B5563";
+    private static final String LIGHT_TEXT_MUTED = "#6B7280";
+    private static final String LIGHT_BORDER = "#E5E7EB";
+    private static final String LIGHT_CARD = "#FFFFFF";
+    private static final String LIGHT_HOVER = "#F9FAFB";
+
+    private static final String DARK_BG = "#0B1120";
+    private static final String DARK_SIDEBAR = "#1A202C";
+    private static final String DARK_HEADER = "#1A202C";
+    private static final String DARK_TEXT = "#F7FAFC";
+    private static final String DARK_TEXT_SECONDARY = "#E2E8F0";
+    private static final String DARK_TEXT_MUTED = "#A0AEC0";
+    private static final String DARK_BORDER = "#2D3748";
+    private static final String DARK_CARD = "#1A202C";
+    private static final String DARK_HOVER = "#2D3748";
+
+    private static final String ACCENT_COLOR = "#3182CE";
+    private static final String SUCCESS_COLOR = "#38A169";
+    private static final String WARNING_COLOR = "#DD6B20";
+    private static final String DANGER_COLOR = "#E53E3E";
 
     public AdminDashboard(User user) {
         this.currentUser = user;
         this.userService = new UserService();
         SessionManager.login(user);
 
-        // Initialiser les vues
         this.dashboardView = new DashboardView(currentUser, userService, this);
         this.userManagementView = new UserManagementView(currentUser, userService, this);
         this.userProfileView = new UserProfileView(currentUser, userService, this);
@@ -55,87 +87,90 @@ public class AdminDashboard {
 
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        primaryStage.setTitle("LOOPI - Tableau de Bord Administrateur");
+        primaryStage.setTitle("LOOPI - Administration");
+
+        try {
+            File logoFile = new File("logo.png");
+            if (logoFile.exists()) {
+                Image icon = new Image(new FileInputStream(logoFile));
+                primaryStage.getIcons().add(icon);
+            }
+        } catch (Exception e) {
+            System.out.println("Logo non trouvé");
+        }
 
         root = new BorderPane();
-        root.setStyle("-fx-background-color: #E6F8F6;");
 
-        // Créer le header modernisé
-        VBox header = createModernHeader();
+        sidebar = createSidebar();
+        VBox header = createHeader();
+
+        root.setLeft(sidebar);
         root.setTop(header);
 
-        // Créer le sidebar avec le style modernisé
-        VBox sidebar = createModernSidebar();
-        root.setLeft(sidebar);
-
-        // Zone de contenu principale avec padding
         mainContentArea = new StackPane();
-        mainContentArea.setPadding(new Insets(0));
-        mainContentArea.setStyle("-fx-background-color: transparent;");
-
-        // Charger le dashboard par défaut
-        showDashboard();
+        mainContentArea.setPadding(new Insets(24));
         root.setCenter(mainContentArea);
 
-        Scene scene = new Scene(root, 1400, 800);
+        showDashboard();
+
+        Scene scene = new Scene(root, 1400, 900);
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
 
-        SessionManager.printSessionInfo();
+        applyTheme();
     }
 
-    // ============ HEADER MODERNISÉ ============
-    private VBox createModernHeader() {
+    private VBox createHeader() {
         VBox header = new VBox();
-        header.setStyle("-fx-background-color: linear-gradient(to right, #03414D, #03414D);");
+        header.setPadding(new Insets(12, 24, 12, 24));
+        header.setStyle(getHeaderStyle());
 
-        // Barre supérieure
-        HBox topBar = new HBox(20);
-        topBar.setPadding(new Insets(15, 30, 15, 30));
-        topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setStyle("-fx-background-color: transparent;");
+        HBox headerContent = new HBox(16);
+        headerContent.setAlignment(Pos.CENTER_LEFT);
 
-        // Bouton menu toggle
         Button menuToggle = new Button("☰");
-        menuToggle.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
-                "-fx-font-size: 20px; -fx-min-width: 40; -fx-min-height: 40; -fx-cursor: hand;");
+        menuToggle.setStyle("-fx-background-color: transparent; -fx-text-fill: " + getTextColor() +
+                "; -fx-font-size: 22px; -fx-cursor: hand; -fx-padding: 8; -fx-min-width: 40;");
         menuToggle.setOnAction(e -> toggleSidebar());
 
-        // Logo et titre
-        HBox logoBox = new HBox(15);
+        HBox logoBox = new HBox(8);
         logoBox.setAlignment(Pos.CENTER_LEFT);
 
-        Circle logoCircle = new Circle(20);
-        logoCircle.setFill(Color.web("#FFFFFF"));
+        try {
+            File logoFile = new File("logo.png");
+            if (logoFile.exists()) {
+                Image logoImage = new Image(new FileInputStream(logoFile), 32, 32, true, true);
+                ImageView logoView = new ImageView(logoImage);
+                logoView.setFitWidth(32);
+                logoView.setFitHeight(32);
+                logoBox.getChildren().add(logoView);
+            } else {
+                Label logoIcon = new Label("♻️");
+                logoIcon.setFont(Font.font("System", 28));
+                logoBox.getChildren().add(logoIcon);
+            }
+        } catch (Exception e) {
+            Label logoIcon = new Label("♻️");
+            logoIcon.setFont(Font.font("System", 28));
+            logoBox.getChildren().add(logoIcon);
+        }
 
-        VBox titleBox = new VBox(2);
-        Label mainTitle = new Label("LOOPI");
-        mainTitle.setFont(Font.font("Arial", FontWeight.BOLD, 22));
-        mainTitle.setTextFill(Color.WHITE);
+        Label logoText = new Label("LOOPI");
+        logoText.setFont(Font.font("System", FontWeight.BOLD, 18));
+        logoText.setTextFill(Color.web(getTextColor()));
+        logoBox.getChildren().add(logoText);
 
-        Label subtitle = new Label("Admin Dashboard");
-        subtitle.setFont(Font.font("Arial", 11));
-        subtitle.setTextFill(Color.web("#E6F8F6"));
-
-        titleBox.getChildren().addAll(mainTitle, subtitle);
-        logoBox.getChildren().addAll(logoCircle, titleBox);
-
-        // Espaceur
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        // Barre de recherche
         HBox searchBox = new HBox(0);
-        searchBox.setStyle("-fx-background-color: rgba(255,255,255,0.1); -fx-background-radius: 8;");
+        searchBox.setStyle("-fx-background-color: " + (isDarkMode ? DARK_CARD : "#F9FAFB") +
+                "; -fx-background-radius: 8; -fx-border-color: " + getBorderColor() + "; -fx-border-radius: 8;");
         searchBox.setAlignment(Pos.CENTER_LEFT);
-        searchBox.setPadding(new Insets(5, 15, 5, 15));
 
         TextField searchField = new TextField();
-        searchField.setPromptText("Search users, stats...");
+        searchField.setPromptText("Rechercher...");
         searchField.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
-                "-fx-font-size: 14px; -fx-text-fill: white;");
-        searchField.setPrefWidth(250);
+                "-fx-font-size: 14px; -fx-text-fill: " + getTextColor() + "; -fx-prompt-text-fill: " + getTextColorMuted() + ";");
+        searchField.setPrefWidth(280);
         searchField.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
                 performGlobalSearch(searchField.getText());
@@ -143,448 +178,344 @@ public class AdminDashboard {
         });
 
         Button searchBtn = new Button("🔍");
-        searchBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-cursor: hand;");
+        searchBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + getTextColorMuted() +
+                "; -fx-cursor: hand; -fx-padding: 8 16; -fx-font-size: 16px;");
         searchBtn.setOnAction(e -> performGlobalSearch(searchField.getText()));
 
         searchBox.getChildren().addAll(searchField, searchBtn);
 
-        // Notifications et profil
-        HBox rightControls = new HBox(15);
-        rightControls.setAlignment(Pos.CENTER_RIGHT);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Bouton notifications
+        themeToggleBtn = new Button(isDarkMode ? "☀️" : "🌙");
+        themeToggleBtn.setStyle("-fx-background-color: " + (isDarkMode ? DARK_CARD : "#F9FAFB") +
+                "; -fx-text-fill: " + getTextColor() + "; -fx-font-size: 18px; -fx-padding: 8 14; " +
+                "-fx-background-radius: 8; -fx-cursor: hand; -fx-border-color: " + getBorderColor() + "; -fx-border-radius: 8;");
+        themeToggleBtn.setOnAction(e -> toggleTheme());
+
         Button notificationsBtn = new Button("🔔");
-        notificationsBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
-                "-fx-font-size: 18px; -fx-cursor: hand;");
-        notificationsBtn.setTooltip(new Tooltip("Notifications"));
-
-        // Profil utilisateur - STOCKER LA RÉFÉRENCE
-        headerProfileContainer = new StackPane();
-        headerProfileContainer.setOnMouseClicked(e -> showUserProfileInMain());
-
-        Circle profileCircle = new Circle(22);
-        profileCircle.setFill(Color.web("#FFFFFF"));
-
-        // Charger l'image de profil
-        ImageView profileImageView = loadProfileImage(currentUser, 44);
-        if (profileImageView != null) {
-            headerProfileContainer.getChildren().add(profileImageView);
-        } else {
-            String initials = getInitials(currentUser);
-            Label profileText = new Label(initials);
-            profileText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-            profileText.setTextFill(Color.web("#03414D"));
-            headerProfileContainer.getChildren().addAll(profileCircle, profileText);
-        }
-
-        headerProfileInfo = new VBox(2);
-        headerProfileInfo.setAlignment(Pos.CENTER_LEFT);
-
-        Label profileName = new Label(currentUser.getNomComplet());
-        profileName.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        profileName.setTextFill(Color.WHITE);
-
-        Label profileRole = new Label(currentUser.getRole().toUpperCase());
-        profileRole.setFont(Font.font("Arial", 10));
-        profileRole.setTextFill(Color.web("#E6F8F6"));
-
-        headerProfileInfo.getChildren().addAll(profileName, profileRole);
-        headerProfileContainer.setStyle("-fx-cursor: hand;");
+        notificationsBtn.setStyle("-fx-background-color: " + (isDarkMode ? DARK_CARD : "#F9FAFB") +
+                "; -fx-text-fill: " + getTextColor() + "; -fx-font-size: 18px; -fx-padding: 8 14; " +
+                "-fx-background-radius: 8; -fx-cursor: hand; -fx-border-color: " + getBorderColor() + "; -fx-border-radius: 8;");
 
         HBox profileBox = new HBox(10);
         profileBox.setAlignment(Pos.CENTER_RIGHT);
-        profileBox.getChildren().addAll(headerProfileInfo, headerProfileContainer);
 
-        rightControls.getChildren().addAll(searchBox, notificationsBtn, profileBox);
-        topBar.getChildren().addAll(menuToggle, logoBox, spacer, rightControls);
+        headerProfileInfo = new VBox(2);
+        headerProfileInfo.setAlignment(Pos.CENTER_RIGHT);
+        headerProfileName = new Label(currentUser.getNomComplet());
+        headerProfileName.setFont(Font.font("System", FontWeight.MEDIUM, 14));
+        headerProfileName.setTextFill(Color.web(getTextColor()));
 
-        // Barre des onglets
-        HBox tabBar = createTabBar();
+        headerProfileRole = new Label(getRoleInFrench(currentUser.getRole()));
+        headerProfileRole.setFont(Font.font("System", FontWeight.NORMAL, 12));
+        headerProfileRole.setTextFill(Color.web(getTextColorMuted()));
 
-        header.getChildren().addAll(topBar, tabBar);
-        return header;
-    }
+        headerProfileInfo.getChildren().addAll(headerProfileName, headerProfileRole);
 
-    // Méthode pour mettre à jour l'image de profil dans le header
-    public void updateHeaderProfileImage() {
-        // Rafraîchir les données utilisateur
-        currentUser = userService.getUserById(currentUser.getId());
+        headerProfileContainer = new StackPane();
+        headerProfileContainer.setStyle("-fx-cursor: hand;");
+        headerProfileContainer.setOnMouseClicked(e -> showUserProfileInMain());
 
-        // Mettre à jour le conteneur de profil dans le header
-        headerProfileContainer.getChildren().clear();
+        Circle profileCircle = new Circle(18);
+        profileCircle.setFill(Color.web(ACCENT_COLOR));
 
-        ImageView profileImageView = loadProfileImage(currentUser, 44);
+        ImageView profileImageView = loadProfileImage(currentUser, 36);
         if (profileImageView != null) {
             headerProfileContainer.getChildren().add(profileImageView);
         } else {
-            Circle profileCircle = new Circle(22);
-            profileCircle.setFill(Color.web("#FFFFFF"));
             String initials = getInitials(currentUser);
             Label profileText = new Label(initials);
-            profileText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-            profileText.setTextFill(Color.web("#03414D"));
+            profileText.setFont(Font.font("System", FontWeight.BOLD, 14));
+            profileText.setTextFill(Color.WHITE);
             headerProfileContainer.getChildren().addAll(profileCircle, profileText);
         }
 
-        // Mettre à jour les informations du profil
-        if (headerProfileInfo != null && headerProfileInfo.getChildren().size() >= 2) {
-            ((Label)headerProfileInfo.getChildren().get(0)).setText(currentUser.getNomComplet());
-            ((Label)headerProfileInfo.getChildren().get(1)).setText(currentUser.getRole().toUpperCase());
-        }
+        profileBox.getChildren().addAll(headerProfileInfo, headerProfileContainer);
 
-        // Mettre à jour le footer du sidebar
-        updateSidebarFooter();
+        headerContent.getChildren().addAll(menuToggle, logoBox, searchBox, spacer, themeToggleBtn, notificationsBtn, profileBox);
+        header.getChildren().add(headerContent);
+
+        return header;
     }
 
-    // Méthode pour mettre à jour le footer du sidebar
-    private void updateSidebarFooter() {
-        VBox sidebar = (VBox) root.getLeft();
-        VBox footer = (VBox) sidebar.getChildren().get(3);
-
-        // Mettre à jour l'avatar du footer
-        if (footerAvatarContainer != null) {
-            footerAvatarContainer.getChildren().clear();
-            Circle footerAvatar = new Circle(20);
-            footerAvatar.setFill(Color.web("#03414D"));
-
-            ImageView footerImageView = loadProfileImage(currentUser, 40);
-            if (footerImageView != null) {
-                footerAvatarContainer.getChildren().add(footerImageView);
-            } else {
-                String initials = getInitials(currentUser);
-                Label footerInitials = new Label(initials);
-                footerInitials.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-                footerInitials.setTextFill(Color.WHITE);
-                footerAvatarContainer.getChildren().addAll(footerAvatar, footerInitials);
-            }
-        }
-
-        // Mettre à jour les informations utilisateur dans le footer
-        if (footer.getChildren().size() > 0) {
-            HBox userFooter = (HBox) footer.getChildren().get(0);
-            if (userFooter.getChildren().size() > 1) {
-                VBox userInfo = (VBox) userFooter.getChildren().get(1);
-                if (userInfo.getChildren().size() >= 2) {
-                    ((Label)userInfo.getChildren().get(0)).setText(currentUser.getNomComplet());
-                    ((Label)userInfo.getChildren().get(1)).setText(currentUser.getEmail());
-                }
-            }
-        }
-    }
-
-    private HBox createTabBar() {
-        HBox tabBar = new HBox();
-        tabBar.setPadding(new Insets(0, 30, 0, 30));
-        tabBar.setStyle("-fx-background-color: #72DFD0;");
-        tabBar.setPrefHeight(40);
-
-        HBox tabsContainer = new HBox(0);
-        tabsContainer.setAlignment(Pos.CENTER_LEFT);
-
-        Button dashboardTab = createTabButton("Dashboard", "dashboard", true);
-        Button usersTab = createTabButton("Users Management", "users", false);
-        Button analyticsTab = createTabButton("Analytics", "analytics", false);
-        Button settingsTab = createTabButton("Settings", "settings", false);
-
-        tabsContainer.getChildren().addAll(dashboardTab, usersTab, analyticsTab, settingsTab);
-        tabBar.getChildren().add(tabsContainer);
-
-        return tabBar;
-    }
-
-    private Button createTabButton(String text, String viewName, boolean active) {
-        Button tab = new Button(text);
-        tab.setPadding(new Insets(10, 20, 10, 20));
-        tab.setFont(Font.font("Arial", FontWeight.BOLD, 13));
-
-        if (active) {
-            tab.setStyle("-fx-background-color: #A0F6D2; -fx-text-fill: #03414D; " +
-                    "-fx-border-color: transparent; -fx-cursor: hand;");
-        } else {
-            tab.setStyle("-fx-background-color: transparent; -fx-text-fill: #000000; " +
-                    "-fx-border-color: transparent; -fx-cursor: hand;");
-        }
-
-        tab.setOnAction(e -> switchView(viewName));
-
-        tab.setOnMouseEntered(e -> {
-            if (!currentView.equals(viewName)) {
-                tab.setStyle("-fx-background-color: rgba(255,255,255,0.1); -fx-text-fill: #03414D; " +
-                        "-fx-border-color: transparent; -fx-cursor: hand;");
-            }
-        });
-
-        tab.setOnMouseExited(e -> {
-            if (!currentView.equals(viewName)) {
-                tab.setStyle("-fx-background-color: transparent; -fx-text-fill: #000000; " +
-                        "-fx-border-color: transparent; -fx-cursor: hand;");
-            }
-        });
-
-        return tab;
-    }
-
-    // ============ SIDEBAR MODERNISÉ ============
-    private VBox createModernSidebar() {
+    private VBox createSidebar() {
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(260);
-        sidebar.setStyle("-fx-background-color: #72DFD0; -fx-border-color: #03414D; -fx-border-width: 0 1 0 0;");
-        sidebar.setPadding(new Insets(25, 0, 20, 0));
+        sidebar.setStyle(getSidebarStyle());
+        sidebar.setPadding(new Insets(20, 12, 20, 12));
 
-        // Logo sidebar
-        HBox sidebarLogo = new HBox(15);
-        sidebarLogo.setPadding(new Insets(0, 0, 25, 25));
-        sidebarLogo.setAlignment(Pos.CENTER_LEFT);
+        VBox navMenu = new VBox(4);
+        navMenu.setPadding(new Insets(0, 0, 20, 0));
 
-        Label sidebarIcon = new Label("📊");
-        sidebarIcon.setFont(Font.font("Arial", 24));
+        Button dashboardBtn = createSidebarButton("📊", "Tableau de bord", "dashboard", true);
+        sidebarButtons.put("dashboard", dashboardBtn);
 
-        VBox logoText = new VBox(2);
-        Label logoTitle = new Label("LOOPI Admin");
-        logoTitle.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        logoTitle.setTextFill(Color.web("#03414D"));
+        Button usersBtn = createSidebarButton("👥", "Utilisateurs", "users", false);
+        sidebarButtons.put("users", usersBtn);
 
-        Label logoSubtitle = new Label("Analytics");
-        logoSubtitle.setFont(Font.font("Arial", 11));
-        logoSubtitle.setTextFill(Color.web("#03414D"));
+        Button analyticsBtn = createSidebarButton("📈", "Statistiques", "analytics", false);
+        sidebarButtons.put("analytics", analyticsBtn);
 
-        logoText.getChildren().addAll(logoTitle, logoSubtitle);
-        sidebarLogo.getChildren().addAll(sidebarIcon, logoText);
+        Separator separator = new Separator();
+        separator.setPadding(new Insets(12, 0, 12, 0));
+        separator.setStyle("-fx-background-color: " + getBorderColor() + ";");
 
-        // Navigation
-        VBox navSection = new VBox(5);
-        navSection.setPadding(new Insets(10, 15, 20, 15));
+        Button profileBtn = createSidebarButton("👤", "Mon profil", "profile", false);
+        sidebarButtons.put("profile", profileBtn);
 
-        // Dashboard Section
-        Label dashboardLabel = new Label("DASHBOARD");
-        dashboardLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
-        dashboardLabel.setTextFill(Color.web("#03414D"));
-        dashboardLabel.setPadding(new Insets(15, 0, 10, 10));
+        Button settingsBtn = createSidebarButton("⚙️", "Paramètres", "settings", false);
+        sidebarButtons.put("settings", settingsBtn);
 
-        Button dashboardBtn = createSidebarButton("📊", "Dashboard", "dashboard", true);
-        dashboardBtn.setOnAction(e -> switchView("dashboard"));
+        Button helpBtn = createSidebarButton("❓", "Aide", "help", false);
+        sidebarButtons.put("help", helpBtn);
 
-        Button usersBtn = createSidebarButton("👥", "Users", "users", false);
-        usersBtn.setOnAction(e -> switchView("users"));
+        navMenu.getChildren().addAll(dashboardBtn, usersBtn, analyticsBtn, separator, profileBtn, settingsBtn, helpBtn);
 
-        Button analyticsBtn = createSidebarButton("📈", "Analytics", "analytics", false);
-        analyticsBtn.setOnAction(e -> switchView("analytics"));
-
-        // Applications Section
-        Label appsLabel = new Label("APPLICATIONS");
-        appsLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
-        appsLabel.setTextFill(Color.web("#03414D"));
-        appsLabel.setPadding(new Insets(20, 0, 10, 10));
-
-        Button profileBtn = createSidebarButton("👤", "My Profile", "profile", false);
-        profileBtn.setOnAction(e -> showUserProfileInMain());
-
-        Button settingsBtn = createSidebarButton("⚙️", "Settings", "settings", false);
-        settingsBtn.setOnAction(e -> showSettingsView());
-
-        // Support Section
-        Label supportLabel = new Label("SUPPORT");
-        supportLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
-        supportLabel.setTextFill(Color.web("#03414D"));
-        supportLabel.setPadding(new Insets(20, 0, 10, 10));
-
-        Button helpBtn = createSidebarButton("❓", "Help Center", "help", false);
-        helpBtn.setOnAction(e -> showHelpCenter());
-
-        Button supportBtn = createSidebarButton("🆘", "Contact Support", "contact", false);
-        supportBtn.setOnAction(e -> showContactSupport());
-
-        // Espaceur
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        // Footer sidebar
-        VBox footer = new VBox(15);
-        footer.setPadding(new Insets(20, 20, 20, 20));
-        footer.setStyle("-fx-background-color: #A0F6D2; -fx-border-color: #03414D; -fx-border-width: 1 0 0 0;");
+        VBox footer = new VBox(12);
+        footer.setPadding(new Insets(12, 0, 0, 0));
+        footer.setStyle("-fx-border-color: " + getBorderColor() + "; -fx-border-width: 1 0 0 0;");
 
-        // User info in footer - STOCKER LA RÉFÉRENCE
         HBox userFooter = new HBox(10);
         userFooter.setAlignment(Pos.CENTER_LEFT);
+        userFooter.setPadding(new Insets(12, 0, 0, 0));
 
-        footerAvatarContainer = new StackPane();
-        Circle footerAvatar = new Circle(20);
-        footerAvatar.setFill(Color.web("#03414D"));
+        StackPane footerAvatarContainer = new StackPane();
+        Circle footerAvatar = new Circle(18);
+        footerAvatar.setFill(Color.web(ACCENT_COLOR));
 
-        ImageView footerImageView = loadProfileImage(currentUser, 40);
+        ImageView footerImageView = loadProfileImage(currentUser, 36);
         if (footerImageView != null) {
             footerAvatarContainer.getChildren().add(footerImageView);
         } else {
             Label footerInitials = new Label(getInitials(currentUser));
-            footerInitials.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+            footerInitials.setFont(Font.font("System", FontWeight.BOLD, 12));
             footerInitials.setTextFill(Color.WHITE);
             footerAvatarContainer.getChildren().addAll(footerAvatar, footerInitials);
         }
 
         VBox userInfo = new VBox(2);
         Label footerName = new Label(currentUser.getNomComplet());
-        footerName.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        footerName.setTextFill(Color.web("#03414D"));
+        footerName.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        footerName.setTextFill(Color.web(getTextColor()));
 
         Label footerEmail = new Label(currentUser.getEmail());
-        footerEmail.setFont(Font.font("Arial", 10));
-        footerEmail.setTextFill(Color.web("#03414D"));
+        footerEmail.setFont(Font.font("System", FontWeight.NORMAL, 11));
+        footerEmail.setTextFill(Color.web(getTextColorMuted()));
 
         userInfo.getChildren().addAll(footerName, footerEmail);
         userFooter.getChildren().addAll(footerAvatarContainer, userInfo);
 
-        Button logoutBtn = new Button("🚪 Logout");
-        logoutBtn.setPrefWidth(220);
-        logoutBtn.setPrefHeight(40);
-        logoutBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-background-radius: 8; -fx-cursor: hand;");
+        Button logoutBtn = new Button("🚪 Déconnexion");
+        logoutBtn.setPrefWidth(236);
+        logoutBtn.setPrefHeight(38);
+        logoutBtn.setStyle("-fx-background-color: " + DANGER_COLOR + "; -fx-text-fill: white; " +
+                "-fx-font-weight: 600; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 13px;");
         logoutBtn.setOnAction(e -> logout());
 
         footer.getChildren().addAll(userFooter, logoutBtn);
 
-        navSection.getChildren().addAll(
-                dashboardLabel, dashboardBtn, usersBtn, analyticsBtn,
-                appsLabel, profileBtn, settingsBtn,
-                supportLabel, helpBtn, supportBtn
-        );
-
-        sidebar.getChildren().addAll(sidebarLogo, navSection, spacer, footer);
+        sidebar.getChildren().addAll(navMenu, spacer, footer);
         return sidebar;
     }
 
     private Button createSidebarButton(String icon, String text, String view, boolean active) {
         Button btn = new Button(text);
-        btn.setPrefWidth(230);
-        btn.setPrefHeight(45);
+        btn.setPrefWidth(236);
+        btn.setPrefHeight(42);
         btn.setAlignment(Pos.CENTER_LEFT);
-        btn.setPadding(new Insets(0, 0, 0, 15));
-        btn.setFont(Font.font("Arial", 14));
-        btn.setGraphicTextGap(15);
+        btn.setPadding(new Insets(0, 0, 0, 12));
+        btn.setFont(Font.font("System", 13));
+        btn.setGraphicTextGap(10);
 
-        // Ajouter l'icône
         Label iconLabel = new Label(icon);
-        iconLabel.setFont(Font.font("Arial", 16));
+        iconLabel.setFont(Font.font("System", 16));
         btn.setGraphic(iconLabel);
 
         if (active) {
-            btn.setStyle("-fx-background-color: #A0F6D2; -fx-text-fill: #03414D; " +
-                    "-fx-font-weight: bold; -fx-border-color: transparent; " +
-                    "-fx-border-radius: 8;");
+            btn.setStyle("-fx-background-color: " + ACCENT_COLOR + "; -fx-text-fill: white; " +
+                    "-fx-font-weight: 600; -fx-background-radius: 6;");
         } else {
-            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #03414D; " +
-                    "-fx-border-color: transparent; -fx-border-radius: 8;");
+            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + getTextColor() +
+                    "; -fx-font-weight: 500; -fx-background-radius: 6;");
         }
+
+        btn.setOnAction(e -> switchView(view));
 
         btn.setOnMouseEntered(e -> {
             if (!currentView.equals(view)) {
-                btn.setStyle("-fx-background-color: #A0F6D2; -fx-text-fill: #03414D; " +
-                        "-fx-font-size: 14px; -fx-border-color: transparent; " +
-                        "-fx-border-radius: 8;");
+                btn.setStyle("-fx-background-color: " + (isDarkMode ? DARK_HOVER : LIGHT_HOVER) +
+                        "; -fx-text-fill: " + getTextColor() + "; -fx-font-weight: 500; -fx-background-radius: 6;");
             }
         });
 
         btn.setOnMouseExited(e -> {
             if (!currentView.equals(view)) {
-                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #03414D; " +
-                        "-fx-font-size: 14px; -fx-border-color: transparent; " +
-                        "-fx-border-radius: 8;");
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + getTextColor() +
+                        "; -fx-font-weight: 500; -fx-background-radius: 6;");
             }
         });
 
         return btn;
     }
 
-    // ============ MÉTHODES DE NAVIGATION ============
+    private void updateSidebarButtons(String activeView) {
+        sidebarButtons.forEach((view, btn) -> {
+            if (view.equals(activeView)) {
+                btn.setStyle("-fx-background-color: " + ACCENT_COLOR + "; -fx-text-fill: white; " +
+                        "-fx-font-weight: 600; -fx-background-radius: 6;");
+            } else {
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + getTextColor() +
+                        "; -fx-font-weight: 500; -fx-background-radius: 6;");
+            }
+        });
+    }
+
+    public void toggleTheme() {
+        isDarkMode = !isDarkMode;
+        applyTheme();
+        themeToggleBtn.setText(isDarkMode ? "☀️" : "🌙");
+        themeToggleBtn.setStyle("-fx-background-color: " + (isDarkMode ? DARK_CARD : "#F9FAFB") +
+                "; -fx-text-fill: " + getTextColor() + "; -fx-font-size: 18px; -fx-padding: 8 14; " +
+                "-fx-background-radius: 8; -fx-cursor: hand; -fx-border-color: " + getBorderColor() + "; -fx-border-radius: 8;");
+        updateHeaderProfileImage();
+        refreshAllViews();
+    }
+
+    private void applyTheme() {
+        root.setStyle("-fx-background-color: " + getBgColor() + ";");
+        sidebar.setStyle(getSidebarStyle());
+        VBox header = (VBox) root.getTop();
+        header.setStyle(getHeaderStyle());
+
+        if (headerProfileName != null) headerProfileName.setTextFill(Color.web(getTextColor()));
+        if (headerProfileRole != null) headerProfileRole.setTextFill(Color.web(getTextColorMuted()));
+    }
+
+    private void refreshAllViews() {
+        switch (currentView) {
+            case "dashboard": showDashboard(); break;
+            case "users": showUserManagementViewInCenter(); break;
+            case "profile": showUserProfileInMain(); break;
+            case "analytics": showAnalyticsView(); break;
+            case "settings": showSettingsView(); break;
+        }
+    }
+
+    public String getBgColor() { return isDarkMode ? DARK_BG : LIGHT_BG; }
+    public String getTextColor() { return isDarkMode ? DARK_TEXT : LIGHT_TEXT; }
+    public String getTextColorMuted() { return isDarkMode ? DARK_TEXT_MUTED : LIGHT_TEXT_MUTED; }
+    public String getBorderColor() { return isDarkMode ? DARK_BORDER : LIGHT_BORDER; }
+    public String getCardBg() { return isDarkMode ? DARK_CARD : LIGHT_CARD; }
+    public String getAccentColor() { return ACCENT_COLOR; }
+    public String getSuccessColor() { return SUCCESS_COLOR; }
+    public String getWarningColor() { return WARNING_COLOR; }
+    public String getDangerColor() { return DANGER_COLOR; }
+
+    private String getSidebarStyle() {
+        return "-fx-background-color: " + (isDarkMode ? DARK_SIDEBAR : LIGHT_SIDEBAR) +
+                "; -fx-border-color: " + getBorderColor() + "; -fx-border-width: 0 1 0 0;";
+    }
+
+    private String getHeaderStyle() {
+        return "-fx-background-color: " + (isDarkMode ? DARK_HEADER : LIGHT_HEADER) +
+                "; -fx-border-color: " + getBorderColor() + "; -fx-border-width: 0 0 1 0;";
+    }
+
+    public String getRoleInFrench(String role) {
+        if (role == null) return "";
+        switch (role.toLowerCase()) {
+            case "admin": return "Administrateur";
+            case "organisateur": return "Organisateur";
+            case "participant": return "Participant";
+            default: return role;
+        }
+    }
+
+    public void updateHeaderProfileImage() {
+        currentUser = userService.getUserById(currentUser.getId());
+
+        headerProfileContainer.getChildren().clear();
+
+        ImageView profileImageView = loadProfileImage(currentUser, 36);
+        if (profileImageView != null) {
+            headerProfileContainer.getChildren().add(profileImageView);
+        } else {
+            Circle profileCircle = new Circle(18);
+            profileCircle.setFill(Color.web(ACCENT_COLOR));
+            String initials = getInitials(currentUser);
+            Label profileText = new Label(initials);
+            profileText.setFont(Font.font("System", FontWeight.BOLD, 12));
+            profileText.setTextFill(Color.WHITE);
+            headerProfileContainer.getChildren().addAll(profileCircle, profileText);
+        }
+
+        if (headerProfileName != null) headerProfileName.setText(currentUser.getNomComplet());
+        if (headerProfileRole != null) headerProfileRole.setText(getRoleInFrench(currentUser.getRole()));
+
+        updateSidebarFooter();
+    }
+
+    private void updateSidebarFooter() {
+        VBox footer = (VBox) sidebar.getChildren().get(2);
+        HBox userFooter = (HBox) footer.getChildren().get(0);
+        StackPane avatarContainer = (StackPane) userFooter.getChildren().get(0);
+        VBox userInfo = (VBox) userFooter.getChildren().get(1);
+
+        avatarContainer.getChildren().clear();
+        ImageView footerImageView = loadProfileImage(currentUser, 36);
+        if (footerImageView != null) {
+            avatarContainer.getChildren().add(footerImageView);
+        } else {
+            Circle footerAvatar = new Circle(18);
+            footerAvatar.setFill(Color.web(ACCENT_COLOR));
+            Label footerInitials = new Label(getInitials(currentUser));
+            footerInitials.setFont(Font.font("System", FontWeight.BOLD, 12));
+            footerInitials.setTextFill(Color.WHITE);
+            avatarContainer.getChildren().addAll(footerAvatar, footerInitials);
+        }
+
+        ((Label)userInfo.getChildren().get(0)).setText(currentUser.getNomComplet());
+        ((Label)userInfo.getChildren().get(1)).setText(currentUser.getEmail());
+    }
+
     private void switchView(String view) {
         currentView = view;
         updateSidebarButtons(view);
 
         switch (view) {
-            case "dashboard":
-                showDashboard();
-                break;
-            case "users":
-                showUserManagementViewInCenter();
-                break;
-            case "analytics":
-                showAnalyticsView();
-                break;
-            case "settings":
-                showSettingsView();
-                break;
-            case "profile":
-                showUserProfileInMain();
-                break;
+            case "dashboard": showDashboard(); break;
+            case "users": showUserManagementViewInCenter(); break;
+            case "analytics": showAnalyticsView(); break;
+            case "settings": showSettingsView(); break;
+            case "profile": showUserProfileInMain(); break;
+            case "help": showHelpCenter(); break;
         }
     }
 
-    private void updateSidebarButtons(String activeView) {
-        VBox sidebar = (VBox) root.getLeft();
-        VBox navSection = (VBox) sidebar.getChildren().get(1);
-
-        // Réinitialiser tous les boutons
-        for (var node : navSection.getChildren()) {
-            if (node instanceof Button) {
-                Button btn = (Button) node;
-                String btnView = getButtonView(btn.getText());
-
-                if (btnView != null) {
-                    if (btnView.equals(activeView)) {
-                        btn.setStyle("-fx-background-color: #A0F6D2; -fx-text-fill: #03414D; " +
-                                "-fx-font-weight: bold; -fx-border-color: transparent; " +
-                                "-fx-border-radius: 8;");
-                    } else {
-                        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #03414D; " +
-                                "-fx-border-color: transparent; -fx-border-radius: 8;");
-                    }
-                }
-            }
-        }
-    }
-
-    private String getButtonView(String buttonText) {
-        switch (buttonText) {
-            case "Dashboard": return "dashboard";
-            case "Users": return "users";
-            case "Analytics": return "analytics";
-            case "My Profile": return "profile";
-            case "Settings": return "settings";
-            default: return null;
-        }
-    }
-
-    // ============ MÉTHODES D'AFFICHAGE ============
     public void showDashboard() {
-        dashboardView.showDashboard(mainContentArea);
-        currentView = "dashboard";
-        updateSidebarButtons("dashboard");
+        dashboardView.showDashboard(mainContentArea, isDarkMode);
     }
 
     public void showUserManagementViewInCenter() {
-        userManagementView.showUserManagementView(mainContentArea);
-        currentView = "users";
-        updateSidebarButtons("users");
+        userManagementView.showUserManagementView(mainContentArea, isDarkMode);
     }
 
     public void showUserProfileInMain() {
-        userProfileView.showUserProfileView(mainContentArea);
-        currentView = "profile";
-        updateSidebarButtons("profile");
+        userProfileView.showUserProfileView(mainContentArea, isDarkMode);
     }
 
     public void showAnalyticsView() {
-        analyticsView.showAnalyticsView(mainContentArea);
-        currentView = "analytics";
-        updateSidebarButtons("analytics");
+        analyticsView.showAnalyticsView(mainContentArea, isDarkMode);
     }
 
     public void showSettingsView() {
-        settingsView.showSettingsView(mainContentArea);
-        currentView = "settings";
-        updateSidebarButtons("settings");
+        settingsView.showSettingsView(mainContentArea, isDarkMode);
     }
 
-    // ============ MÉTHODES UTILITAIRES ============
     public String getInitials(User user) {
         String initials = "";
         if (user.getPrenom() != null && !user.getPrenom().isEmpty()) {
@@ -596,30 +527,18 @@ public class AdminDashboard {
         return initials.isEmpty() ? "U" : initials;
     }
 
-    // Méthode pour charger les images de profil
-    private ImageView loadProfileImage(User user, double size) {
+    public ImageView loadProfileImage(User user, double size) {
         if (user.getPhoto() != null && !user.getPhoto().isEmpty() && !user.getPhoto().equals("default.jpg")) {
             try {
                 String photoPath = user.getPhoto();
-                File imageFile;
+                File imageFile = new File(photoPath);
 
-                // Vérifier différents formats de chemin
-                if (photoPath.startsWith("profiles/")) {
-                    imageFile = new File(photoPath);
-                } else if (photoPath.startsWith("profiles\\")) {
-                    imageFile = new File(photoPath);
-                } else if (photoPath.contains("profile_")) {
-                    // Essayer avec le dossier profiles
-                    imageFile = new File("profiles/" + photoPath);
-                    if (!imageFile.exists()) {
-                        imageFile = new File(photoPath);
-                    }
-                } else {
-                    imageFile = new File(photoPath);
+                if (!imageFile.exists() && photoPath.contains("profiles")) {
+                    imageFile = new File("profiles/" + photoPath.replace("profiles/", "").replace("profiles\\", ""));
                 }
 
                 if (imageFile.exists()) {
-                    Image avatarImage = new Image("file:" + imageFile.getAbsolutePath(), size, size, true, true, true);
+                    Image avatarImage = new Image(new FileInputStream(imageFile), size, size, true, true);
                     ImageView avatarImageView = new ImageView(avatarImage);
                     avatarImageView.setFitWidth(size);
                     avatarImageView.setFitHeight(size);
@@ -628,44 +547,33 @@ public class AdminDashboard {
                     return avatarImageView;
                 }
             } catch (Exception e) {
-                System.out.println("Error loading profile image for user " + user.getId() + ": " + e.getMessage());
+                System.out.println("Erreur chargement image: " + e.getMessage());
             }
         }
-
         return null;
     }
 
     private void toggleSidebar() {
-        VBox sidebar = (VBox) root.getLeft();
-        if (sidebarCollapsed) {
-            sidebar.setPrefWidth(260);
-            sidebarCollapsed = false;
+        if (sidebar.getPrefWidth() > 100) {
+            sidebar.setPrefWidth(70);
         } else {
-            sidebar.setPrefWidth(80);
-            sidebarCollapsed = true;
+            sidebar.setPrefWidth(260);
         }
     }
 
     private void performGlobalSearch(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) {
-            return;
-        }
+        if (keyword == null || keyword.trim().isEmpty()) return;
         switchView("users");
         userManagementView.searchUsers(keyword);
     }
 
     private void showHelpCenter() {
-        showAlert("Help Center", "For assistance, please contact: support@loopi.tn\n\n" +
-                "Documentation: https://docs.loopi.tn\n" +
-                "FAQ: https://loopi.tn/faq");
-    }
-
-    private void showContactSupport() {
-        showAlert("Contact Support",
-                "Email: support@loopi.tn\n" +
-                        "Phone: +216 XX XXX XXX\n" +
-                        "Office Hours: Mon-Fri 9:00-17:00\n" +
-                        "Address: Tunis, Tunisia");
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Centre d'aide");
+        alert.setHeaderText(null);
+        alert.setContentText("Pour assistance, contactez: support@loopi.tn\n\nDocumentation: https://docs.loopi.tn");
+        alert.initOwner(primaryStage);
+        alert.showAndWait();
     }
 
     public void showAlert(String title, String message) {
@@ -677,38 +585,31 @@ public class AdminDashboard {
         alert.showAndWait();
     }
 
-    // Méthodes d'accès pour les vues
-    public Stage getPrimaryStage() {
-        return primaryStage;
+    public void showError(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.initOwner(primaryStage);
+        alert.showAndWait();
     }
 
-    public User getCurrentUser() {
-        return currentUser;
-    }
-
-    public void setCurrentUser(User user) {
-        this.currentUser = user;
-    }
-
-    public UserService getUserService() {
-        return userService;
-    }
-
-    public StackPane getMainContentArea() {
-        return mainContentArea;
-    }
+    public Stage getPrimaryStage() { return primaryStage; }
+    public User getCurrentUser() { return currentUser; }
+    public void setCurrentUser(User user) { this.currentUser = user; }
+    public UserService getUserService() { return userService; }
+    public StackPane getMainContentArea() { return mainContentArea; }
+    public boolean isDarkMode() { return isDarkMode; }
 
     private void logout() {
         SessionManager.logout();
         primaryStage.close();
-
-        // Retour à la page de login
         try {
             LoginView loginView = new LoginView();
             Stage loginStage = new Stage();
             loginView.start(loginStage);
         } catch (Exception e) {
-            System.out.println("Error returning to login: " + e.getMessage());
+            System.out.println("Erreur retour login: " + e.getMessage());
         }
     }
 }

@@ -10,6 +10,9 @@ public interface IParticipationService {
     boolean annulerParticipation(int idEvent, int idUser);
     boolean updateStatut(int idEvent, int idUser, String statut);
 
+    // AJOUTER cette méthode pour compléter l'interface
+    boolean modifierParticipation(int idEvent, int idUser, String contact, Integer age);
+
     // Récupération des participations
     List<Participation> getParticipationsByUser(int idUser);
     List<Participation> getParticipationsByEvent(int idEvent);

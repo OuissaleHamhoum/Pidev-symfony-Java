@@ -25,11 +25,13 @@ public class ParticipationService implements IParticipationService {
 
     @Override
     public boolean participer(int idEvent, int idUser, String contact, Integer age) {
+        // Vérifier si l'utilisateur participe déjà
         if (isParticipant(idEvent, idUser)) {
             System.out.println("⚠️ L'utilisateur participe déjà à cet événement");
             return false;
         }
 
+        // Vérifier si l'événement est complet
         if (isEventComplet(idEvent)) {
             System.out.println("⚠️ Événement complet");
             return false;
@@ -61,15 +63,17 @@ public class ParticipationService implements IParticipationService {
                     User participant = userService.getUserById(idUser);
                     User organisateur = userService.getUserById(event.getId_organisateur());
 
-                    // NOTIFICATION POUR LE PARTICIPANT
-                    notificationService.creerNotificationParticipation(idUser, idEvent, event.getTitre());
+                    if (event != null && participant != null && organisateur != null) {
+                        // Notification pour le participant
+                        notificationService.creerNotificationParticipation(idUser, idEvent, event.getTitre());
 
-                    // NOTIFICATION POUR L'ORGANISATEUR
-                    notificationService.creerNotificationNouveauParticipant(
-                            organisateur.getId(),
-                            idEvent,
-                            participant.getPrenom() + " " + participant.getNom()
-                    );
+                        // Notification pour l'organisateur
+                        notificationService.creerNotificationNouveauParticipant(
+                                organisateur.getId(),
+                                idEvent,
+                                participant.getPrenom() + " " + participant.getNom()
+                        );
+                    }
 
                     System.out.println("✅ Participation ajoutée avec succès. ID: " + idParticipation);
                 }
@@ -98,11 +102,11 @@ public class ParticipationService implements IParticipationService {
 
             int affectedRows = pst.executeUpdate();
             if (affectedRows > 0) {
-                // NOTIFICATION POUR LE PARTICIPANT
+                // Notification pour le participant
                 notificationService.creerNotificationAnnulation(idUser, idEvent, event.getTitre());
 
-                // NOTIFICATION POUR L'ORGANISATEUR
-                if (organisateur != null) {
+                // Notification pour l'organisateur
+                if (organisateur != null && participant != null) {
                     notificationService.creerNotificationParticipantAnnule(
                             organisateur.getId(),
                             idEvent,
@@ -119,7 +123,7 @@ public class ParticipationService implements IParticipationService {
         return false;
     }
 
-    // SUPPRIMEZ L'ANNOTATION @Override pour cette méthode car elle n'est pas dans l'interface
+    // Cette méthode n'est pas dans l'interface, mais on la garde
     public boolean modifierParticipation(int idEvent, int idUser, String contact, Integer age) {
         String query = "UPDATE participation SET contact = ?, age = ? WHERE id_evenement = ? AND id_user = ?";
 
@@ -374,6 +378,9 @@ public class ParticipationService implements IParticipationService {
                     event.setCapacite_max(null);
                 }
                 event.setImage_evenement(rs.getString("image_evenement"));
+
+                // Charger les statistiques de participation pour cet événement
+                eventService.loadParticipationStats(event);
                 events.add(event);
             }
         } catch (SQLException e) {
@@ -393,13 +400,17 @@ public class ParticipationService implements IParticipationService {
         p.setDateInscription(rs.getTimestamp("date_inscription"));
         p.setStatut(rs.getString("statut"));
 
-        // Informations supplémentaires
-        p.setEventTitre(rs.getString("titre"));
-        p.setEventLieu(rs.getString("lieu"));
+        // Informations supplémentaires (peuvent ne pas exister dans toutes les requêtes)
+        try {
+            p.setEventTitre(rs.getString("titre"));
+            p.setEventLieu(rs.getString("lieu"));
 
-        Timestamp eventDate = rs.getTimestamp("date_evenement");
-        if (eventDate != null) {
-            p.setEventDate(eventDate.toLocalDateTime());
+            Timestamp eventDate = rs.getTimestamp("date_evenement");
+            if (eventDate != null) {
+                p.setEventDate(eventDate.toLocalDateTime());
+            }
+        } catch (SQLException e) {
+            // Ignorer si les colonnes n'existent pas
         }
 
         try {
@@ -407,7 +418,7 @@ public class ParticipationService implements IParticipationService {
             String orgNom = rs.getString("org_nom");
             p.setOrganisateurNom(orgPrenom + " " + orgNom);
         } catch (SQLException e) {
-            // Colonnes n'existent pas dans certaines requêtes
+            // Ignorer si les colonnes n'existent pas
         }
 
         return p;

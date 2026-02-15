@@ -12,11 +12,10 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+
 import java.io.File;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,203 +31,239 @@ public class UserProfileView {
         this.adminDashboard = adminDashboard;
     }
 
-    public void showUserProfileView(StackPane mainContentArea) {
-        VBox profileView = createEnhancedUserProfileView();
+    public void showUserProfileView(StackPane mainContentArea, boolean isDarkMode) {
+        ScrollPane scrollPane = createUserProfileView(isDarkMode);
         mainContentArea.getChildren().clear();
-        mainContentArea.getChildren().add(profileView);
+        mainContentArea.getChildren().add(scrollPane);
     }
 
-    private VBox createEnhancedUserProfileView() {
-        VBox container = new VBox(25);
-        container.setPadding(new Insets(30));
-        container.setStyle("-fx-background-color: #E6F8F6;");
+    private String getRoleInFrench(String role) {
+        if (role == null) return "";
+        switch (role.toLowerCase()) {
+            case "admin": return "Administrateur";
+            case "organisateur": return "Organisateur";
+            case "participant": return "Participant";
+            default: return role;
+        }
+    }
 
-        // En-tête
+    private ScrollPane createUserProfileView(boolean isDarkMode) {
+        VBox container = new VBox(24);
+        container.setPadding(new Insets(0));
+        container.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + "; -fx-background-radius: 12; -fx-padding: 24;");
+
         HBox header = new HBox();
         header.setAlignment(Pos.CENTER_LEFT);
 
-        VBox headerText = new VBox(5);
-        Label title = new Label("My Profile");
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
-        title.setTextFill(Color.web("#03414D"));
+        VBox headerText = new VBox(4);
+        Label title = new Label("Mon profil");
+        title.setFont(Font.font("System", FontWeight.BOLD, 24));
+        title.setTextFill(Color.web(adminDashboard.getTextColor()));
 
-        Label subtitle = new Label("Manage your personal information and settings");
-        subtitle.setFont(Font.font("Arial", 14));
-        subtitle.setTextFill(Color.web("#03414D"));
+        Label subtitle = new Label("Gérez vos informations personnelles");
+        subtitle.setFont(Font.font("System", 14));
+        subtitle.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
 
         headerText.getChildren().addAll(title, subtitle);
         HBox.setHgrow(headerText, Priority.ALWAYS);
 
-        Button backBtn = new Button("← Back to Dashboard");
-        backBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #03414D; " +
-                "-fx-font-weight: bold; -fx-border-color: transparent; -fx-cursor: hand;");
+        Button backBtn = new Button("← Retour");
+        backBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getAccentColor() +
+                "; -fx-font-weight: 600; -fx-cursor: hand; -fx-font-size: 14px;");
         backBtn.setOnAction(e -> adminDashboard.showDashboard());
 
         header.getChildren().addAll(headerText, backBtn);
 
-        // Contenu du profil
-        VBox profileContent = new VBox(30);
-        profileContent.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 15; " +
-                "-fx-padding: 30; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 5, 0, 0, 2);");
+        VBox profileContent = new VBox(24);
+        profileContent.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#F9FAFB") +
+                "; -fx-background-radius: 12; -fx-padding: 24; -fx-border-color: " + adminDashboard.getBorderColor() +
+                "; -fx-border-radius: 12;");
 
-        // Section Avatar et Informations
-        HBox topSection = new HBox(40);
+        HBox topSection = new HBox(32);
         topSection.setAlignment(Pos.CENTER_LEFT);
 
-        // Avatar avec option de modification
-        VBox avatarBox = new VBox(20);
+        VBox avatarBox = new VBox(16);
         avatarBox.setAlignment(Pos.CENTER);
-        avatarBox.setPrefWidth(250);
+        avatarBox.setPrefWidth(200);
 
         StackPane avatarContainer = new StackPane();
-        Circle avatarCircle = new Circle(80);
-        avatarCircle.setFill(Color.web("#72DFD0"));
+        Circle avatarCircle = new Circle(60);
+        avatarCircle.setFill(Color.web(adminDashboard.getAccentColor()));
 
-        // Charger l'image de profil si disponible
-        ImageView avatarImageView = loadProfileImage(currentUser, 160);
+        ImageView avatarImageView = adminDashboard.loadProfileImage(currentUser, 120);
         if (avatarImageView != null) {
             avatarContainer.getChildren().add(avatarImageView);
         } else {
-            // Si l'image n'existe pas, utiliser l'avatar par défaut
-            createDefaultAvatar(avatarContainer, avatarCircle);
+            String initials = adminDashboard.getInitials(currentUser);
+            Label avatarText = new Label(initials);
+            avatarText.setFont(Font.font("System", FontWeight.BOLD, 32));
+            avatarText.setTextFill(Color.WHITE);
+            avatarContainer.getChildren().addAll(avatarCircle, avatarText);
         }
 
-        Button changeAvatarBtn = new Button("📷 Change Photo");
-        changeAvatarBtn.setStyle("-fx-background-color: #72DFD0; -fx-text-fill: #03414D; " +
-                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 8; -fx-cursor: hand;");
+        Button changeAvatarBtn = new Button("📷 Changer photo");
+        changeAvatarBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getAccentColor() +
+                "; -fx-font-weight: 500; -fx-padding: 8 16; -fx-background-radius: 6; -fx-cursor: hand; -fx-border-color: " +
+                adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-font-size: 13px;");
         changeAvatarBtn.setOnAction(e -> changeProfilePicture());
 
         avatarBox.getChildren().addAll(avatarContainer, changeAvatarBtn);
 
-        // Informations de base
-        VBox basicInfo = new VBox(20);
-        basicInfo.setStyle("-fx-padding: 20 0 0 0;");
+        VBox basicInfo = new VBox(16);
+        basicInfo.setAlignment(Pos.CENTER_LEFT);
 
         Label nameLabel = new Label(currentUser.getNomComplet());
-        nameLabel.setFont(Font.font("Arial", FontWeight.BOLD, 28));
-        nameLabel.setTextFill(Color.web("#03414D"));
+        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
+        nameLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
-        HBox roleBox = new HBox(10);
+        HBox roleBox = new HBox(8);
         roleBox.setAlignment(Pos.CENTER_LEFT);
 
-        Label roleLabel = new Label(currentUser.getRole().toUpperCase());
-        roleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        Label roleLabel = new Label(getRoleInFrench(currentUser.getRole()));
+        roleLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
         roleLabel.setTextFill(Color.WHITE);
-        roleLabel.setPadding(new Insets(8, 20, 8, 20));
-        roleLabel.setStyle("-fx-background-color: #72DFD0; -fx-background-radius: 20;");
+        roleLabel.setPadding(new Insets(4, 12, 4, 12));
+
+        String roleColor = currentUser.getRole().equalsIgnoreCase("admin") ? adminDashboard.getAccentColor() :
+                currentUser.getRole().equalsIgnoreCase("organisateur") ? adminDashboard.getSuccessColor() :
+                        adminDashboard.getWarningColor();
+        roleLabel.setStyle("-fx-background-color: " + roleColor + "; -fx-background-radius: 16;");
 
         Label emailLabel = new Label(currentUser.getEmail());
-        emailLabel.setFont(Font.font("Arial", 16));
-        emailLabel.setTextFill(Color.web("#03414D"));
+        emailLabel.setFont(Font.font("System", 16));
+        emailLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
-        Label memberSinceLabel = new Label("Member since: " +
+        Label memberSinceLabel = new Label("Membre depuis: " +
                 (currentUser.getCreatedAt() != null ?
                         currentUser.getCreatedAt().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")) :
-                        "Unknown date"));
-        memberSinceLabel.setFont(Font.font("Arial", 12));
-        memberSinceLabel.setTextFill(Color.web("#03414D"));
+                        "Date inconnue"));
+        memberSinceLabel.setFont(Font.font("System", 13));
+        memberSinceLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
 
-        roleBox.getChildren().addAll(roleLabel);
+        roleBox.getChildren().add(roleLabel);
         basicInfo.getChildren().addAll(nameLabel, roleBox, emailLabel, memberSinceLabel);
 
         topSection.getChildren().addAll(avatarBox, basicInfo);
 
-        // Séparateur
         Separator separator = new Separator();
-        separator.setPadding(new Insets(20, 0, 20, 0));
+        separator.setPadding(new Insets(16, 0, 16, 0));
+        separator.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() + ";");
 
-        // Formulaire de modification
-        VBox formSection = new VBox(20);
-        formSection.setStyle("-fx-background-color: #E6F8F6; -fx-background-radius: 12; -fx-padding: 30;");
+        VBox formSection = new VBox(16);
+        formSection.setStyle("-fx-background-color: " + (isDarkMode ? adminDashboard.getCardBg() : "#FFFFFF") +
+                "; -fx-background-radius: 12; -fx-padding: 24; -fx-border-color: " + adminDashboard.getBorderColor() +
+                "; -fx-border-radius: 12;");
 
-        Label formTitle = new Label("Edit Information");
-        formTitle.setFont(Font.font("Arial", FontWeight.BOLD, 20));
-        formTitle.setTextFill(Color.web("#03414D"));
+        Label formTitle = new Label("Modifier mes informations");
+        formTitle.setFont(Font.font("System", FontWeight.BOLD, 18));
+        formTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
 
         GridPane formGrid = new GridPane();
-        formGrid.setHgap(30);
-        formGrid.setVgap(20);
-        formGrid.setPadding(new Insets(20, 0, 20, 0));
+        formGrid.setHgap(24);
+        formGrid.setVgap(16);
+        formGrid.setPadding(new Insets(16, 0, 16, 0));
 
-        // Champs de formulaire
+        Label nomLabel = new Label("Nom");
+        nomLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        nomLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        Label prenomLabel = new Label("Prénom");
+        prenomLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        prenomLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        Label emailLabel2 = new Label("Email");
+        emailLabel2.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        emailLabel2.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        Label genreLabel = new Label("Genre");
+        genreLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        genreLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        Label currentPassLabel = new Label("Mot de passe actuel");
+        currentPassLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        currentPassLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        Label newPassLabel = new Label("Nouveau mot de passe");
+        newPassLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        newPassLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        Label confirmPassLabel = new Label("Confirmation");
+        confirmPassLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
+        confirmPassLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
         TextField nomField = new TextField(currentUser.getNom());
-        styleFormTextField(nomField);
+        styleFormTextField(nomField, isDarkMode);
 
         TextField prenomField = new TextField(currentUser.getPrenom());
-        styleFormTextField(prenomField);
+        styleFormTextField(prenomField, isDarkMode);
 
         TextField emailField = new TextField(currentUser.getEmail());
-        styleFormTextField(emailField);
+        styleFormTextField(emailField, isDarkMode);
 
         ComboBox<String> genreCombo = new ComboBox<>();
-        genreCombo.getItems().addAll("Homme", "Femme", "Non spécifié");
-        if (currentUser.getIdGenre() == 1) {
-            genreCombo.setValue("Homme");
-        } else if (currentUser.getIdGenre() == 2) {
-            genreCombo.setValue("Femme");
-        } else {
-            genreCombo.setValue("Non spécifié");
-        }
-        styleFormComboBox(genreCombo);
+        genreCombo.getItems().addAll("Homme", "Femme", "Autre");
+        if (currentUser.getIdGenre() == 1) genreCombo.setValue("Homme");
+        else if (currentUser.getIdGenre() == 2) genreCombo.setValue("Femme");
+        else genreCombo.setValue("Autre");
+        styleFormComboBox(genreCombo, isDarkMode);
 
         PasswordField currentPasswordField = new PasswordField();
-        currentPasswordField.setPromptText("Current password");
-        styleFormTextField(currentPasswordField);
+        currentPasswordField.setPromptText("Mot de passe actuel");
+        styleFormTextField(currentPasswordField, isDarkMode);
 
         PasswordField newPasswordField = new PasswordField();
-        newPasswordField.setPromptText("New password (optional)");
-        styleFormTextField(newPasswordField);
+        newPasswordField.setPromptText("Nouveau mot de passe (optionnel)");
+        styleFormTextField(newPasswordField, isDarkMode);
 
         PasswordField confirmPasswordField = new PasswordField();
-        confirmPasswordField.setPromptText("Confirm new password");
-        styleFormTextField(confirmPasswordField);
+        confirmPasswordField.setPromptText("Confirmer le nouveau mot de passe");
+        styleFormTextField(confirmPasswordField, isDarkMode);
 
-        // Ajouter les champs au formulaire
-        formGrid.add(new Label("Last Name:"), 0, 0);
+        formGrid.add(nomLabel, 0, 0);
         formGrid.add(nomField, 1, 0);
-        formGrid.add(new Label("First Name:"), 0, 1);
+        formGrid.add(prenomLabel, 0, 1);
         formGrid.add(prenomField, 1, 1);
-        formGrid.add(new Label("Email:"), 0, 2);
+        formGrid.add(emailLabel2, 0, 2);
         formGrid.add(emailField, 1, 2);
-        formGrid.add(new Label("Gender:"), 0, 3);
+        formGrid.add(genreLabel, 0, 3);
         formGrid.add(genreCombo, 1, 3);
-        formGrid.add(new Label("Current Password:"), 0, 4);
+        formGrid.add(currentPassLabel, 0, 4);
         formGrid.add(currentPasswordField, 1, 4);
-        formGrid.add(new Label("New Password:"), 0, 5);
+        formGrid.add(newPassLabel, 0, 5);
         formGrid.add(newPasswordField, 1, 5);
-        formGrid.add(new Label("Confirm Password:"), 0, 6);
+        formGrid.add(confirmPassLabel, 0, 6);
         formGrid.add(confirmPasswordField, 1, 6);
+
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setPrefWidth(140);
+        ColumnConstraints col2 = new ColumnConstraints();
+        col2.setPrefWidth(300);
+        formGrid.getColumnConstraints().addAll(col1, col2);
 
         formSection.getChildren().addAll(formTitle, formGrid);
 
-        // Boutons
-        HBox buttonBox = new HBox(20);
+        HBox buttonBox = new HBox(16);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
-        buttonBox.setPadding(new Insets(20, 0, 0, 0));
+        buttonBox.setPadding(new Insets(16, 0, 0, 0));
 
-        Button cancelBtn = new Button("Cancel");
-        cancelBtn.setStyle("-fx-background-color: #A0F6D2; -fx-text-fill: #03414D; " +
-                "-fx-font-weight: bold; -fx-padding: 12 24; -fx-background-radius: 8; -fx-cursor: hand; " +
-                "-fx-min-width: 120; -fx-min-height: 40;");
+        Button cancelBtn = new Button("Annuler");
+        cancelBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-font-weight: 500; -fx-padding: 8 24; -fx-background-radius: 6; -fx-cursor: hand; -fx-border-color: " +
+                adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-font-size: 13px;");
         cancelBtn.setOnAction(e -> adminDashboard.showDashboard());
 
-        Button saveBtn = new Button("💾 Save Changes");
-        saveBtn.setStyle("-fx-background-color: #72DFD0; -fx-text-fill: #03414D; " +
-                "-fx-font-weight: bold; -fx-padding: 12 24; -fx-background-radius: 8; -fx-cursor: hand; " +
-                "-fx-min-width: 120; -fx-min-height: 40;");
+        Button saveBtn = new Button("💾 Enregistrer");
+        saveBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: 600; -fx-padding: 8 24; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 13px;");
         saveBtn.setOnAction(e -> {
             if (saveProfileChanges(nomField, prenomField, emailField, genreCombo,
                     currentPasswordField, newPasswordField, confirmPasswordField)) {
-                adminDashboard.showAlert("Success", "Your profile has been updated successfully!");
-                // Mettre à jour l'utilisateur courant
+                adminDashboard.showAlert("Succès", "Profil mis à jour avec succès");
                 currentUser = userService.getUserById(currentUser.getId());
                 SessionManager.setCurrentUser(currentUser);
-                // Mettre à jour l'utilisateur dans l'AdminDashboard
                 adminDashboard.setCurrentUser(currentUser);
-                // Mettre à jour l'image de profil dans le header
                 adminDashboard.updateHeaderProfileImage();
-                // Rafraîchir l'affichage
-                showUserProfileView(adminDashboard.getMainContentArea());
+                showUserProfileView(adminDashboard.getMainContentArea(), isDarkMode);
             }
         });
 
@@ -240,216 +275,129 @@ public class UserProfileView {
         ScrollPane scrollPane = new ScrollPane(container);
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-background: transparent; -fx-border-color: transparent;");
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 
-        return new VBox(scrollPane);
+        return scrollPane;
     }
 
-    private ImageView loadProfileImage(User user, double size) {
-        if (user.getPhoto() != null && !user.getPhoto().isEmpty() && !user.getPhoto().equals("default.jpg")) {
-            try {
-                String photoPath = user.getPhoto();
-                File imageFile;
-
-                // Vérifier différents formats de chemin
-                if (photoPath.startsWith("profiles/")) {
-                    imageFile = new File(photoPath);
-                } else if (photoPath.startsWith("profiles\\")) {
-                    imageFile = new File(photoPath);
-                } else if (photoPath.contains("profile_")) {
-                    // Essayer avec le dossier profiles
-                    imageFile = new File("profiles/" + photoPath);
-                    if (!imageFile.exists()) {
-                        imageFile = new File(photoPath);
-                    }
-                } else {
-                    imageFile = new File(photoPath);
-                }
-
-                if (imageFile.exists()) {
-                    Image avatarImage = new Image("file:" + imageFile.getAbsolutePath(), size, size, true, true, true);
-                    ImageView avatarImageView = new ImageView(avatarImage);
-                    avatarImageView.setFitWidth(size);
-                    avatarImageView.setFitHeight(size);
-                    avatarImageView.setPreserveRatio(true);
-                    avatarImageView.setStyle("-fx-background-radius: 50%;");
-                    return avatarImageView;
-                }
-            } catch (Exception e) {
-                System.out.println("Error loading profile image for user " + user.getId() + ": " + e.getMessage());
-            }
-        }
-
-        return null;
-    }
-
-    private void createDefaultAvatar(StackPane container, Circle circle) {
-        String initials = adminDashboard.getInitials(currentUser);
-        Label avatarText = new Label(initials);
-        avatarText.setFont(Font.font("Arial", FontWeight.BOLD, 32));
-        avatarText.setTextFill(Color.WHITE);
-        container.getChildren().addAll(circle, avatarText);
-    }
-
-    // ============ GESTION DU PROFIL ============
     private boolean saveProfileChanges(TextField nomField, TextField prenomField, TextField emailField,
                                        ComboBox<String> genreCombo, PasswordField currentPasswordField,
                                        PasswordField newPasswordField, PasswordField confirmPasswordField) {
-        // Validation des champs obligatoires
         if (nomField.getText().isEmpty() || prenomField.getText().isEmpty() || emailField.getText().isEmpty()) {
-            adminDashboard.showAlert("Error", "Last Name, First Name and Email are required");
+            adminDashboard.showError("Erreur", "Tous les champs sont requis");
             return false;
         }
 
-        // Validation de l'email
         if (!isValidEmail(emailField.getText())) {
-            adminDashboard.showAlert("Error", "Please enter a valid email address");
+            adminDashboard.showError("Erreur", "Format d'email invalide");
             return false;
         }
 
-        // Vérifier si l'email a changé
-        if (!emailField.getText().equals(currentUser.getEmail())) {
-            if (userService.emailExists(emailField.getText())) {
-                adminDashboard.showAlert("Error", "This email is already used by another user");
-                return false;
-            }
+        if (!emailField.getText().equals(currentUser.getEmail()) && userService.emailExists(emailField.getText())) {
+            adminDashboard.showError("Erreur", "Cet email est déjà utilisé");
+            return false;
         }
 
-        // Vérification du mot de passe actuel si changement de mot de passe demandé
         if (!newPasswordField.getText().isEmpty()) {
             if (currentPasswordField.getText().isEmpty()) {
-                adminDashboard.showAlert("Error", "Please enter your current password to change password");
+                adminDashboard.showError("Erreur", "Mot de passe actuel requis");
                 return false;
             }
 
-            // Dans un système réel, on vérifierait le mot de passe hashé
             if (!currentPasswordField.getText().equals(currentUser.getPassword())) {
-                adminDashboard.showAlert("Error", "Current password is incorrect");
+                adminDashboard.showError("Erreur", "Mot de passe actuel incorrect");
                 return false;
             }
 
             if (newPasswordField.getText().length() < 8) {
-                adminDashboard.showAlert("Error", "New password must be at least 8 characters long");
+                adminDashboard.showError("Erreur", "Le mot de passe doit contenir 8+ caractères");
                 return false;
             }
 
             if (!newPasswordField.getText().equals(confirmPasswordField.getText())) {
-                adminDashboard.showAlert("Error", "New passwords do not match");
+                adminDashboard.showError("Erreur", "Les mots de passe ne correspondent pas");
                 return false;
             }
         }
 
-        // Mettre à jour l'utilisateur
         currentUser.setNom(nomField.getText());
         currentUser.setPrenom(prenomField.getText());
         currentUser.setEmail(emailField.getText());
 
-        // Mettre à jour l'idGenre
         String genre = genreCombo.getValue();
-        if ("Homme".equals(genre)) {
-            currentUser.setIdGenre(1);
-        } else if ("Femme".equals(genre)) {
-            currentUser.setIdGenre(2);
-        } else {
-            currentUser.setIdGenre(3);
-        }
+        if ("Homme".equals(genre)) currentUser.setIdGenre(1);
+        else if ("Femme".equals(genre)) currentUser.setIdGenre(2);
+        else currentUser.setIdGenre(3);
 
-        // Mettre à jour le mot de passe si nécessaire
         if (!newPasswordField.getText().isEmpty()) {
             currentUser.setPassword(newPasswordField.getText());
         }
 
-        // Sauvegarder dans la base de données
-        if (userService.updateUser(currentUser)) {
-            // Mettre à jour l'utilisateur dans la session
-            SessionManager.setCurrentUser(currentUser);
-            return true;
-        } else {
-            adminDashboard.showAlert("Error", "An error occurred while updating the profile");
-            return false;
-        }
+        return userService.updateUser(currentUser);
     }
 
     private void changeProfilePicture() {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Choose Profile Picture");
-        fileChooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
+        fileChooser.setTitle("Choisir une photo");
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif")
         );
 
         File selectedFile = fileChooser.showOpenDialog(adminDashboard.getPrimaryStage());
         if (selectedFile != null) {
             try {
-                // Créer un dossier pour les photos de profil si nécessaire
                 File profileDir = new File("profiles");
-                if (!profileDir.exists()) {
-                    profileDir.mkdir();
-                }
+                if (!profileDir.exists()) profileDir.mkdir();
 
-                // Générer un nom de fichier unique
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-                String fileExtension = getFileExtension(selectedFile.getName());
-                String newFileName = "profile_" + currentUser.getId() + "_" + timestamp + fileExtension;
+                String extension = getFileExtension(selectedFile.getName());
+                String newFileName = "profile_" + currentUser.getId() + "_" + timestamp + extension;
                 File destFile = new File("profiles/" + newFileName);
-                Path destPath = destFile.toPath();
 
-                // Copier le fichier
-                Files.copy(selectedFile.toPath(), destPath, StandardCopyOption.REPLACE_EXISTING);
-
-                // Mettre à jour le chemin de la photo dans l'utilisateur
+                Files.copy(selectedFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 currentUser.setPhoto("profiles/" + newFileName);
 
-                // Mettre à jour dans la base de données
                 if (userService.updateUser(currentUser)) {
-                    adminDashboard.showAlert("Success", "Profile picture updated successfully!");
-
-                    // Mettre à jour l'utilisateur dans la session
+                    adminDashboard.showAlert("Succès", "Photo mise à jour");
                     SessionManager.setCurrentUser(currentUser);
-
-                    // Mettre à jour l'utilisateur dans l'AdminDashboard
                     adminDashboard.setCurrentUser(currentUser);
-
-                    // Mettre à jour l'image de profil dans le header
                     adminDashboard.updateHeaderProfileImage();
-
-                    // Rafraîchir l'affichage pour montrer la nouvelle image
-                    showUserProfileView(adminDashboard.getMainContentArea());
-                } else {
-                    adminDashboard.showAlert("Error", "Error updating profile picture");
+                    showUserProfileView(adminDashboard.getMainContentArea(), adminDashboard.isDarkMode());
                 }
-
             } catch (Exception e) {
-                adminDashboard.showAlert("Error", "Error loading image: " + e.getMessage());
-                e.printStackTrace();
+                adminDashboard.showError("Erreur", "Échec du téléchargement");
             }
         }
     }
 
-    private String getFileExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }
-
-    private void styleFormTextField(TextField field) {
-        field.setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #72DFD0; " +
-                "-fx-border-radius: 8; -fx-padding: 10 14; -fx-font-size: 14px; -fx-text-fill: #000000;");
+    private void styleFormTextField(TextField field, boolean isDarkMode) {
+        field.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-padding: 8 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-prompt-text-fill: " + adminDashboard.getTextColorMuted() + ";");
         field.setPrefWidth(300);
     }
 
-    private void styleFormTextField(PasswordField field) {
-        field.setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #72DFD0; " +
-                "-fx-border-radius: 8; -fx-padding: 10 14; -fx-font-size: 14px; -fx-text-fill: #000000;");
+    private void styleFormTextField(PasswordField field, boolean isDarkMode) {
+        field.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-padding: 8 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-prompt-text-fill: " + adminDashboard.getTextColorMuted() + ";");
         field.setPrefWidth(300);
     }
 
-    private void styleFormComboBox(ComboBox<String> comboBox) {
-        comboBox.setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #72DFD0; " +
-                "-fx-background-radius: 8; -fx-padding: 8 12; -fx-font-size: 14px;");
+    private void styleFormComboBox(ComboBox<String> comboBox, boolean isDarkMode) {
+        comboBox.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-background-radius: 6; -fx-border-radius: 6; " +
+                "-fx-padding: 6 10; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
         comboBox.setPrefWidth(300);
     }
 
     private boolean isValidEmail(String email) {
         return email != null && email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
+    }
+
+    private String getFileExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
     }
 }

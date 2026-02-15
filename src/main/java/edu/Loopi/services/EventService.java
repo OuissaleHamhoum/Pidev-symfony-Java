@@ -2,13 +2,14 @@ package edu.Loopi.services;
 
 import edu.Loopi.entities.Event;
 import edu.Loopi.entities.User;
+import edu.Loopi.interfaces.IEvenementService;
 import edu.Loopi.tools.MyConnection;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EventService {
+public class EventService implements IEvenementService {
     private Connection connection;
 
     public EventService() {
@@ -17,6 +18,7 @@ public class EventService {
 
     // ============ CRUD ÉVÉNEMENTS ============
 
+    @Override
     public boolean addEvent(Event event) {
         String query = "INSERT INTO evenement (titre, description, date_evenement, lieu, " +
                 "id_organisateur, capacite_max, image_evenement) " +
@@ -52,6 +54,7 @@ public class EventService {
         return false;
     }
 
+    @Override
     public boolean updateEvent(Event event) {
         String query = "UPDATE evenement SET titre = ?, description = ?, date_evenement = ?, " +
                 "lieu = ?, capacite_max = ?, image_evenement = ? WHERE id_evenement = ?";
@@ -78,6 +81,7 @@ public class EventService {
         return false;
     }
 
+    @Override
     public boolean deleteEvent(int idEvent) {
         String query = "DELETE FROM evenement WHERE id_evenement = ?";
 
@@ -90,6 +94,7 @@ public class EventService {
         return false;
     }
 
+    @Override
     public Event getEventById(int idEvent) {
         String query = "SELECT * FROM evenement WHERE id_evenement = ?";
 
@@ -98,7 +103,9 @@ public class EventService {
             ResultSet rs = pst.executeQuery();
 
             if (rs.next()) {
-                return mapResultSetToEvent(rs);
+                Event event = mapResultSetToEvent(rs);
+                loadParticipationStats(event);
+                return event;
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur récupération événement: " + e.getMessage());
@@ -106,6 +113,28 @@ public class EventService {
         return null;
     }
 
+    @Override
+    public List<Event> getAllEvents() {
+        List<Event> events = new ArrayList<>();
+        String query = "SELECT * FROM evenement ORDER BY date_evenement DESC";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                Event event = mapResultSetToEvent(rs);
+                loadParticipationStats(event);
+                events.add(event);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur récupération tous événements: " + e.getMessage());
+        }
+        return events;
+    }
+
+    // ============ GESTION PAR ORGANISATEUR ============
+
+    @Override
     public List<Event> getEventsByOrganisateur(int organisateurId) {
         List<Event> events = new ArrayList<>();
         String query = "SELECT * FROM evenement WHERE id_organisateur = ? ORDER BY date_evenement DESC";
@@ -116,7 +145,6 @@ public class EventService {
 
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
-                // Charger les statistiques de participation
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -126,24 +154,25 @@ public class EventService {
         return events;
     }
 
-    public List<Event> getAllEvents() {
-        List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement ORDER BY date_evenement DESC";
+    @Override
+    public int countEventsByOrganisateur(int organisateurId) {
+        String query = "SELECT COUNT(*) FROM evenement WHERE id_organisateur = ?";
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-
-            while (rs.next()) {
-                events.add(mapResultSetToEvent(rs));
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, organisateurId);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
             }
         } catch (SQLException e) {
-            System.err.println("❌ Erreur récupération tous événements: " + e.getMessage());
+            System.err.println("❌ Erreur comptage événements: " + e.getMessage());
         }
-        return events;
+        return 0;
     }
 
     // ============ GESTION DES PARTICIPATIONS ============
 
+    @Override
     public boolean inscrireParticipant(int idEvent, int idUser, String contact, Integer age) {
         String query = "INSERT INTO participation (id_user, id_evenement, contact, age) " +
                 "VALUES (?, ?, ?, ?)";
@@ -166,6 +195,7 @@ public class EventService {
         return false;
     }
 
+    @Override
     public boolean desinscrireParticipant(int idEvent, int idUser) {
         String query = "DELETE FROM participation WHERE id_evenement = ? AND id_user = ?";
 
@@ -179,6 +209,7 @@ public class EventService {
         return false;
     }
 
+    @Override
     public boolean updateStatutParticipant(int idEvent, int idUser, String statut) {
         String query = "UPDATE participation SET statut = ? WHERE id_evenement = ? AND id_user = ?";
 
@@ -193,6 +224,7 @@ public class EventService {
         return false;
     }
 
+    @Override
     public List<User> getParticipantsByEvent(int idEvent) {
         List<User> participants = new ArrayList<>();
         String query = "SELECT u.*, p.contact, p.age, p.statut, p.date_inscription " +
@@ -226,9 +258,70 @@ public class EventService {
         return participants;
     }
 
+    @Override
+    public boolean isParticipant(int idEvent, int idUser) {
+        String query = "SELECT COUNT(*) FROM participation WHERE id_evenement = ? AND id_user = ?";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idEvent);
+            pst.setInt(2, idUser);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur vérification participant: " + e.getMessage());
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isEventComplet(int idEvent) {
+        String query = "SELECT e.capacite_max, COUNT(p.id) as nb_participants " +
+                "FROM evenement e " +
+                "LEFT JOIN participation p ON e.id_evenement = p.id_evenement " +
+                "WHERE e.id_evenement = ? " +
+                "GROUP BY e.id_evenement";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idEvent);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                Integer capaciteMax = rs.getInt("capacite_max");
+                if (rs.wasNull()) {
+                    return false; // Pas de limite
+                }
+                int nbParticipants = rs.getInt("nb_participants");
+                return nbParticipants >= capaciteMax;
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur vérification capacité: " + e.getMessage());
+        }
+        return false;
+    }
+
     // ============ STATISTIQUES ============
 
-    private void loadParticipationStats(Event event) {
+    @Override
+    public int countParticipantsByEvent(int idEvent) {
+        String query = "SELECT COUNT(*) FROM participation WHERE id_evenement = ?";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idEvent);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur comptage participants: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    @Override
+    public void loadParticipationStats(Event event) {
         String query = "SELECT statut, COUNT(*) as count FROM participation " +
                 "WHERE id_evenement = ? GROUP BY statut";
 
@@ -261,37 +354,102 @@ public class EventService {
         }
     }
 
-    public int countEventsByOrganisateur(int organisateurId) {
-        String query = "SELECT COUNT(*) FROM evenement WHERE id_organisateur = ?";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, organisateurId);
-            ResultSet rs = pst.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur comptage événements: " + e.getMessage());
-        }
-        return 0;
+    @Override
+    public double getTauxRemplissage(Event event) {
+        return event.getTauxRemplissage();
     }
 
-    public int countParticipantsByEvent(int idEvent) {
-        String query = "SELECT COUNT(*) FROM participation WHERE id_evenement = ?";
+    // ============ RECHERCHE ET FILTRES ============
+
+    @Override
+    public List<Event> searchEvents(String keyword) {
+        List<Event> events = new ArrayList<>();
+        String query = "SELECT * FROM evenement WHERE titre LIKE ? OR lieu LIKE ? " +
+                "ORDER BY date_evenement DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, idEvent);
+            String searchPattern = "%" + keyword + "%";
+            pst.setString(1, searchPattern);
+            pst.setString(2, searchPattern);
+
             ResultSet rs = pst.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
+            while (rs.next()) {
+                Event event = mapResultSetToEvent(rs);
+                loadParticipationStats(event);
+                events.add(event);
             }
         } catch (SQLException e) {
-            System.err.println("❌ Erreur comptage participants: " + e.getMessage());
+            System.err.println("❌ Erreur recherche événements: " + e.getMessage());
         }
-        return 0;
+        return events;
+    }
+
+    @Override
+    public List<Event> getUpcomingEvents() {
+        List<Event> events = new ArrayList<>();
+        String query = "SELECT * FROM evenement WHERE date_evenement > NOW() ORDER BY date_evenement ASC";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                Event event = mapResultSetToEvent(rs);
+                loadParticipationStats(event);
+                events.add(event);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur récupération événements à venir: " + e.getMessage());
+        }
+        return events;
+    }
+
+    @Override
+    public List<Event> getPastEvents() {
+        List<Event> events = new ArrayList<>();
+        String query = "SELECT * FROM evenement WHERE date_evenement < NOW() ORDER BY date_evenement DESC";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                Event event = mapResultSetToEvent(rs);
+                loadParticipationStats(event);
+                events.add(event);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur récupération événements passés: " + e.getMessage());
+        }
+        return events;
+    }
+
+    @Override
+    public List<Event> getOngoingEvents() {
+        List<Event> events = new ArrayList<>();
+        String query = "SELECT * FROM evenement WHERE DATE(date_evenement) = CURDATE()";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                Event event = mapResultSetToEvent(rs);
+                loadParticipationStats(event);
+                events.add(event);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur récupération événements en cours: " + e.getMessage());
+        }
+        return events;
     }
 
     // ============ MÉTHODES UTILITAIRES ============
+
+    @Override
+    public String getEventStatut(Event event) {
+        return event.getStatut();
+    }
+
+    @Override
+    public int getPlacesRestantes(Event event) {
+        if (event.getCapacite_max() == null) return -1; // Illimité
+        return event.getCapacite_max() - event.getParticipantsCount();
+    }
 
     private Event mapResultSetToEvent(ResultSet rs) throws SQLException {
         Event event = new Event();
@@ -315,25 +473,5 @@ public class EventService {
         event.setCreated_at(rs.getTimestamp("created_at"));
 
         return event;
-    }
-
-    public List<Event> searchEvents(String keyword) {
-        List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement WHERE titre LIKE ? OR lieu LIKE ? " +
-                "ORDER BY date_evenement DESC";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            String searchPattern = "%" + keyword + "%";
-            pst.setString(1, searchPattern);
-            pst.setString(2, searchPattern);
-
-            ResultSet rs = pst.executeQuery();
-            while (rs.next()) {
-                events.add(mapResultSetToEvent(rs));
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur recherche événements: " + e.getMessage());
-        }
-        return events;
     }
 }
