@@ -241,6 +241,7 @@ public class SettingsView {
         return row;
     }
 
+
     private void styleComboBox(ComboBox<String> comboBox, boolean isDarkMode) {
         comboBox.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
                 "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-background-radius: 6; -fx-border-radius: 6; " +

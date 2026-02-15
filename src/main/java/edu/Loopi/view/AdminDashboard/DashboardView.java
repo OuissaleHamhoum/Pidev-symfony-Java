@@ -882,6 +882,7 @@ public class DashboardView {
         return card;
     }
 
+
     private String getRoleInFrench(String role) {
         if (role == null) return "";
         switch (role.toLowerCase()) {

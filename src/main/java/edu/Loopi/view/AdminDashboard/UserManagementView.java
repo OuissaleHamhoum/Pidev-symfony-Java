@@ -915,6 +915,7 @@ public class UserManagementView {
         return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
     }
 
+
     private void showError(Label errorLabel, String message) {
         errorLabel.setText(message);
         errorLabel.setVisible(true);

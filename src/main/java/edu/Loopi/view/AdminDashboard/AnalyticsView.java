@@ -541,6 +541,7 @@ public class AnalyticsView {
 
         pieChart.getData().clear();
 
+
         if (hommes + femmes + autres > 0) {
             if (hommes > 0) pieChart.getData().add(new PieChart.Data("Hommes (" + hommes + ")", hommes));
             if (femmes > 0) pieChart.getData().add(new PieChart.Data("Femmes (" + femmes + ")", femmes));

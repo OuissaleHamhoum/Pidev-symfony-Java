@@ -396,6 +396,7 @@ public class UserProfileView {
         return email != null && email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
     }
 
+
     private String getFileExtension(String fileName) {
         int dotIndex = fileName.lastIndexOf('.');
         return (dotIndex == -1) ? "" : fileName.substring(dotIndex);

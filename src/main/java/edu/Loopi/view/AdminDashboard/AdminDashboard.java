@@ -604,6 +604,7 @@ public class AdminDashboard {
     private void logout() {
         SessionManager.logout();
         primaryStage.close();
+
         try {
             LoginView loginView = new LoginView();
             Stage loginStage = new Stage();
