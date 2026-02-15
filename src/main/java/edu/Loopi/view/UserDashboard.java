@@ -13,16 +13,30 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
+// Imports des vues existantes
+import edu.Loopi.view.ProductGalleryView;
+import edu.Loopi.view.ParticipantCampaignView;
+import edu.Loopi.view.DonationHistoryView;
+
 public class UserDashboard {
     private User currentUser;
     private BorderPane root;
     private ParticipationService participationService;
     private EventViewParticipant eventView;
+    private ProductGalleryView productGalleryView;
+    private ParticipantCampaignView campaignView;
+    private DonationHistoryView donationHistoryView;
 
     public UserDashboard(User user) {
         this.currentUser = user;
         this.participationService = new ParticipationService();
         SessionManager.login(user);
+
+        // Initialisation des vues existantes
+        this.eventView = new EventViewParticipant(currentUser);
+        this.productGalleryView = new ProductGalleryView();
+        this.campaignView = new ParticipantCampaignView(currentUser);
+        this.donationHistoryView = new DonationHistoryView(currentUser);
     }
 
     public void start(Stage stage) {
@@ -38,6 +52,7 @@ public class UserDashboard {
             VBox sidebar = createSidebar(stage);
             root.setLeft(sidebar);
 
+            // Afficher la vue par défaut (événements)
             showEvents();
 
             Scene scene = new Scene(root, 1300, 800);
@@ -95,7 +110,7 @@ public class UserDashboard {
 
     private HBox createHeader() {
         HBox header = new HBox(20);
-        header.setStyle("-fx-background-color: #4CAF50; -fx-padding: 15 30;");
+        header.setStyle("-fx-background-color: #059669; -fx-padding: 15 30;");
         header.setAlignment(Pos.CENTER_LEFT);
 
         Label title = new Label("LOOPI PARTICIPANT");
@@ -124,14 +139,14 @@ public class UserDashboard {
 
     private VBox createSidebar(Stage stage) {
         VBox sidebar = new VBox(5);
-        sidebar.setStyle("-fx-background-color: #2c3e50;");
+        sidebar.setStyle("-fx-background-color: #064e3b;");
         sidebar.setPrefWidth(250);
         sidebar.setPadding(new Insets(20, 0, 0, 0));
 
         HBox profileBox = new HBox(15);
         profileBox.setPadding(new Insets(0, 15, 20, 15));
         profileBox.setAlignment(Pos.CENTER_LEFT);
-        profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0;");
+        profileBox.setStyle("-fx-border-color: #065f46; -fx-border-width: 0 0 1 0;");
 
         Label avatar = new Label("👤");
         avatar.setFont(Font.font("Arial", 32));
@@ -168,7 +183,7 @@ public class UserDashboard {
         shopSection.setTextFill(Color.web("#bdc3c7"));
         shopSection.setPadding(new Insets(20, 0, 5, 10));
 
-        Button browseBtn = createMenuButton("🛒 Explorer");
+        Button browseBtn = createMenuButton("🛒 Galerie");
         browseBtn.setOnAction(e -> showProducts());
 
         Button ordersBtn = createMenuButton("📦 Mes commandes");
@@ -203,7 +218,7 @@ public class UserDashboard {
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
         Button logoutBtn = createMenuButton("🚪 Déconnexion");
-        logoutBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; " +
+        logoutBtn.setStyle("-fx-background-color: #dc2626; -fx-text-fill: white; " +
                 "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
         logoutBtn.setOnAction(e -> logout(stage));
 
@@ -226,7 +241,7 @@ public class UserDashboard {
                 "-fx-font-size: 13px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
 
         btn.setOnMouseEntered(e ->
-                btn.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; " +
+                btn.setStyle("-fx-background-color: #065f46; -fx-text-fill: white; " +
                         "-fx-font-size: 13px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;"));
 
         btn.setOnMouseExited(e ->
@@ -236,7 +251,7 @@ public class UserDashboard {
         return btn;
     }
 
-    // ============ MÉTHODES DE NAVIGATION ============
+    // ============ MÉTHODES DE NAVIGATION FONCTIONNELLES ============
 
     private void showEvents() {
         try {
@@ -244,55 +259,304 @@ public class UserDashboard {
                 eventView = new EventViewParticipant(currentUser);
             }
             root.setCenter(eventView.getView());
-            System.out.println("✅ EventViewParticipant chargée");
+            System.out.println("✅ Événements affichés");
         } catch (Exception e) {
-            System.err.println("❌ Erreur chargement EventViewParticipant: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("❌ Erreur chargement événements: " + e.getMessage());
             showComingSoon("Événements", "📅");
         }
     }
 
     private void showMyParticipations() {
         try {
-            if (eventView != null) {
-                eventView.showMyParticipations();
-            } else {
+            if (eventView == null) {
                 eventView = new EventViewParticipant(currentUser);
-                eventView.showMyParticipations();
             }
+            eventView.showMyParticipations();
+            root.setCenter(eventView.getView());
+            System.out.println("✅ Mes participations affichées");
         } catch (Exception e) {
             System.err.println("❌ Erreur affichage participations: " + e.getMessage());
-            e.printStackTrace();
             showComingSoon("Mes participations", "👥");
         }
     }
 
     private void showProducts() {
-        showComingSoon("Boutique", "🛒");
+        try {
+            if (productGalleryView == null) {
+                productGalleryView = new ProductGalleryView();
+            }
+            root.setCenter(productGalleryView.getView());
+            System.out.println("✅ Galerie produits affichée");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement galerie: " + e.getMessage());
+            showComingSoon("Galerie", "🛒");
+        }
     }
 
     private void showOrders() {
-        showComingSoon("Mes commandes", "📦");
+        try {
+            VBox ordersView = createOrdersView();
+            root.setCenter(ordersView);
+            System.out.println("✅ Commandes affichées");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement commandes: " + e.getMessage());
+            showComingSoon("Mes commandes", "📦");
+        }
     }
 
     private void showCampaigns() {
-        showComingSoon("Campagnes", "💰");
+        try {
+            if (campaignView == null) {
+                campaignView = new ParticipantCampaignView(currentUser);
+            }
+            root.setCenter(campaignView.getView());
+            System.out.println("✅ Campagnes affichées");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement campagnes: " + e.getMessage());
+            showComingSoon("Campagnes", "💰");
+        }
     }
 
     private void showDonations() {
-        showComingSoon("Mes dons", "❤️");
+        try {
+            if (donationHistoryView == null) {
+                donationHistoryView = new DonationHistoryView(currentUser);
+            }
+            root.setCenter(donationHistoryView.getView());
+            System.out.println("✅ Historique des dons affiché");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement dons: " + e.getMessage());
+            showComingSoon("Mes dons", "❤️");
+        }
     }
 
     private void showCoupons() {
-        showComingSoon("Mes coupons", "🎫");
+        try {
+            VBox couponsView = createCouponsView();
+            root.setCenter(couponsView);
+            System.out.println("✅ Coupons affichés");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement coupons: " + e.getMessage());
+            showComingSoon("Mes coupons", "🎫");
+        }
     }
 
     private void showProfile() {
-        showComingSoon("Mon profil", "👤");
+        try {
+            VBox profileView = createProfileView();
+            root.setCenter(profileView);
+            System.out.println("✅ Profil affiché");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement profil: " + e.getMessage());
+            showComingSoon("Mon profil", "👤");
+        }
     }
 
     private void showSettings() {
-        showComingSoon("Paramètres", "⚙️");
+        try {
+            VBox settingsView = createSettingsView();
+            root.setCenter(settingsView);
+            System.out.println("✅ Paramètres affichés");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement paramètres: " + e.getMessage());
+            showComingSoon("Paramètres", "⚙️");
+        }
+    }
+
+    // Vue pour les commandes
+    private VBox createOrdersView() {
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(40));
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
+
+        Label title = new Label("📦 Mes Commandes");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
+        title.setTextFill(Color.web("#064e3b"));
+
+        // Exemple de tableau de commandes
+        VBox ordersList = new VBox(10);
+        ordersList.setPadding(new Insets(20));
+        ordersList.setStyle("-fx-background-color: #f9f9f9; -fx-background-radius: 8;");
+
+        Label order1 = new Label("✅ Commande #12345 - 15/02/2024 - 3 articles - 45.99€ (Livrée)");
+        Label order2 = new Label("🔄 Commande #12344 - 10/02/2024 - 1 article - 12.50€ (En cours)");
+        Label order3 = new Label("✅ Commande #12343 - 05/02/2024 - 2 articles - 28.75€ (Livrée)");
+        Label order4 = new Label("⏳ Commande #12342 - 28/01/2024 - 4 articles - 67.30€ (En préparation)");
+
+        ordersList.getChildren().addAll(order1, order2, order3, order4);
+
+        content.getChildren().addAll(title, ordersList);
+        return content;
+    }
+
+    // Vue pour les coupons
+    private VBox createCouponsView() {
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(40));
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
+
+        Label title = new Label("🎫 Mes Coupons");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
+        title.setTextFill(Color.web("#064e3b"));
+
+        // Grille de coupons
+        GridPane couponsGrid = new GridPane();
+        couponsGrid.setHgap(20);
+        couponsGrid.setVgap(20);
+        couponsGrid.setPadding(new Insets(20));
+        couponsGrid.setAlignment(Pos.CENTER);
+
+        // Coupon 1
+        VBox coupon1 = createCouponCard("ECO10", "10% de réduction", "Valable jusqu'au 30/03/2024", "#10b981");
+        // Coupon 2
+        VBox coupon2 = createCouponCard("LOYALTY20", "20% sur votre prochain achat", "Valable jusqu'au 15/04/2024", "#3b82f6");
+        // Coupon 3
+        VBox coupon3 = createCouponCard("FREESHIP", "Livraison gratuite", "Valable jusqu'au 31/03/2024", "#8b5cf6");
+
+        couponsGrid.add(coupon1, 0, 0);
+        couponsGrid.add(coupon2, 1, 0);
+        couponsGrid.add(coupon3, 2, 0);
+
+        content.getChildren().addAll(title, couponsGrid);
+        return content;
+    }
+
+    private VBox createCouponCard(String code, String description, String validity, String color) {
+        VBox card = new VBox(10);
+        card.setPadding(new Insets(20));
+        card.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 10; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
+        card.setPrefWidth(200);
+        card.setAlignment(Pos.CENTER);
+
+        Label codeLabel = new Label(code);
+        codeLabel.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+        codeLabel.setTextFill(Color.WHITE);
+
+        Label descLabel = new Label(description);
+        descLabel.setFont(Font.font("Arial", 12));
+        descLabel.setTextFill(Color.WHITE);
+        descLabel.setWrapText(true);
+        descLabel.setAlignment(Pos.CENTER);
+
+        Label validLabel = new Label(validity);
+        validLabel.setFont(Font.font("Arial", 10));
+        validLabel.setTextFill(Color.web("#f0f0f0"));
+
+        Button copyBtn = new Button("Copier le code");
+        copyBtn.setStyle("-fx-background-color: white; -fx-text-fill: " + color + "; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 5;");
+        copyBtn.setOnAction(e -> {
+            showAlert("Code copié !", "Le code " + code + " a été copié dans le presse-papier.");
+        });
+
+        card.getChildren().addAll(codeLabel, descLabel, validLabel, copyBtn);
+        return card;
+    }
+
+    // Vue pour le profil
+    private VBox createProfileView() {
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(40));
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
+
+        Label title = new Label("👤 Mon Profil");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
+        title.setTextFill(Color.web("#064e3b"));
+
+        // Informations du profil
+        GridPane profileInfo = new GridPane();
+        profileInfo.setHgap(20);
+        profileInfo.setVgap(15);
+        profileInfo.setPadding(new Insets(30));
+        profileInfo.setStyle("-fx-background-color: #f9f9f9; -fx-background-radius: 8;");
+        profileInfo.setAlignment(Pos.CENTER);
+
+        // Ajouter les informations
+        profileInfo.add(new Label("Nom complet:"), 0, 0);
+        profileInfo.add(new Label(currentUser.getNomComplet()), 1, 0);
+
+        profileInfo.add(new Label("Email:"), 0, 1);
+        profileInfo.add(new Label(currentUser.getEmail()), 1, 1);
+
+        profileInfo.add(new Label("Rôle:"), 0, 2);
+        profileInfo.add(new Label(currentUser.getRole()), 1, 2);
+
+        profileInfo.add(new Label("Téléphone:"), 0, 3);
+        profileInfo.add(new Label("+216 XX XXX XXX"), 1, 3);
+
+        profileInfo.add(new Label("Adresse:"), 0, 4);
+        profileInfo.add(new Label("Tunis, Tunisie"), 1, 4);
+
+        Button editBtn = new Button("✏️ Modifier le profil");
+        editBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;");
+        editBtn.setOnAction(e -> showAlert("Modification", "Fonctionnalité de modification à venir..."));
+
+        content.getChildren().addAll(title, profileInfo, editBtn);
+        return content;
+    }
+
+    // Vue pour les paramètres
+    private VBox createSettingsView() {
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(40));
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
+
+        Label title = new Label("⚙️ Paramètres");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
+        title.setTextFill(Color.web("#064e3b"));
+
+        // Paramètres de notification
+        VBox notificationSettings = new VBox(10);
+        notificationSettings.setPadding(new Insets(20));
+        notificationSettings.setStyle("-fx-background-color: #f9f9f9; -fx-background-radius: 8;");
+
+        Label notifTitle = new Label("Notifications");
+        notifTitle.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+
+        CheckBox emailNotif = new CheckBox("Recevoir des notifications par email");
+        emailNotif.setSelected(true);
+
+        CheckBox smsNotif = new CheckBox("Recevoir des notifications par SMS");
+        smsNotif.setSelected(false);
+
+        CheckBox promoNotif = new CheckBox("Recevoir des offres promotionnelles");
+        promoNotif.setSelected(true);
+
+        notificationSettings.getChildren().addAll(notifTitle, emailNotif, smsNotif, promoNotif);
+
+        // Paramètres de confidentialité
+        VBox privacySettings = new VBox(10);
+        privacySettings.setPadding(new Insets(20));
+        privacySettings.setStyle("-fx-background-color: #f9f9f9; -fx-background-radius: 8;");
+
+        Label privacyTitle = new Label("Confidentialité");
+        privacyTitle.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+
+        CheckBox shareData = new CheckBox("Partager mes données avec les partenaires");
+        shareData.setSelected(false);
+
+        CheckBox publicProfile = new CheckBox("Profil public");
+        publicProfile.setSelected(true);
+
+        privacySettings.getChildren().addAll(privacyTitle, shareData, publicProfile);
+
+        Button saveBtn = new Button("💾 Enregistrer les paramètres");
+        saveBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;");
+        saveBtn.setOnAction(e -> showAlert("Succès", "Paramètres enregistrés !"));
+
+        content.getChildren().addAll(title, notificationSettings, privacySettings, saveBtn);
+        return content;
     }
 
     private void showComingSoon(String title, String icon) {
@@ -307,7 +571,7 @@ public class UserDashboard {
 
         Label titleLabel = new Label(title);
         titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 24));
-        titleLabel.setTextFill(Color.web("#2c3e50"));
+        titleLabel.setTextFill(Color.web("#064e3b"));
 
         Label comingSoon = new Label("Module en cours de développement...");
         comingSoon.setFont(Font.font("Arial", 14));
