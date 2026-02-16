@@ -56,7 +56,7 @@ public class EventView {
     private static final String DB_IMAGE_PATH = "uploads/events/";
 
     // 🔑 INSÉREZ VOTRE CLÉ API OPENAI ICI (optionnel)
-    private static final String OPENAI_API_KEY = "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";
+    private static final String OPENAI_API_KEY = "sOPENAI_API_KEY";
 
     // 📚 Bibliothèque d'images gratuites (toutes fonctionnelles)
     private static final String[] FREE_IMAGES = {
@@ -137,7 +137,7 @@ public class EventView {
     private String generateImageWithAI(String prompt) {
         // Vérifier si la clé API est configurée
         if (OPENAI_API_KEY == null || OPENAI_API_KEY.isEmpty() ||
-                OPENAI_API_KEY.equals("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") ||
+                OPENAI_API_KEY.equals("OPENAI_API_KEY") ||
                 !OPENAI_API_KEY.startsWith("sk-")) {
 
             System.out.println("ℹ️ Pas de clé API valide, utilisation d'images gratuites");
