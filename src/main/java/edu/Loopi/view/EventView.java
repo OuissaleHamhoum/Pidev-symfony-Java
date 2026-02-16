@@ -3,7 +3,6 @@ package edu.Loopi.view;
 import edu.Loopi.entities.Event;
 import edu.Loopi.entities.User;
 import edu.Loopi.services.EventService;
-import edu.Loopi.utils.ConfigManager;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
