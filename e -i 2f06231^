@@ -1,0 +1,41 @@
+[33m2009bc1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mGestion-Evenement[m[33m)[m Modification EventView.java
+[33ma2562f1[m Modification OPENAI_API_KEY
+[33mcd5e836[m First commit test
+[33m6d8ca0d[m Modification les interfaces login, register, dashboard admin
+[33m4cf1a27[m Modification les interfaces login, register, dashboard admin
+[33m2b117ef[m mise à jour l'interface pour l'integration
+[33m93636bb[m mise à jour de l'integration d'apres main
+[33m2f06231[m Sauvegarde avant mise à jour main
+[33m7b9972f[m merge main before ouissle
+[33mba7a980[m fix merge userdashboard
+[33m4a71561[m interface de participant
+[33mc9cc7bc[m interface campagne pour le participant ,Integration IA
+[33mba09a2a[m[33m ([m[1;31morigin/Gestion-Galerie[m[33m)[m galerieview crud
+[33m7c2430a[m Fix conflicts and update project
+[33m6fffb67[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/gestion-collection[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mGestion-utilisateur[m[33m)[m Merge branch 'Gestion-utilisateur' of https://github.com/OuissaleHamhoum/Loopi-Project into gestion-collection
+[33m7a2a13d[m Sauvegarde avant pull de gestion-utilisateur
+[33mee7737c[m[33m ([m[1;31morigin/Gestion-utilisateur[m[33m)[m delete AdminDashboard_12.java
+[33m5931a62[m Second modification file LoginView.java
+[33mb02466d[m First file UserProfileView.java
+[33macd4cce[m First file UserManagementView.java
+[33m8257c7e[m First file SettingsView.java
+[33m98316d8[m First file DashboardView.java
+[33m62557be[m First file AnalyticsView.java
+[33m465e001[m First file AdminDashboard.java
+[33md15d91f[m Ajout de l'interface des campagnes avec les fonctionnalités CRUD complètes
+[33m06075f3[m Ajout de l'interface des campagnes avec les fonctionnalités CRUD
+[33m4ea5a87[m Update donation table schema and fix foreign keys
+[33m96ee5fd[m Modification et amelioration AdminDashboard.java
+[33m756459e[m Merge branch 'Gestion-utilisateur' of https://github.com/OuissaleHamhoum/Loopi-Project Merge branch 'Gestion-utilisateur'
+[33ma30d8d4[m The four modification AdminDashboard.java
+[33mb2e9839[m third modification AdminDashboard.java
+[33m96a3606[m Second modification AdminDashboard.java
+[33m1bfd43b[m Second modification
+[33md2227d6[m Modification l'interface
+[33m6a00dbb[m Initialisation du projet
+[33ma454224[m Delete .github/workflows/blank.yml
+[33m801a68a[m Update README.md
+[33m4f0f878[m Create blank.yml
+[33mde4a22b[m Revise README for improved project clarity
+[33m7616de5[m Update README.md
+[33mf6d6ada[m Initial commit
