@@ -3,6 +3,7 @@ package edu.Loopi.view;
 import edu.Loopi.entities.Event;
 import edu.Loopi.entities.User;
 import edu.Loopi.services.EventService;
+import edu.Loopi.utils.ConfigManager;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -55,8 +56,51 @@ public class EventView {
     // 📁 Chemin pour la BDD
     private static final String DB_IMAGE_PATH = "uploads/events/";
 
-    // 🔑 INSÉREZ VOTRE CLÉ API OPENAI ICI (optionnel)
-    private static final String OPENAI_API_KEY = "sOPENAI_API_KEY";
+    // 🔑 API Key management - SECURE VERSION
+    private static String getOpenAIApiKey() {
+        // Try environment variable first
+        String apiKey = System.getenv("OPENAI_API_KEY");
+        if (apiKey != null && !apiKey.isEmpty()) {
+            return apiKey;
+        }
+
+        // Try system property
+        apiKey = System.getProperty("openai.api.key");
+        if (apiKey != null && !apiKey.isEmpty()) {
+            return apiKey;
+        }
+
+        // Try config file
+        try {
+            Properties props = new Properties();
+            File configFile = new File(System.getProperty("user.home"), ".loopi/config.properties");
+            if (configFile.exists()) {
+                try (FileInputStream fis = new FileInputStream(configFile)) {
+                    props.load(fis);
+                    apiKey = props.getProperty("openai.api.key");
+                    if (apiKey != null && !apiKey.isEmpty()) {
+                        return apiKey;
+                    }
+                }
+            }
+
+            // Try project config file
+            configFile = new File("config.properties");
+            if (configFile.exists()) {
+                try (FileInputStream fis = new FileInputStream(configFile)) {
+                    props.load(fis);
+                    apiKey = props.getProperty("openai.api.key");
+                    if (apiKey != null && !apiKey.isEmpty()) {
+                        return apiKey;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("⚠️ Could not load config file: " + e.getMessage());
+        }
+
+        return "";
+    }
 
     // 📚 Bibliothèque d'images gratuites (toutes fonctionnelles)
     private static final String[] FREE_IMAGES = {
@@ -132,14 +176,13 @@ public class EventView {
         return null;
     }
 
-    // ============ GÉNÉRATION D'IMAGE AVEC FALLBACK - CORRIGÉ ============
+    // ============ GÉNÉRATION D'IMAGE AVEC FALLBACK - SECURE VERSION ============
 
     private String generateImageWithAI(String prompt) {
-        // Vérifier si la clé API est configurée
-        if (OPENAI_API_KEY == null || OPENAI_API_KEY.isEmpty() ||
-                OPENAI_API_KEY.equals("OPENAI_API_KEY") ||
-                !OPENAI_API_KEY.startsWith("")) {
+        String apiKey = getOpenAIApiKey();
 
+        // Vérifier si la clé API est configurée
+        if (apiKey == null || apiKey.isEmpty()) {
             System.out.println("ℹ️ Pas de clé API valide, utilisation d'images gratuites");
             return downloadFreeImage(prompt);
         }
@@ -152,7 +195,7 @@ public class EventView {
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Authorization", "Bearer " + OPENAI_API_KEY);
+            connection.setRequestProperty("Authorization", "Bearer " + apiKey);
             connection.setDoOutput(true);
             connection.setConnectTimeout(30000);
             connection.setReadTimeout(60000);
@@ -631,7 +674,7 @@ public class EventView {
         return card;
     }
 
-    // ============ DIALOGUE DE CRÉATION D'ÉVÉNEMENT - CORRIGÉ avec Platform.runLater ============
+    // ============ DIALOGUE DE CRÉATION D'ÉVÉNEMENT ============
 
     private void openEventDialog(Event existingEvent) {
         Stage dialog = new Stage();
@@ -794,7 +837,7 @@ public class EventView {
         capaciteControl.getChildren().addAll(capaciteSpinner, capaciteHelp);
         capaciteBox.getChildren().addAll(capaciteLabel, capaciteControl);
 
-        // --- SECTION IMAGE AVEC Platform.runLater CORRIGÉ ---
+        // --- SECTION IMAGE ---
         VBox imageSection = new VBox(10);
         imageSection.setPadding(new Insets(15));
         imageSection.setStyle("-fx-background-color: #f8fafc; -fx-background-radius: 12; " +
@@ -841,7 +884,7 @@ public class EventView {
         generateAIBtn.setStyle("-fx-background-color: #8b5cf6; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 6; " +
                 "-fx-font-size: 12px;");
-        generateAIBtn.setTooltip(new Tooltip("Générer une image gratuite"));
+        generateAIBtn.setTooltip(new Tooltip("Générer une image avec IA (si clé API configurée)"));
 
         Button clearImageBtn = new Button("🗑️");
         clearImageBtn.setStyle("-fx-background-color: #e2e8f0; -fx-text-fill: #1e293b; " +
@@ -854,7 +897,20 @@ public class EventView {
 
         imageButtons.getChildren().addAll(browseBtn, generateAIBtn, clearImageBtn, aiProgress);
 
-        imageSection.getChildren().addAll(imageTitle, previewBox, imageButtons);
+        // Info sur l'API Key
+        Label apiInfoLabel = new Label();
+        apiInfoLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 10));
+        apiInfoLabel.setTextFill(Color.web("#64748b"));
+
+        String apiKey = getOpenAIApiKey();
+        if (apiKey.isEmpty()) {
+            apiInfoLabel.setText("ℹ️ Mode hors ligne: utilisation d'images gratuites uniquement");
+            generateAIBtn.setTooltip(new Tooltip("Mode hors ligne: utilisation d'images gratuites"));
+        } else {
+            apiInfoLabel.setText("✅ Mode IA: génération d'images disponible");
+        }
+
+        imageSection.getChildren().addAll(imageTitle, previewBox, imageButtons, apiInfoLabel);
 
         // Assemblage
         form.getChildren().addAll(titleBox, descBox, dateBox, lieuBox, capaciteBox, imageSection);
@@ -910,7 +966,7 @@ public class EventView {
             }
         });
 
-        // --- ACTION GÉNÉRATION IA - CORRIGÉ avec Platform.runLater ---
+        // --- ACTION GÉNÉRATION IA - SECURE VERSION ---
         generateAIBtn.setOnAction(e -> {
             String description = descArea.getText().trim();
             String titre = titreField.getText().trim();
@@ -941,7 +997,6 @@ public class EventView {
                     super.succeeded();
                     String result = getValue();
 
-                    // ✅ CORRECTION : Platform.runLater pour l'interface JavaFX
                     Platform.runLater(() -> {
                         if (result != null) {
                             selectedImagePath = result;
@@ -956,6 +1011,12 @@ public class EventView {
                             success.setHeaderText("✅ Image ajoutée");
                             success.setContentText("L'image a été téléchargée avec succès.");
                             success.showAndWait();
+                        } else {
+                            Alert warning = new Alert(Alert.AlertType.WARNING);
+                            warning.setTitle("Information");
+                            warning.setHeaderText("⚠️ Utilisation d'image gratuite");
+                            warning.setContentText("Une image gratuite a été utilisée à la place.");
+                            warning.showAndWait();
                         }
 
                         generateAIBtn.setDisable(false);
@@ -968,7 +1029,6 @@ public class EventView {
                 protected void failed() {
                     super.failed();
 
-                    // ✅ CORRECTION : Platform.runLater pour l'interface JavaFX
                     Platform.runLater(() -> {
                         generateAIBtn.setDisable(false);
                         browseBtn.setDisable(false);
