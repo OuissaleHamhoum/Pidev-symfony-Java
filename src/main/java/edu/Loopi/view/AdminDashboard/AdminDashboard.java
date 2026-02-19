@@ -30,6 +30,7 @@ public class AdminDashboard {
     private BorderPane root;
     private StackPane mainContentArea;
     private String currentView = "dashboard";
+    private ProductManagementView productManagementView;
 
     private DashboardView dashboardView;
     private UserManagementView userManagementView;
@@ -83,6 +84,8 @@ public class AdminDashboard {
         this.userProfileView = new UserProfileView(currentUser, userService, this);
         this.analyticsView = new AnalyticsView(currentUser, userService, this);
         this.settingsView = new SettingsView(currentUser, userService, this);
+
+        this.productManagementView = new ProductManagementView(currentUser, userService, this);
     }
 
     public void start(Stage primaryStage) {
@@ -257,6 +260,10 @@ public class AdminDashboard {
         Button analyticsBtn = createSidebarButton("📈", "Statistiques", "analytics", false);
         sidebarButtons.put("analytics", analyticsBtn);
 
+        // Nouveau bouton pour la gestion de galerie
+        Button galleryManagementBtn = createSidebarButton("🖼️", "Gestion Galerie", "gallery", false);
+        sidebarButtons.put("gallery", galleryManagementBtn);
+
         Separator separator = new Separator();
         separator.setPadding(new Insets(12, 0, 12, 0));
         separator.setStyle("-fx-background-color: " + getBorderColor() + ";");
@@ -270,7 +277,8 @@ public class AdminDashboard {
         Button helpBtn = createSidebarButton("❓", "Aide", "help", false);
         sidebarButtons.put("help", helpBtn);
 
-        navMenu.getChildren().addAll(dashboardBtn, usersBtn, analyticsBtn, separator, profileBtn, settingsBtn, helpBtn);
+        navMenu.getChildren().addAll(dashboardBtn, usersBtn, analyticsBtn, galleryManagementBtn, separator, profileBtn, settingsBtn, helpBtn);
+
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -490,10 +498,18 @@ public class AdminDashboard {
             case "dashboard": showDashboard(); break;
             case "users": showUserManagementViewInCenter(); break;
             case "analytics": showAnalyticsView(); break;
+
+            case "gallery": showProductManagementView(); break; // Ajoutez cette ligne
+
+
             case "settings": showSettingsView(); break;
             case "profile": showUserProfileInMain(); break;
             case "help": showHelpCenter(); break;
         }
+    }
+
+    public void showProductManagementView() {
+        productManagementView.showProductManagementView(mainContentArea, isDarkMode);
     }
 
     public void showDashboard() {
