@@ -111,6 +111,7 @@ public class FavorisService implements IFavorisService {
     }
 
     // Méthode utilitaire pour obtenir les IDs des produits favoris
+    // Dans FavorisService.java, ajoutez cette méthode :
     public List<Integer> getFavorisIdsByUser(int idUser) {
         List<Integer> ids = new ArrayList<>();
         String query = "SELECT id_produit FROM favoris WHERE id_user = ?";
@@ -125,4 +126,6 @@ public class FavorisService implements IFavorisService {
         }
         return ids;
     }
+
+
 }

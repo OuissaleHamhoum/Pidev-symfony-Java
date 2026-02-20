@@ -92,4 +92,28 @@ public class ProduitService {
             e.printStackTrace();
         }
     }
+
+    // Dans ProduitService.java, ajoutez :
+    // Dans ProduitService.java, ajoutez la méthode manquante :
+    // Dans ProduitService.java, ajoutez cette méthode :
+    public Produit getProduitById(int id) {
+        String query = "SELECT * FROM produit WHERE id_produit = ?";
+        try (PreparedStatement pst = cnx.prepareStatement(query)) {
+            pst.setInt(1, id);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return new Produit(
+                        rs.getInt("id_produit"),
+                        rs.getString("nom_produit"),
+                        rs.getString("description"),
+                        rs.getString("image_produit"),
+                        rs.getInt("id_cat"),
+                        rs.getInt("id_user")
+                );
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur getProduitById: " + e.getMessage());
+        }
+        return null;
+    }
 }

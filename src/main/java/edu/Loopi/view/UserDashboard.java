@@ -187,6 +187,10 @@ public class UserDashboard {
         Button browseBtn = createMenuButton("🛒 Galerie");
         browseBtn.setOnAction(e -> showProducts());
 
+        // NOUVEAU BOUTON RECOMMANDATIONS
+        Button recBtn = createMenuButton("🎯 Recommandations");
+        recBtn.setOnAction(e -> showRecommendations());
+
         // NOUVEAU BOUTON FAVORIS
         Button favorisBtn = createMenuButton("❤️ Mes favoris");
         favorisBtn.setOnAction(e -> showFavoris());
@@ -229,13 +233,25 @@ public class UserDashboard {
 
         menuItems.getChildren().addAll(
                 eventsSection, eventsBtn, myParticipationsBtn,
-                shopSection, browseBtn, favorisBtn, ordersBtn,
+                shopSection, browseBtn, recBtn, favorisBtn, ordersBtn, // recBtn ajouté ici
                 donationsSection, campaignsBtn, myDonationsBtn, myCouponsBtn,
                 profileSection, profileBtn, settingsBtn
         );
 
         sidebar.getChildren().addAll(profileBox, menuItems, spacer, logoutBtn);
         return sidebar;
+    }
+
+    // Ajouter la méthode :
+    private void showRecommendations() {
+        try {
+            RecommendationView recView = new RecommendationView();
+            root.setCenter(recView.getView());
+            System.out.println("✅ Recommandations affichées");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement recommandations: " + e.getMessage());
+            showComingSoon("Recommandations", "🎯");
+        }
     }
 
     private Button createMenuButton(String text) {
