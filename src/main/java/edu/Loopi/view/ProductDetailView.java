@@ -6,10 +6,8 @@ import edu.Loopi.entities.User;
 import edu.Loopi.services.FeedbackService;
 import edu.Loopi.services.ProduitService;
 import edu.Loopi.services.FavorisService;
-import edu.Loopi.services.SentimentAnalysisService;
-import edu.Loopi.services.ProductChatbotService;
+import edu.Loopi.services.OpenAIService;
 import edu.Loopi.tools.SessionManager;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -20,6 +18,8 @@ import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.animation.ScaleTransition;
 import javafx.util.Duration;
+import javafx.concurrent.Task;
+import javafx.scene.control.ProgressIndicator;
 
 import java.io.File;
 import java.net.URLEncoder;
@@ -33,18 +33,10 @@ public class ProductDetailView {
     private FeedbackService feedbackService = new FeedbackService();
     private ProduitService produitService = new ProduitService();
     private FavorisService favorisService = new FavorisService();
-
-    // Services API
-    private SentimentAnalysisService sentimentService = new SentimentAnalysisService();
-    private ProductChatbotService chatbotService = new ProductChatbotService();
-
+    private OpenAIService openAIService = new OpenAIService();
     private int selectedRating = 0;
     private Stage stage;
     private boolean estFavoris = false;
-
-    // Composants chatbot
-    private VBox chatbotMessages;
-    private TextField chatInput;
 
     private final Map<Integer, String> categoryNames = new HashMap<>() {{
         put(1, "Objets décoratifs");
@@ -61,26 +53,38 @@ public class ProductDetailView {
     public void show() {
         this.stage = new Stage();
 
+        // Vérifier si le produit est déjà en favoris
         estFavoris = favorisService.estDansFavoris(currentUser.getId(), produit.getId());
 
+        // Conteneur principal avec padding
         VBox mainContainer = new VBox(20);
         mainContainer.setPadding(new Insets(20));
         mainContainer.setStyle("-fx-background-color: #f5f5f5;");
 
+        // Barre du haut
         HBox topBar = createTopBar();
+
+        // === SECTION PRODUIT ===
         VBox productSection = createProductSection();
+
+        // === SECTION RESEAUX SOCIAUX ===
         HBox socialShareSection = createSocialShareSection();
-        VBox chatbotSection = createChatbotSection();
+
+        // === SECTION FEEDBACK ===
         VBox feedbackSection = createFeedbackSection();
+
+        // === PRODUITS SIMILAIRES ===
         VBox similarSection = createSimilarProductsSection();
 
-        mainContainer.getChildren().addAll(topBar, productSection, socialShareSection, chatbotSection, feedbackSection, similarSection);
+        // Ajout de toutes les sections au conteneur principal
+        mainContainer.getChildren().addAll(topBar, productSection, socialShareSection, feedbackSection, similarSection);
 
+        // ScrollPane pour permettre le défilement
         ScrollPane scrollPane = new ScrollPane(mainContainer);
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
 
-        Scene scene = new Scene(scrollPane, 900, 900);
+        Scene scene = new Scene(scrollPane, 900, 800);
         stage.setScene(scene);
         stage.setTitle("Détails du Produit - " + produit.getNom());
         stage.show();
@@ -105,6 +109,7 @@ public class ProductDetailView {
         VBox productSection = new VBox(20);
         productSection.setStyle("-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
 
+        // Image du produit
         StackPane imageContainer = new StackPane();
         imageContainer.setStyle("-fx-background-color: #fafafa; -fx-background-radius: 10;");
         imageContainer.setPrefHeight(300);
@@ -128,6 +133,7 @@ public class ProductDetailView {
         }
         imageContainer.getChildren().add(imageView);
 
+        // Titre et bouton favoris
         HBox titleBox = new HBox(10);
         titleBox.setAlignment(Pos.CENTER_LEFT);
 
@@ -151,6 +157,9 @@ public class ProductDetailView {
         return productSection;
     }
 
+    /**
+     * Crée la section de partage sur les réseaux sociaux
+     */
     private HBox createSocialShareSection() {
         HBox socialSection = new HBox(20);
         socialSection.setAlignment(Pos.CENTER_LEFT);
@@ -160,18 +169,23 @@ public class ProductDetailView {
         Label shareLabel = new Label("Partager sur :");
         shareLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #2c3e50;");
 
+        // Bouton Facebook
         Button facebookBtn = createSocialButton("Facebook", "#1877f2", "F");
         facebookBtn.setOnAction(e -> shareOnFacebook());
 
+        // Bouton Twitter
         Button twitterBtn = createSocialButton("Twitter", "#1da1f2", "🐦");
         twitterBtn.setOnAction(e -> shareOnTwitter());
 
+        // Bouton WhatsApp
         Button whatsappBtn = createSocialButton("WhatsApp", "#25d366", "📱");
         whatsappBtn.setOnAction(e -> shareOnWhatsApp());
 
+        // Bouton LinkedIn
         Button linkedinBtn = createSocialButton("LinkedIn", "#0077b5", "in");
         linkedinBtn.setOnAction(e -> shareOnLinkedIn());
 
+        // Bouton Copier le lien
         Button copyBtn = createSocialButton("Copier le lien", "#6c757d", "📋");
         copyBtn.setOnAction(e -> copyLinkToClipboard());
 
@@ -182,12 +196,16 @@ public class ProductDetailView {
         return socialSection;
     }
 
+    /**
+     * Crée un bouton de réseau social stylisé
+     */
     private Button createSocialButton(String text, String color, String icon) {
         Button btn = new Button(icon + " " + text);
         btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 15; " +
                 "-fx-background-radius: 20; -fx-cursor: hand;");
 
+        // Animation au survol
         ScaleTransition st = new ScaleTransition(Duration.millis(200), btn);
         st.setToX(1.05);
         st.setToY(1.05);
@@ -211,6 +229,9 @@ public class ProductDetailView {
         return btn;
     }
 
+    /**
+     * Partage sur Facebook
+     */
     private void shareOnFacebook() {
         try {
             String url = "https://www.facebook.com/sharer/sharer.php?u=" +
@@ -222,6 +243,9 @@ public class ProductDetailView {
         }
     }
 
+    /**
+     * Partage sur Twitter
+     */
     private void shareOnTwitter() {
         try {
             String text = "Découvrez " + produit.getNom() + " sur LOOPI !";
@@ -235,6 +259,9 @@ public class ProductDetailView {
         }
     }
 
+    /**
+     * Partage sur WhatsApp
+     */
     private void shareOnWhatsApp() {
         try {
             String text = "Découvrez " + produit.getNom() + " sur LOOPI !\n" + getProductUrl();
@@ -247,6 +274,9 @@ public class ProductDetailView {
         }
     }
 
+    /**
+     * Partage sur LinkedIn
+     */
     private void shareOnLinkedIn() {
         try {
             String url = "https://www.linkedin.com/sharing/share-offsite/?url=" +
@@ -258,6 +288,9 @@ public class ProductDetailView {
         }
     }
 
+    /**
+     * Copie le lien du produit dans le presse-papiers
+     */
     private void copyLinkToClipboard() {
         try {
             javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
@@ -270,11 +303,17 @@ public class ProductDetailView {
         }
     }
 
+    /**
+     * Génère une URL pour le produit (simulée)
+     */
     private String getProductUrl() {
         return "https://www.loopi.tn/produit/" + produit.getId() + "/" +
                 produit.getNom().toLowerCase().replace(" ", "-");
     }
 
+    /**
+     * Ouvre le navigateur par défaut avec l'URL donnée
+     */
     private void openBrowser(String url) {
         try {
             java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
@@ -287,8 +326,10 @@ public class ProductDetailView {
         Button favBtn = new Button();
         favBtn.setStyle("-fx-background-color: transparent; -fx-font-size: 28px; -fx-cursor: hand;");
 
+        // Mettre à jour le texte selon l'état
         updateFavorisButton(favBtn);
 
+        // Animation au survol
         ScaleTransition st = new ScaleTransition(Duration.millis(200), favBtn);
         st.setToX(1.2);
         st.setToY(1.2);
@@ -303,6 +344,7 @@ public class ProductDetailView {
             st.play();
         });
 
+        // Action du bouton
         favBtn.setOnAction(e -> {
             if (estFavoris) {
                 favorisService.supprimerFavoris(currentUser.getId(), produit.getId());
@@ -329,169 +371,41 @@ public class ProductDetailView {
         }
     }
 
-    private VBox createChatbotSection() {
-        VBox chatbotSection = new VBox(15);
-        chatbotSection.setStyle("-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
-
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
-
-        Label icon = new Label("🤖");
-        icon.setStyle("-fx-font-size: 24px;");
-
-        Label title = new Label("Assistant Produit");
-        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        header.getChildren().addAll(icon, title, spacer);
-
-        chatbotMessages = new VBox(10);
-        chatbotMessages.setPadding(new Insets(10));
-        chatbotMessages.setStyle("-fx-background-color: #f8f9fa; -fx-background-radius: 8;");
-
-        VBox welcomeMsg = createChatbotMessage(
-                "Bonjour ! Je suis l'assistant virtuel pour " + produit.getNom() +
-                        ". Posez-moi des questions sur ses avantages écologiques, son entretien, sa durabilité, etc.",
-                true
-        );
-        chatbotMessages.getChildren().add(welcomeMsg);
-
-        ScrollPane messagesScroll = new ScrollPane(chatbotMessages);
-        messagesScroll.setFitToWidth(true);
-        messagesScroll.setPrefHeight(200);
-        messagesScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: #e0e0e0; -fx-border-radius: 8;");
-
-        HBox inputBox = new HBox(10);
-        inputBox.setAlignment(Pos.CENTER);
-        inputBox.setPadding(new Insets(10, 0, 0, 0));
-
-        chatInput = new TextField();
-        chatInput.setPromptText("Posez votre question...");
-        chatInput.setPrefWidth(400);
-        chatInput.setStyle("-fx-background-radius: 20; -fx-padding: 10 15; -fx-border-color: #e0e0e0; -fx-border-radius: 20;");
-
-        ComboBox<String> quickQuestions = new ComboBox<>();
-        quickQuestions.getItems().addAll(
-                "Quels sont ses avantages écologiques ?",
-                "Est-ce un produit durable ?",
-                "Comment l'entretenir ?",
-                "Est-ce un produit unique ?",
-                "Quels matériaux sont utilisés ?"
-        );
-        quickQuestions.setPromptText("Questions rapides");
-        quickQuestions.setStyle("-fx-background-radius: 20; -fx-padding: 5 10;");
-        quickQuestions.setOnAction(e -> {
-            if (quickQuestions.getValue() != null) {
-                chatInput.setText(quickQuestions.getValue());
-                sendChatMessage();
-                quickQuestions.setValue(null);
-            }
-        });
-
-        Button sendBtn = new Button("Envoyer");
-        sendBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 20; -fx-cursor: hand;");
-        sendBtn.setOnAction(e -> sendChatMessage());
-
-        chatInput.setOnAction(e -> sendChatMessage());
-
-        inputBox.getChildren().addAll(chatInput, quickQuestions, sendBtn);
-
-        chatbotSection.getChildren().addAll(header, messagesScroll, inputBox);
-        return chatbotSection;
-    }
-
-    private VBox createChatbotMessage(String text, boolean isBot) {
-        VBox messageBox = new VBox(5);
-        messageBox.setPadding(new Insets(8, 12, 8, 12));
-
-        HBox header = new HBox(5);
-        header.setAlignment(Pos.CENTER_LEFT);
-
-        Label senderIcon = new Label(isBot ? "🤖" : "👤");
-        senderIcon.setStyle("-fx-font-size: 14px;");
-
-        Label senderName = new Label(isBot ? "Assistant" : "Vous");
-        senderName.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: " + (isBot ? "#2196F3" : "#4CAF50") + ";");
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        Label time = new Label(java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
-        time.setStyle("-fx-font-size: 10px; -fx-text-fill: #999;");
-
-        header.getChildren().addAll(senderIcon, senderName, spacer, time);
-
-        Label message = new Label(text);
-        message.setWrapText(true);
-        message.setStyle("-fx-font-size: 13px; -fx-padding: 5 0 0 20;");
-
-        messageBox.getChildren().addAll(header, message);
-
-        String bgColor = isBot ? "#E3F2FD" : "#E8F5E8";
-
-        messageBox.setStyle("-fx-background-color: " + bgColor + "; -fx-background-radius: 10; -fx-padding: 10;");
-
-        return messageBox;
-    }
-
-    private void sendChatMessage() {
-        String question = chatInput.getText().trim();
-        if (question.isEmpty()) return;
-
-        VBox userMsg = createChatbotMessage(question, false);
-        chatbotMessages.getChildren().add(userMsg);
-
-        chatInput.clear();
-
-        VBox typingMsg = new VBox(5);
-        typingMsg.setPadding(new Insets(8, 12, 8, 12));
-        typingMsg.setStyle("-fx-background-color: #E3F2FD; -fx-background-radius: 10; -fx-padding: 10;");
-
-        HBox typingHeader = new HBox(5);
-        typingHeader.setAlignment(Pos.CENTER_LEFT);
-
-        Label typingIcon = new Label("🤖");
-        typingIcon.setStyle("-fx-font-size: 14px;");
-
-        Label typingName = new Label("Assistant tape...");
-        typingName.setStyle("-fx-font-style: italic; -fx-text-fill: #666; -fx-font-size: 11px;");
-
-        typingHeader.getChildren().addAll(typingIcon, typingName);
-        typingMsg.getChildren().add(typingHeader);
-
-        chatbotMessages.getChildren().add(typingMsg);
-
-        chatbotMessages.layout();
-
-        new Thread(() -> {
-            String response = chatbotService.askAboutProduct(produit, question);
-
-            Platform.runLater(() -> {
-                chatbotMessages.getChildren().remove(typingMsg);
-
-                VBox botMsg = createChatbotMessage(response, true);
-                chatbotMessages.getChildren().add(botMsg);
-            });
-        }).start();
-    }
-
     private VBox createFeedbackSection() {
         VBox feedbackSection = new VBox(20);
         feedbackSection.setStyle("-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
 
+        // En-tête avec note moyenne
         HBox ratingHeader = createRatingHeader();
 
         Label feedbackTitle = new Label("Avis des clients");
         feedbackTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
 
+        // Barre d'outils IA
+        HBox aiTools = new HBox(10);
+        aiTools.setAlignment(Pos.CENTER_RIGHT);
+        aiTools.setPadding(new Insets(0, 0, 10, 0));
+
+        Button analyzeBtn = new Button("📊 Analyser les avis");
+        analyzeBtn.setStyle("-fx-background-color: #8b5cf6; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 5; -fx-cursor: hand;");
+        analyzeBtn.setOnAction(e -> showSentimentAnalysis());
+
+        Button chatbotBtn = new Button("🤖 Assistant virtuel");
+        chatbotBtn.setStyle("-fx-background-color: #10b981; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 5; -fx-cursor: hand;");
+        chatbotBtn.setOnAction(e -> showChatbot());
+
+        aiTools.getChildren().addAll(analyzeBtn, chatbotBtn);
+
+        // Formulaire d'avis
         VBox formBox = new VBox(10);
         formBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-background-radius: 5;");
 
         Label rateLabel = new Label("Donnez votre avis :");
         rateLabel.setStyle("-fx-font-weight: bold;");
 
+        // Étoiles
         HBox starBox = new HBox(5);
         for (int i = 1; i <= 5; i++) {
             final int rating = i;
@@ -516,6 +430,7 @@ public class ProductDetailView {
 
         formBox.getChildren().addAll(rateLabel, starBox, commentArea, submitBtn);
 
+        // Liste des commentaires
         VBox commentsList = new VBox(10);
 
         List<Feedback> feedbacks = feedbackService.getFeedbacksByProduct(produit.getId());
@@ -530,7 +445,7 @@ public class ProductDetailView {
             }
         }
 
-        feedbackSection.getChildren().addAll(ratingHeader, feedbackTitle, formBox, commentsList);
+        feedbackSection.getChildren().addAll(ratingHeader, feedbackTitle, aiTools, formBox, commentsList);
         return feedbackSection;
     }
 
@@ -614,10 +529,12 @@ public class ProductDetailView {
 
         feedbackService.addFeedback(feedback);
 
+        // Reset
         selectedRating = 0;
         commentArea.clear();
         updateStars(starBox);
 
+        // Refresh
         refresh();
     }
 
@@ -652,27 +569,7 @@ public class ProductDetailView {
 
         card.getChildren().addAll(header, comment);
 
-        // Analyse des sentiments
-        var sentiment = sentimentService.analyzeSentiment(f.getCommentaire());
-
-        HBox sentimentBox = new HBox(5);
-        sentimentBox.setAlignment(Pos.CENTER_LEFT);
-        sentimentBox.setPadding(new Insets(5, 0, 0, 0));
-
-        String sentimentText = (String) sentiment.get("sentiment");
-        String sentimentEmoji = (String) sentiment.get("emoji");
-        String sentimentColor = (String) sentiment.get("color");
-        double score = (double) sentiment.get("score");
-        String confiance = (String) sentiment.get("confiance");
-
-        Label sentimentLabel = new Label(sentimentEmoji + " " + sentimentText +
-                " (" + String.format("%.0f", score * 100) + "%) - Confiance " + confiance);
-        sentimentLabel.setStyle("-fx-background-color: " + sentimentColor + "20; -fx-text-fill: " + sentimentColor + "; " +
-                "-fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 3 10; -fx-background-radius: 12;");
-
-        sentimentBox.getChildren().add(sentimentLabel);
-        card.getChildren().add(sentimentBox);
-
+        // Boutons pour ses propres commentaires
         if (f.getIdUser() == currentUser.getId()) {
             HBox actions = new HBox(10);
             actions.setAlignment(Pos.CENTER_RIGHT);
@@ -828,6 +725,263 @@ public class ProductDetailView {
                 card.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 8; -fx-background-radius: 5; -fx-cursor: hand;"));
 
         return card;
+    }
+
+    /**
+     * Analyse des sentiments des avis
+     */
+    private void showSentimentAnalysis() {
+        List<Feedback> feedbacks = feedbackService.getFeedbacksByProduct(produit.getId());
+
+        if (feedbacks.isEmpty()) {
+            showAlert("Information", "Aucun avis à analyser pour ce produit.");
+            return;
+        }
+
+        Task<OpenAIService.SentimentAnalysis> task = new Task<OpenAIService.SentimentAnalysis>() {
+            @Override
+            protected OpenAIService.SentimentAnalysis call() throws Exception {
+                // Analyser le premier commentaire comme exemple
+                return openAIService.analyzeSentiment(feedbacks.get(0).getCommentaire());
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            OpenAIService.SentimentAnalysis analysis = task.getValue();
+            showSentimentResult(analysis, feedbacks.size());
+        });
+
+        task.setOnFailed(e -> {
+            showAlert("Erreur", "Échec de l'analyse des sentiments");
+        });
+
+        showLoadingDialog("Analyse des avis en cours...", task);
+        new Thread(task).start();
+    }
+
+    private void showSentimentResult(OpenAIService.SentimentAnalysis analysis, int totalAvis) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("📊 Analyse des sentiments");
+        dialog.setHeaderText(null);
+
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(450);
+
+        // En-tête avec émotion dominante
+        HBox headerBox = new HBox(15);
+        headerBox.setAlignment(Pos.CENTER_LEFT);
+
+        Label emotionIcon = new Label(analysis.getSentimentEmoji());
+        emotionIcon.setStyle("-fx-font-size: 48px;");
+
+        VBox sentimentBox = new VBox(5);
+        Label sentimentLabel = new Label("Sentiment: " + analysis.getSentiment());
+        sentimentLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: " +
+                getSentimentColor(analysis.getSentiment()) + ";");
+
+        Label scoreLabel = new Label(String.format("Score de confiance: %.0f%%", analysis.getScore() * 100));
+        scoreLabel.setStyle("-fx-font-size: 14px;");
+
+        sentimentBox.getChildren().addAll(sentimentLabel, scoreLabel);
+        headerBox.getChildren().addAll(emotionIcon, sentimentBox);
+
+        // Barre de progression
+        ProgressBar sentimentBar = new ProgressBar(analysis.getScore());
+        sentimentBar.setPrefWidth(400);
+        sentimentBar.setStyle("-fx-accent: " + getSentimentColor(analysis.getSentiment()) + ";");
+
+        // Explication
+        Label explicationLabel = new Label(analysis.getExplanation());
+        explicationLabel.setWrapText(true);
+        explicationLabel.setStyle("-fx-font-size: 14px; -fx-padding: 10; -fx-background-color: #f8f9fa; -fx-background-radius: 8;");
+
+        // Mots-clés détectés
+        if (!analysis.getMotsCles().isEmpty()) {
+            VBox keywordsBox = new VBox(10);
+            keywordsBox.setPadding(new Insets(10, 0, 0, 0));
+
+            Label keywordsTitle = new Label("🔑 Mots-clés détectés:");
+            keywordsTitle.setStyle("-fx-font-weight: bold;");
+
+            FlowPane keywordsFlow = new FlowPane(10, 10);
+            keywordsFlow.setPrefWrapLength(400);
+
+            for (String mot : analysis.getMotsCles()) {
+                Label tag = new Label(mot);
+                tag.setStyle("-fx-background-color: #e2e8f0; -fx-padding: 5 12; -fx-background-radius: 15; -fx-font-size: 12px;");
+                keywordsFlow.getChildren().add(tag);
+            }
+
+            keywordsBox.getChildren().addAll(keywordsTitle, keywordsFlow);
+            content.getChildren().add(keywordsBox);
+        }
+
+        // Statistiques
+        HBox statsBox = new HBox(20);
+        statsBox.setAlignment(Pos.CENTER);
+        statsBox.setPadding(new Insets(15, 0, 0, 0));
+        statsBox.setStyle("-fx-border-color: #e2e8f0; -fx-border-width: 1 0 0 0; -fx-padding: 15 0 0 0;");
+
+        VBox totalBox = new VBox(5);
+        totalBox.setAlignment(Pos.CENTER);
+        Label totalValue = new Label(String.valueOf(totalAvis));
+        totalValue.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        Label totalLabel = new Label("Total avis");
+        totalBox.getChildren().addAll(totalValue, totalLabel);
+
+        statsBox.getChildren().add(totalBox);
+
+        content.getChildren().addAll(headerBox, sentimentBar, explicationLabel, statsBox);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    private String getSentimentColor(String sentiment) {
+        switch (sentiment) {
+            case "positif": return "#10b981";
+            case "negatif": return "#ef4444";
+            default: return "#f59e0b";
+        }
+    }
+
+    /**
+     * Chatbot pour les questions sur le produit
+     */
+    private void showChatbot() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("🤖 Assistant LOOPI");
+        dialog.setHeaderText("Posez vos questions sur " + produit.getNom());
+
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(450);
+
+        // Zone des messages
+        VBox messagesBox = new VBox(10);
+        messagesBox.setPrefHeight(300);
+        messagesBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 10; -fx-background-radius: 8;");
+
+        ScrollPane scrollPane = new ScrollPane(messagesBox);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefHeight(300);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+
+        // Message de bienvenue
+        HBox welcomeMsg = createChatMessage("Bonjour ! Je suis l'assistant LOOPI. " +
+                "Posez-moi des questions sur les avantages de " + produit.getNom() +
+                " (qualités artistiques, écologiques, etc.)", false);
+        messagesBox.getChildren().add(welcomeMsg);
+
+        // Zone de saisie
+        HBox inputBox = new HBox(10);
+        inputBox.setAlignment(Pos.CENTER);
+
+        TextField questionField = new TextField();
+        questionField.setPromptText("Votre question...");
+        questionField.setPrefWidth(300);
+
+        Button sendBtn = new Button("Envoyer");
+        sendBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 5;");
+
+        inputBox.getChildren().addAll(questionField, sendBtn);
+
+        content.getChildren().addAll(scrollPane, inputBox);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        // Gestion de l'envoi
+        sendBtn.setOnAction(e -> {
+            String question = questionField.getText().trim();
+            if (!question.isEmpty()) {
+                // Ajouter la question de l'utilisateur
+                HBox userMsg = createChatMessage(question, true);
+                messagesBox.getChildren().add(userMsg);
+
+                // Effacer le champ
+                questionField.clear();
+
+                // Faire défiler vers le bas
+                scrollPane.setVvalue(1.0);
+
+                // Obtenir la réponse de l'IA
+                Task<String> responseTask = new Task<String>() {
+                    @Override
+                    protected String call() throws Exception {
+                        String category = categoryNames.getOrDefault(produit.getIdCategorie(), "Art recyclé");
+                        return openAIService.askProductBenefits(produit.getNom(), category, question);
+                    }
+                };
+
+                responseTask.setOnSucceeded(ev -> {
+                    String response = responseTask.getValue();
+                    if (response != null && !response.isEmpty()) {
+                        HBox botMsg = createChatMessage(response, false);
+                        messagesBox.getChildren().add(botMsg);
+                        scrollPane.setVvalue(1.0);
+                    }
+                });
+
+                new Thread(responseTask).start();
+            }
+        });
+
+        // Permettre l'envoi avec Entrée
+        questionField.setOnAction(e -> sendBtn.fire());
+
+        dialog.showAndWait();
+    }
+
+    private HBox createChatMessage(String message, boolean isUser) {
+        HBox box = new HBox(10);
+        box.setAlignment(isUser ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        box.setPadding(new Insets(5));
+
+        Label avatar = new Label(isUser ? "👤" : "🤖");
+        avatar.setStyle("-fx-font-size: 20px;");
+
+        Label msgLabel = new Label(message);
+        msgLabel.setWrapText(true);
+        msgLabel.setMaxWidth(300);
+        msgLabel.setStyle(isUser ?
+                "-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 10; -fx-background-radius: 15 15 5 15;" :
+                "-fx-background-color: #e2e8f0; -fx-text-fill: #1e293b; -fx-padding: 10; -fx-background-radius: 15 15 15 5;");
+
+        if (isUser) {
+            box.getChildren().addAll(msgLabel, avatar);
+        } else {
+            box.getChildren().addAll(avatar, msgLabel);
+        }
+
+        return box;
+    }
+
+    private void showLoadingDialog(String message, Task<?> task) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("🤖 Traitement IA");
+        dialog.setHeaderText(null);
+
+        VBox content = new VBox(15);
+        content.setAlignment(Pos.CENTER);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(300);
+
+        ProgressIndicator progress = new ProgressIndicator();
+        progress.setPrefSize(40, 40);
+        Label msgLabel = new Label(message);
+        msgLabel.setStyle("-fx-font-size: 14px;");
+
+        content.getChildren().addAll(progress, msgLabel);
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        task.setOnSucceeded(e -> dialog.close());
+        task.setOnFailed(e -> dialog.close());
+
+        dialog.show();
     }
 
     private String formatDate(java.time.LocalDateTime date) {

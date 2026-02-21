@@ -2,10 +2,8 @@ package edu.Loopi.view;
 
 import edu.Loopi.entities.Produit;
 import edu.Loopi.services.ProduitService;
-import edu.Loopi.services.ImageAdviceService;
-import edu.Loopi.services.AutoDescriptionService;
+import edu.Loopi.services.OpenAIService;
 import edu.Loopi.tools.SessionManager;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -18,18 +16,16 @@ import javafx.scene.effect.DropShadow;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.concurrent.Task;
 import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class GalerieView {
     private ProduitService ps = new ProduitService();
+    private OpenAIService openAIService = new OpenAIService();
     private FlowPane flowPane = new FlowPane(25, 25);
     private String selectedImagePath = "";
-
-    // Services API
-    private ImageAdviceService imageAdviceService = new ImageAdviceService();
-    private AutoDescriptionService autoDescriptionService = new AutoDescriptionService();
 
     // Constantes de couleurs
     private static final String PRIMARY_COLOR = "#4361ee";
@@ -39,6 +35,7 @@ public class GalerieView {
     private static final String DARK_COLOR = "#2c3e50";
     private static final String LIGHT_GRAY = "#f8f9fa";
     private static final String BORDER_COLOR = "#e9ecef";
+    private static final String AI_COLOR = "#8b5cf6";
 
     // Composants pour les filtres
     private TextField searchField = new TextField();
@@ -59,10 +56,16 @@ public class GalerieView {
         container.setPadding(new Insets(0));
         container.setStyle("-fx-background-color: " + LIGHT_GRAY + ";");
 
+        // En-tête compact
         VBox header = createCompactHeader();
+
+        // Statistiques compactes
         statisticsPanel = createCompactStatisticsPanel();
+
+        // Barre de filtres compacte
         HBox filterBar = createCompactFilterBar();
 
+        // Grille de produits
         flowPane.setPadding(new Insets(20, 30, 30, 30));
         flowPane.setAlignment(Pos.TOP_CENTER);
         flowPane.setHgap(25);
@@ -82,6 +85,9 @@ public class GalerieView {
         return container;
     }
 
+    /**
+     * Crée un en-tête compact
+     */
     private VBox createCompactHeader() {
         VBox header = new VBox(8);
         header.setPadding(new Insets(15, 40, 10, 40));
@@ -108,7 +114,7 @@ public class GalerieView {
 
         topRow.getChildren().addAll(title, spacer, addBtn);
 
-        Label subtitle = new Label("Gérez vos créations artistiques");
+        Label subtitle = new Label("Gérez vos créations artistiques avec l'assistance IA");
         subtitle.setFont(Font.font("System", 14));
         subtitle.setTextFill(Color.rgb(255, 255, 255, 0.9));
 
@@ -116,6 +122,9 @@ public class GalerieView {
         return header;
     }
 
+    /**
+     * Crée un panneau de statistiques compact
+     */
     private VBox createCompactStatisticsPanel() {
         VBox panel = new VBox(8);
         panel.setPadding(new Insets(10, 40, 5, 40));
@@ -133,18 +142,23 @@ public class GalerieView {
         return panel;
     }
 
+    /**
+     * Crée une barre de filtres compacte
+     */
     private HBox createCompactFilterBar() {
         HBox filterBar = new HBox(15);
         filterBar.setAlignment(Pos.CENTER_LEFT);
         filterBar.setPadding(new Insets(10, 40, 10, 40));
         filterBar.setStyle("-fx-background-color: white;");
 
+        // Bouton d'actualisation
         Button refreshBtn = new Button("🔄");
         refreshBtn.setStyle("-fx-background-color: " + PRIMARY_COLOR + "; -fx-text-fill: white; " +
                 "-fx-font-size: 16px; -fx-padding: 8 12; -fx-background-radius: 10; -fx-cursor: hand;");
         refreshBtn.setTooltip(new Tooltip("Actualiser"));
         refreshBtn.setOnAction(e -> refreshData());
 
+        // Champ de recherche
         HBox searchBox = new HBox(8);
         searchBox.setAlignment(Pos.CENTER_LEFT);
         searchBox.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 20; -fx-padding: 5 12;");
@@ -159,9 +173,11 @@ public class GalerieView {
 
         searchBox.getChildren().addAll(searchIcon, searchField);
 
+        // Séparateur
         Separator sep1 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep1.setStyle("-fx-background-color: " + BORDER_COLOR + ";");
 
+        // Filtre catégorie
         VBox categoryBox = new VBox(2);
         Label catLabel = new Label("Catégorie");
         catLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #6c757d; -fx-font-weight: bold;");
@@ -175,9 +191,11 @@ public class GalerieView {
 
         categoryBox.getChildren().addAll(catLabel, categoryFilter);
 
+        // Séparateur
         Separator sep2 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep2.setStyle("-fx-background-color: " + BORDER_COLOR + ";");
 
+        // Tri
         VBox sortBox = new VBox(2);
         Label sortLabel = new Label("Trier par");
         sortLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #6c757d; -fx-font-weight: bold;");
@@ -195,6 +213,7 @@ public class GalerieView {
 
         sortBox.getChildren().addAll(sortLabel, sortCombo);
 
+        // Bouton réinitialiser
         Button resetBtn = new Button("✕ Réinitialiser");
         resetBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + DANGER_COLOR + "; " +
                 "-fx-border-color: " + DANGER_COLOR + "; -fx-border-radius: 15; -fx-padding: 6 15; " +
@@ -211,6 +230,7 @@ public class GalerieView {
     private void updateStats(List<Produit> list) {
         statsBar.getChildren().clear();
 
+        // Carte Total
         statsBar.getChildren().add(createCompactStatCard(
                 "📦 Total",
                 String.valueOf(list.size()),
@@ -218,6 +238,7 @@ public class GalerieView {
                 "Tous vos produits"
         ));
 
+        // Stats par catégorie
         for (Map.Entry<String, Integer> entry : categories.entrySet()) {
             long count = list.stream().filter(p -> p.getIdCategorie() == entry.getValue()).count();
             if (count > 0) {
@@ -234,11 +255,11 @@ public class GalerieView {
 
     private String getCategoryColor(int categoryId) {
         switch(categoryId) {
-            case 1: return SUCCESS_COLOR;
-            case 2: return WARNING_COLOR;
-            case 3: return "#9b59b6";
-            case 4: return DANGER_COLOR;
-            default: return "#6c757d";
+            case 1: return SUCCESS_COLOR;      // Objets décoratifs - Vert
+            case 2: return WARNING_COLOR;      // Art mural - Orange
+            case 3: return "#9b59b6";          // Mobilier artistique - Violet
+            case 4: return DANGER_COLOR;        // Installations artistiques - Rouge
+            default: return "#6c757d";          // Gris par défaut
         }
     }
 
@@ -283,6 +304,7 @@ public class GalerieView {
         String selectedCat = categoryFilter.getValue();
         String selectedSort = sortCombo.getValue();
 
+        // Filtrage
         List<Produit> filteredList = allProduits.stream()
                 .filter(p -> p.getNom().toLowerCase().contains(search) ||
                         p.getDescription().toLowerCase().contains(search))
@@ -292,6 +314,7 @@ public class GalerieView {
                 })
                 .collect(Collectors.toList());
 
+        // Tri
         if (selectedSort != null) {
             switch (selectedSort) {
                 case "🔤 A-Z":
@@ -311,8 +334,10 @@ public class GalerieView {
             }
         }
 
+        // Mise à jour des statistiques
         updateStats(allProduits);
 
+        // Affichage des résultats
         if (filteredList.isEmpty()) {
             showEmptyState();
         } else {
@@ -364,6 +389,7 @@ public class GalerieView {
         card.setStyle("-fx-background-color: white; -fx-padding: 0; -fx-background-radius: 18; " +
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 12, 0, 0, 3); -fx-cursor: hand;");
 
+        // Image Container avec overlay
         StackPane imageContainer = new StackPane();
         imageContainer.setPrefSize(260, 160);
         imageContainer.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 18 18 0 0;");
@@ -387,6 +413,7 @@ public class GalerieView {
         }
         imageContainer.getChildren().add(imageView);
 
+        // Badge de catégorie
         String catName = "Inconnue";
         for (Map.Entry<String, Integer> entry : categories.entrySet()) {
             if (entry.getValue() == p.getIdCategorie()) {
@@ -404,15 +431,18 @@ public class GalerieView {
         StackPane.setMargin(categoryBadge, new Insets(8, 0, 0, 8));
         imageContainer.getChildren().add(categoryBadge);
 
+        // Content Container
         VBox contentBox = new VBox(10);
         contentBox.setPadding(new Insets(12, 15, 15, 15));
         contentBox.setAlignment(Pos.CENTER_LEFT);
 
+        // Nom du produit
         Label name = new Label(p.getNom());
         name.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: " + DARK_COLOR + ";");
         name.setWrapText(true);
         name.setMaxWidth(220);
 
+        // Description courte
         String shortDesc = p.getDescription().length() > 50
                 ? p.getDescription().substring(0, 50) + "..."
                 : p.getDescription();
@@ -422,10 +452,12 @@ public class GalerieView {
         description.setMinHeight(35);
         description.setMaxHeight(50);
 
+        // Boutons d'action
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER);
         actions.setPadding(new Insets(8, 0, 0, 0));
 
+        // Bouton Modifier
         Button editBtn = new Button("Modifier");
         editBtn.setStyle("-fx-background-color: " + PRIMARY_COLOR + "; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 0; -fx-background-radius: 8; " +
@@ -445,6 +477,7 @@ public class GalerieView {
         });
         editBtn.setOnAction(e -> showProductForm(p));
 
+        // Bouton Supprimer
         Button deleteBtn = new Button("Supprimer");
         deleteBtn.setStyle("-fx-background-color: white; -fx-text-fill: " + DANGER_COLOR + "; " +
                 "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 0; -fx-background-radius: 8; " +
@@ -464,11 +497,32 @@ public class GalerieView {
         });
         deleteBtn.setOnAction(e -> confirmDelete(p));
 
-        actions.getChildren().addAll(editBtn, deleteBtn);
+        // Bouton IA pour conseils image
+        Button aiAdviceBtn = new Button("🤖 IA");
+        aiAdviceBtn.setStyle("-fx-background-color: " + AI_COLOR + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 0; -fx-background-radius: 8; " +
+                "-fx-cursor: hand;");
+        aiAdviceBtn.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(aiAdviceBtn, Priority.ALWAYS);
+
+        aiAdviceBtn.setOnMouseEntered(e -> {
+            aiAdviceBtn.setStyle("-fx-background-color: #7c3aed; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 0; -fx-background-radius: 8; " +
+                    "-fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(139,92,246,0.4), 10, 0, 0, 2);");
+        });
+        aiAdviceBtn.setOnMouseExited(e -> {
+            aiAdviceBtn.setStyle("-fx-background-color: " + AI_COLOR + "; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 0; -fx-background-radius: 8; " +
+                    "-fx-cursor: hand;");
+        });
+        aiAdviceBtn.setOnAction(e -> showImageAdvice(p));
+
+        actions.getChildren().addAll(editBtn, aiAdviceBtn, deleteBtn);
 
         contentBox.getChildren().addAll(name, description, actions);
         card.getChildren().addAll(imageContainer, contentBox);
 
+        // Hover Effects sur la carte
         DropShadow shadow = new DropShadow();
         shadow.setColor(Color.rgb(0, 0, 0, 0.1));
         shadow.setRadius(15);
@@ -484,6 +538,88 @@ public class GalerieView {
         });
 
         return card;
+    }
+
+    /**
+     * Affiche les conseils IA pour l'image
+     */
+    private void showImageAdvice(Produit p) {
+        String category = getCategoryName(p.getIdCategorie());
+
+        // Créer un dialog de chargement
+        Dialog<Void> loadingDialog = new Dialog<>();
+        loadingDialog.setTitle("🤖 Assistance IA");
+        loadingDialog.setHeaderText("L'IA analyse votre produit...");
+
+        VBox content = new VBox(20);
+        content.setAlignment(Pos.CENTER);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(400);
+
+        ProgressIndicator progress = new ProgressIndicator();
+        progress.setPrefSize(50, 50);
+        Label loadingLabel = new Label("Génération des conseils en cours...");
+        loadingLabel.setStyle("-fx-font-size: 14px;");
+
+        content.getChildren().addAll(progress, loadingLabel);
+        loadingDialog.getDialogPane().setContent(content);
+        loadingDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        // Exécuter la requête en arrière-plan
+        Task<String> adviceTask = new Task<String>() {
+            @Override
+            protected String call() throws Exception {
+                return openAIService.getImageAdvice(p.getNom(), category, p.getDescription());
+            }
+        };
+
+        adviceTask.setOnSucceeded(e -> {
+            loadingDialog.close();
+            String advice = adviceTask.getValue();
+            if (advice != null && !advice.isEmpty()) {
+                showAdviceDialog("💡 Conseils IA pour l'image", advice);
+            } else {
+                showAlert("Information", "Impossible d'obtenir les conseils pour le moment.");
+            }
+        });
+
+        adviceTask.setOnFailed(e -> {
+            loadingDialog.close();
+            showAlert("Erreur", "Échec de la génération des conseils: " +
+                    adviceTask.getException().getMessage());
+        });
+
+        new Thread(adviceTask).start();
+        loadingDialog.showAndWait();
+    }
+
+    private void showAdviceDialog(String title, String advice) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle(title);
+        dialog.setHeaderText(null);
+
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(500);
+
+        // Icône
+        HBox iconBox = new HBox();
+        iconBox.setAlignment(Pos.CENTER);
+        Label iconLabel = new Label("🤖");
+        iconLabel.setStyle("-fx-font-size: 48px;");
+        iconBox.getChildren().add(iconLabel);
+
+        // Conseils
+        Label adviceLabel = new Label(advice);
+        adviceLabel.setWrapText(true);
+        adviceLabel.setStyle("-fx-font-size: 14px; -fx-line-spacing: 5; -fx-padding: 10; " +
+                "-fx-background-color: #f3f4f6; -fx-background-radius: 8;");
+
+        content.getChildren().addAll(iconBox, adviceLabel);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
     private void confirmDelete(Produit p) {
@@ -530,29 +666,6 @@ public class GalerieView {
         mainForm.setPadding(new Insets(20));
         mainForm.setPrefWidth(450);
 
-        // --- SECTION API CONSEILS IMAGE ---
-        VBox apiAdviceSection = new VBox(10);
-        apiAdviceSection.setStyle("-fx-background-color: #e8f4fd; -fx-padding: 15; -fx-background-radius: 10; -fx-border-color: #2196F3; -fx-border-radius: 10;");
-
-        Label apiAdviceTitle = new Label("🤖 Assistance IA");
-        apiAdviceTitle.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #0b5e8c;");
-
-        VBox imageAdviceBox = new VBox(5);
-        Label imageAdviceLabel = new Label("Conseils pour l'image:");
-        imageAdviceLabel.setStyle("-fx-font-weight: bold;");
-
-        TextArea imageAdviceArea = new TextArea();
-        imageAdviceArea.setPrefRowCount(3);
-        imageAdviceArea.setEditable(false);
-        imageAdviceArea.setStyle("-fx-background-color: #f9f9f9; -fx-font-size: 12px;");
-
-        Button checkImageBtn = new Button("🔍 Analyser l'image");
-        checkImageBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 5; -fx-cursor: hand;");
-
-        imageAdviceBox.getChildren().addAll(imageAdviceLabel, imageAdviceArea, checkImageBtn);
-
-        apiAdviceSection.getChildren().addAll(apiAdviceTitle, imageAdviceBox);
-
         // --- 1. APERÇU ---
         VBox groupPreview = new VBox(5);
         Label lblPreview = new Label("Image :");
@@ -588,128 +701,50 @@ public class GalerieView {
         }
         groupCat.getChildren().addAll(lblCat, catCombo);
 
-        // --- 4. DESCRIPTION AVEC BOUTON IA ---
+        // --- 4. DESCRIPTION ---
         VBox groupDesc = new VBox(5);
         Label lblDesc = new Label("Description :");
         lblDesc.setStyle("-fx-font-weight: bold; -fx-text-fill: #2d5a27;");
         TextArea descF = new TextArea(existingProduct != null ? existingProduct.getDescription() : "");
-        descF.setPrefRowCount(4);
-        descF.setWrapText(true);
+        descF.setPrefRowCount(3); descF.setWrapText(true);
         descF.setStyle("-fx-background-radius: 10;");
+        groupDesc.getChildren().addAll(lblDesc, descF);
 
-        HBox descActions = new HBox(10);
-        descActions.setAlignment(Pos.CENTER_RIGHT);
-
-        Button generateDescBtn = new Button("✨ Générer description avec IA");
-        generateDescBtn.setStyle("-fx-background-color: #9C27B0; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 5; -fx-cursor: hand;");
-
-        groupDesc.getChildren().addAll(lblDesc, descF, descActions);
-        descActions.getChildren().add(generateDescBtn);
-
-        // --- 5. MÉDIA ---
+        // --- 5. MÉDIA avec boutons IA ---
         VBox groupMedia = new VBox(5);
-        Button fileBtn = new Button("♻️ Remplacer l'image");
-        fileBtn.setMaxWidth(Double.MAX_VALUE);
-        fileBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand;");
-        groupMedia.getChildren().addAll(new Label("Média :"), fileBtn);
 
-        mainForm.getChildren().addAll(apiAdviceSection, groupPreview, groupNom, groupCat, groupDesc, groupMedia);
+        HBox mediaButtons = new HBox(10);
+        mediaButtons.setAlignment(Pos.CENTER_LEFT);
+
+        Button fileBtn = new Button("📁 Choisir une image");
+        fileBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 10; -fx-padding: 8 15;");
+        fileBtn.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(fileBtn, Priority.ALWAYS);
+
+        Button aiHelpBtn = new Button("🤖 Aide IA");
+        aiHelpBtn.setStyle("-fx-background-color: " + AI_COLOR + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-background-radius: 10; -fx-padding: 8 15; -fx-cursor: hand;");
+        aiHelpBtn.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(aiHelpBtn, Priority.ALWAYS);
+        aiHelpBtn.setOnAction(e -> showAIAssistance(existingProduct, nomF, descF, catCombo));
+
+        mediaButtons.getChildren().addAll(fileBtn, aiHelpBtn);
+
+        groupMedia.getChildren().addAll(new Label("Média :"), mediaButtons);
+
+        mainForm.getChildren().addAll(groupPreview, groupNom, groupCat, groupDesc, groupMedia);
 
         if (existingProduct != null && existingProduct.getImage() != null) {
             File file = new File(existingProduct.getImage());
             if (file.exists()) preview.setImage(new Image(file.toURI().toString()));
         }
 
-        // Action pour le bouton d'analyse d'image
-        checkImageBtn.setOnAction(e -> {
-            if (selectedImagePath.isEmpty() && existingProduct != null) {
-                selectedImagePath = existingProduct.getImage();
-            }
-
-            if (!selectedImagePath.isEmpty()) {
-                checkImageBtn.setDisable(true);
-                checkImageBtn.setText("⏳ Analyse en cours...");
-
-                new Thread(() -> {
-                    Map<String, String> advice = imageAdviceService.getImageAdvice(selectedImagePath);
-
-                    Platform.runLater(() -> {
-                        StringBuilder adviceText = new StringBuilder();
-
-                        if (advice.containsKey("quality")) {
-                            adviceText.append("📊 Qualité: ").append(advice.get("quality")).append("\n\n");
-                        }
-                        if (advice.containsKey("composition")) {
-                            adviceText.append("🖼️ Composition: ").append(advice.get("composition")).append("\n\n");
-                        }
-                        if (advice.containsKey("recommendations")) {
-                            adviceText.append("💡 Recommandations:\n").append(advice.get("recommendations"));
-                        } else if (advice.containsKey("tips")) {
-                            adviceText.append("💡 ").append(advice.get("tips"));
-                        }
-
-                        imageAdviceArea.setText(adviceText.toString());
-                        checkImageBtn.setDisable(false);
-                        checkImageBtn.setText("🔍 Analyser l'image");
-                    });
-                }).start();
-            } else {
-                showAlert("Information", "Veuillez d'abord sélectionner une image");
-            }
-        });
-
-        // Action pour le bouton de génération de description
-        generateDescBtn.setOnAction(e -> {
-            String productName = nomF.getText().trim();
-            if (productName.isEmpty()) {
-                showAlert("Information", "Veuillez d'abord saisir un nom de produit");
-                return;
-            }
-
-            String category = catCombo.getValue();
-
-            generateDescBtn.setDisable(true);
-            generateDescBtn.setText("⏳ Génération...");
-
-            new Thread(() -> {
-                String description = autoDescriptionService.generateDescription(productName, category, "");
-
-                Platform.runLater(() -> {
-                    descF.setText(description);
-                    generateDescBtn.setDisable(false);
-                    generateDescBtn.setText("✨ Générer description avec IA");
-                });
-            }).start();
-        });
-
         fileBtn.setOnAction(e -> {
             FileChooser fc = new FileChooser();
-            fc.getExtensionFilters().addAll(
-                    new FileChooser.ExtensionFilter("Images", "*.jpg", "*.jpeg", "*.png", "*.gif")
-            );
             File f = fc.showOpenDialog(null);
             if (f != null) {
                 selectedImagePath = f.getAbsolutePath();
                 preview.setImage(new Image(f.toURI().toString()));
-
-                imageAdviceArea.setText("Analyse en cours...");
-
-                new Thread(() -> {
-                    Map<String, String> advice = imageAdviceService.getImageAdvice(selectedImagePath);
-
-                    Platform.runLater(() -> {
-                        StringBuilder adviceText = new StringBuilder();
-
-                        if (advice.containsKey("quality")) {
-                            adviceText.append("📊 Qualité: ").append(advice.get("quality")).append("\n\n");
-                        }
-                        if (advice.containsKey("tips")) {
-                            adviceText.append("💡 ").append(advice.get("tips"));
-                        }
-
-                        imageAdviceArea.setText(adviceText.toString());
-                    });
-                }).start();
             }
         });
 
@@ -782,5 +817,152 @@ public class GalerieView {
             selectedImagePath = "";
             refreshData();
         });
+    }
+
+    /**
+     * Affiche l'assistance IA pour le formulaire
+     */
+    private void showAIAssistance(Produit existingProduct, TextField nomF, TextArea descF, ComboBox<String> catCombo) {
+        if (nomF.getText().trim().isEmpty()) {
+            showAlert("Information", "Veuillez d'abord saisir un nom de produit.");
+            return;
+        }
+
+        String category = catCombo.getValue() != null ? catCombo.getValue() : "Non spécifiée";
+        String keywords = descF.getText().trim().isEmpty() ?
+                "Aucune description" : descF.getText().substring(0, Math.min(50, descF.getText().length()));
+
+        // Dialog de choix
+        Dialog<String> choiceDialog = new Dialog<>();
+        choiceDialog.setTitle("🤖 Assistance IA");
+        choiceDialog.setHeaderText("Que souhaitez-vous faire ?");
+
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(400);
+
+        Button imageAdviceBtn = new Button("💡 Conseils pour l'image");
+        imageAdviceBtn.setMaxWidth(Double.MAX_VALUE);
+        imageAdviceBtn.setStyle("-fx-background-color: #6366f1; -fx-text-fill: white; " +
+                "-fx-padding: 12; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-weight: bold;");
+        imageAdviceBtn.setOnAction(e -> {
+            choiceDialog.close();
+            showImageAdviceForForm(nomF.getText(), category, descF.getText());
+        });
+
+        Button descriptionBtn = new Button("✍️ Générer une description");
+        descriptionBtn.setMaxWidth(Double.MAX_VALUE);
+        descriptionBtn.setStyle("-fx-background-color: #10b981; -fx-text-fill: white; " +
+                "-fx-padding: 12; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-weight: bold;");
+        descriptionBtn.setOnAction(e -> {
+            choiceDialog.close();
+            generateDescriptionForForm(nomF.getText(), category, keywords, descF);
+        });
+
+        content.getChildren().addAll(imageAdviceBtn, descriptionBtn);
+
+        choiceDialog.getDialogPane().setContent(content);
+        choiceDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        choiceDialog.showAndWait();
+    }
+
+    private void showImageAdviceForForm(String productName, String category, String description) {
+        Task<String> task = new Task<String>() {
+            @Override
+            protected String call() throws Exception {
+                return openAIService.getImageAdvice(productName, category, description);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            String advice = task.getValue();
+            if (advice != null) {
+                showAdviceDialog("💡 Conseils IA pour l'image", advice);
+            }
+        });
+
+        task.setOnFailed(e -> {
+            showAlert("Erreur", "Échec de la génération des conseils");
+        });
+
+        showLoadingDialog("Génération des conseils...", task);
+        new Thread(task).start();
+    }
+
+    private void generateDescriptionForForm(String productName, String category, String keywords, TextArea descF) {
+        Task<String> task = new Task<String>() {
+            @Override
+            protected String call() throws Exception {
+                return openAIService.generateProductDescription(productName, category, keywords);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            String description = task.getValue();
+            if (description != null) {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                confirm.setTitle("Description générée");
+                confirm.setHeaderText("Voici la description suggérée par l'IA :");
+
+                TextArea descArea = new TextArea(description);
+                descArea.setWrapText(true);
+                descArea.setEditable(false);
+                descArea.setPrefRowCount(5);
+                descArea.setPrefWidth(400);
+
+                confirm.getDialogPane().setContent(descArea);
+
+                ButtonType useBtn = new ButtonType("Utiliser cette description");
+                ButtonType cancelBtn = new ButtonType("Annuler", ButtonBar.ButtonData.CANCEL_CLOSE);
+                confirm.getButtonTypes().setAll(useBtn, cancelBtn);
+
+                Optional<ButtonType> result = confirm.showAndWait();
+                if (result.isPresent() && result.get() == useBtn) {
+                    descF.setText(description);
+                }
+            }
+        });
+
+        task.setOnFailed(e -> {
+            showAlert("Erreur", "Échec de la génération de la description");
+        });
+
+        showLoadingDialog("Génération de la description...", task);
+        new Thread(task).start();
+    }
+
+    private void showLoadingDialog(String message, Task<?> task) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("🤖 Traitement IA");
+        dialog.setHeaderText(null);
+
+        VBox content = new VBox(15);
+        content.setAlignment(Pos.CENTER);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(300);
+
+        ProgressIndicator progress = new ProgressIndicator();
+        progress.setPrefSize(40, 40);
+        Label msgLabel = new Label(message);
+        msgLabel.setStyle("-fx-font-size: 14px;");
+
+        content.getChildren().addAll(progress, msgLabel);
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        task.setOnSucceeded(e -> dialog.close());
+        task.setOnFailed(e -> dialog.close());
+
+        dialog.show();
+    }
+
+    private String getCategoryName(int idCat) {
+        switch(idCat) {
+            case 1: return "Objets décoratifs";
+            case 2: return "Art mural";
+            case 3: return "Mobilier artistique";
+            case 4: return "Installations artistiques";
+            default: return "Autre";
+        }
     }
 }
