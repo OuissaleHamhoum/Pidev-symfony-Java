@@ -23,6 +23,8 @@ public class ParticipationService implements IParticipationService {
         this.userService = new UserService();
     }
 
+    // ============ GESTION DES PARTICIPATIONS ============
+
     @Override
     public boolean participer(int idEvent, int idUser, String contact, Integer age) {
         // Vérifier si l'utilisateur participe déjà
@@ -34,6 +36,13 @@ public class ParticipationService implements IParticipationService {
         // Vérifier si l'événement est complet
         if (isEventComplet(idEvent)) {
             System.out.println("⚠️ Événement complet");
+            return false;
+        }
+
+        // Vérifier si l'événement est approuvé
+        Event event = eventService.getEventById(idEvent);
+        if (event == null || !"approuve".equals(event.getStatutValidation())) {
+            System.out.println("⚠️ Événement non disponible");
             return false;
         }
 
@@ -59,11 +68,10 @@ public class ParticipationService implements IParticipationService {
                     int idParticipation = rs.getInt(1);
 
                     // Récupérer les informations nécessaires
-                    Event event = eventService.getEventById(idEvent);
                     User participant = userService.getUserById(idUser);
                     User organisateur = userService.getUserById(event.getId_organisateur());
 
-                    if (event != null && participant != null && organisateur != null) {
+                    if (participant != null && organisateur != null) {
                         // Notification pour le participant
                         notificationService.creerNotificationParticipation(idUser, idEvent, event.getTitre());
 
@@ -123,7 +131,7 @@ public class ParticipationService implements IParticipationService {
         return false;
     }
 
-    // Cette méthode n'est pas dans l'interface, mais on la garde
+    @Override
     public boolean modifierParticipation(int idEvent, int idUser, String contact, Integer age) {
         String query = "UPDATE participation SET contact = ?, age = ? WHERE id_evenement = ? AND id_user = ?";
 
@@ -176,9 +184,15 @@ public class ParticipationService implements IParticipationService {
                 if (event != null) {
                     String message = "";
                     switch (statut) {
-                        case "present": message = "Votre présence a été confirmée"; break;
-                        case "absent": message = "Votre absence a été enregistrée"; break;
-                        default: message = "Votre statut a été mis à jour"; break;
+                        case "present":
+                            message = "Votre présence a été confirmée";
+                            break;
+                        case "absent":
+                            message = "Votre absence a été enregistrée";
+                            break;
+                        default:
+                            message = "Votre statut a été mis à jour";
+                            break;
                     }
 
                     notificationService.creerNotificationModification(
@@ -195,10 +209,12 @@ public class ParticipationService implements IParticipationService {
         return false;
     }
 
+    // ============ RÉCUPÉRATION DES PARTICIPATIONS ============
+
     @Override
     public List<Participation> getParticipationsByUser(int idUser) {
         List<Participation> participations = new ArrayList<>();
-        String query = "SELECT p.*, e.titre, e.lieu, e.date_evenement, " +
+        String query = "SELECT p.*, e.titre, e.lieu, e.date_evenement, e.statut_validation, " +
                 "u.nom as org_nom, u.prenom as org_prenom " +
                 "FROM participation p " +
                 "JOIN evenement e ON p.id_evenement = e.id_evenement " +
@@ -242,6 +258,12 @@ public class ParticipationService implements IParticipationService {
                 if (rs.wasNull()) p.setAge(null);
                 p.setDateInscription(rs.getTimestamp("date_inscription"));
                 p.setStatut(rs.getString("statut"));
+
+                // Informations utilisateur
+                p.setUserNom(rs.getString("nom"));
+                p.setUserPrenom(rs.getString("prenom"));
+                p.setUserEmail(rs.getString("email"));
+
                 participations.add(p);
             }
         } catch (SQLException e) {
@@ -269,6 +291,8 @@ public class ParticipationService implements IParticipationService {
         }
         return null;
     }
+
+    // ============ VÉRIFICATIONS ============
 
     @Override
     public boolean isParticipant(int idEvent, int idUser) {
@@ -314,6 +338,8 @@ public class ParticipationService implements IParticipationService {
         return false;
     }
 
+    // ============ STATISTIQUES ============
+
     @Override
     public int countParticipantsByEvent(int idEvent) {
         String query = "SELECT COUNT(*) FROM participation WHERE id_evenement = ?";
@@ -353,7 +379,7 @@ public class ParticipationService implements IParticipationService {
         List<Event> events = new ArrayList<>();
         String query = "SELECT e.* FROM evenement e " +
                 "JOIN participation p ON e.id_evenement = p.id_evenement " +
-                "WHERE p.id_user = ? " +
+                "WHERE p.id_user = ? AND e.statut_validation = 'approuve' " +
                 "ORDER BY e.date_evenement DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
@@ -378,6 +404,7 @@ public class ParticipationService implements IParticipationService {
                     event.setCapacite_max(null);
                 }
                 event.setImage_evenement(rs.getString("image_evenement"));
+                event.setStatutValidation(rs.getString("statut_validation"));
 
                 // Charger les statistiques de participation pour cet événement
                 eventService.loadParticipationStats(event);
@@ -388,6 +415,38 @@ public class ParticipationService implements IParticipationService {
         }
         return events;
     }
+
+    // ============ MÉTHODES DE SUPPRESSION ============
+
+    public boolean supprimerParticipationsByEvent(int idEvent) {
+        String query = "DELETE FROM participation WHERE id_evenement = ?";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idEvent);
+            int count = pst.executeUpdate();
+            System.out.println("✅ " + count + " participations supprimées pour l'événement " + idEvent);
+            return true;
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur suppression participations: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public boolean supprimerParticipationsByUser(int idUser) {
+        String query = "DELETE FROM participation WHERE id_user = ?";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idUser);
+            int count = pst.executeUpdate();
+            System.out.println("✅ " + count + " participations supprimées pour l'utilisateur " + idUser);
+            return true;
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur suppression participations: " + e.getMessage());
+        }
+        return false;
+    }
+
+    // ============ MÉTHODES UTILITAIRES ============
 
     private Participation mapResultSetToParticipation(ResultSet rs) throws SQLException {
         Participation p = new Participation();
@@ -400,7 +459,7 @@ public class ParticipationService implements IParticipationService {
         p.setDateInscription(rs.getTimestamp("date_inscription"));
         p.setStatut(rs.getString("statut"));
 
-        // Informations supplémentaires (peuvent ne pas exister dans toutes les requêtes)
+        // Informations supplémentaires
         try {
             p.setEventTitre(rs.getString("titre"));
             p.setEventLieu(rs.getString("lieu"));
@@ -422,5 +481,36 @@ public class ParticipationService implements IParticipationService {
         }
 
         return p;
+    }
+
+    public int[] getStatistiquesParticipation(int idEvent) {
+        int[] stats = new int[3]; // [inscrits, presents, absents]
+        String query = "SELECT statut, COUNT(*) as count FROM participation " +
+                "WHERE id_evenement = ? GROUP BY statut";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idEvent);
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                String statut = rs.getString("statut");
+                int count = rs.getInt("count");
+
+                switch (statut) {
+                    case "inscrit":
+                        stats[0] = count;
+                        break;
+                    case "present":
+                        stats[1] = count;
+                        break;
+                    case "absent":
+                        stats[2] = count;
+                        break;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur récupération statistiques: " + e.getMessage());
+        }
+        return stats;
     }
 }
