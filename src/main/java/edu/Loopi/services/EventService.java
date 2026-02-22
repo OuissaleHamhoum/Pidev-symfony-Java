@@ -11,9 +11,13 @@ import java.util.List;
 
 public class EventService implements IEvenementService {
     private Connection connection;
+    private NotificationService notificationService;
+    private UserService userService;
 
     public EventService() {
         this.connection = MyConnection.getInstance().getConnection();
+        this.notificationService = new NotificationService();
+        this.userService = new UserService();
     }
 
     // ============ CRUD ÉVÉNEMENTS ============
@@ -21,8 +25,8 @@ public class EventService implements IEvenementService {
     @Override
     public boolean addEvent(Event event) {
         String query = "INSERT INTO evenement (titre, description, date_evenement, lieu, " +
-                "id_organisateur, capacite_max, image_evenement) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                "id_organisateur, capacite_max, image_evenement, statut_validation, date_soumission) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
         try (PreparedStatement pst = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             pst.setString(1, event.getTitre());
@@ -38,6 +42,7 @@ public class EventService implements IEvenementService {
             }
 
             pst.setString(7, event.getImage_evenement());
+            pst.setString(8, "en_attente"); // Par défaut en attente
 
             int affectedRows = pst.executeUpdate();
 
@@ -46,6 +51,12 @@ public class EventService implements IEvenementService {
                 if (rs.next()) {
                     event.setId_evenement(rs.getInt(1));
                 }
+
+                // Notification à l'admin
+                User organisateur = userService.getUserById(event.getId_organisateur());
+                String orgName = organisateur != null ? organisateur.getPrenom() + " " + organisateur.getNom() : "Inconnu";
+                notificationService.creerNotificationAdminNouvelEvenement(event.getId_evenement(), event.getTitre(), orgName);
+
                 return true;
             }
         } catch (SQLException e) {
@@ -74,7 +85,15 @@ public class EventService implements IEvenementService {
             pst.setString(6, event.getImage_evenement());
             pst.setInt(7, event.getId_evenement());
 
-            return pst.executeUpdate() > 0;
+            boolean success = pst.executeUpdate() > 0;
+
+            if (success && "approuve".equals(event.getStatutValidation())) {
+                // Notifier les participants si c'est un événement approuvé
+                notificationService.creerNotificationEvenementModifie(event.getId_evenement(), event.getTitre(),
+                        "Les détails de l'événement ont été mis à jour");
+            }
+
+            return success;
         } catch (SQLException e) {
             System.err.println("❌ Erreur modification événement: " + e.getMessage());
         }
@@ -83,11 +102,22 @@ public class EventService implements IEvenementService {
 
     @Override
     public boolean deleteEvent(int idEvent) {
+        // Récupérer l'événement avant suppression pour les notifications
+        Event event = getEventById(idEvent);
+
         String query = "DELETE FROM evenement WHERE id_evenement = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idEvent);
-            return pst.executeUpdate() > 0;
+
+            boolean success = pst.executeUpdate() > 0;
+
+            if (success && event != null && "approuve".equals(event.getStatutValidation())) {
+                // Notifier les participants de l'annulation
+                notificationService.creerNotificationEvenementAnnule(idEvent, event.getTitre());
+            }
+
+            return success;
         } catch (SQLException e) {
             System.err.println("❌ Erreur suppression événement: " + e.getMessage());
         }
@@ -96,7 +126,8 @@ public class EventService implements IEvenementService {
 
     @Override
     public Event getEventById(int idEvent) {
-        String query = "SELECT * FROM evenement WHERE id_evenement = ?";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id WHERE e.id_evenement = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idEvent);
@@ -104,6 +135,14 @@ public class EventService implements IEvenementService {
 
             if (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 return event;
             }
@@ -116,13 +155,22 @@ public class EventService implements IEvenementService {
     @Override
     public List<Event> getAllEvents() {
         List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement ORDER BY date_evenement DESC";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id ORDER BY e.date_soumission DESC";
 
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
 
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -137,7 +185,8 @@ public class EventService implements IEvenementService {
     @Override
     public List<Event> getEventsByOrganisateur(int organisateurId) {
         List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement WHERE id_organisateur = ? ORDER BY date_evenement DESC";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id WHERE e.id_organisateur = ? ORDER BY e.date_soumission DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, organisateurId);
@@ -145,6 +194,14 @@ public class EventService implements IEvenementService {
 
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -174,8 +231,15 @@ public class EventService implements IEvenementService {
 
     @Override
     public boolean inscrireParticipant(int idEvent, int idUser, String contact, Integer age) {
-        String query = "INSERT INTO participation (id_user, id_evenement, contact, age) " +
-                "VALUES (?, ?, ?, ?)";
+        // Vérifier si l'événement est approuvé
+        Event event = getEventById(idEvent);
+        if (event == null || !"approuve".equals(event.getStatutValidation())) {
+            System.out.println("⚠️ Événement non disponible");
+            return false;
+        }
+
+        String query = "INSERT INTO participation (id_user, id_evenement, contact, age, statut, date_inscription) " +
+                "VALUES (?, ?, ?, ?, 'inscrit', CURRENT_TIMESTAMP)";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idUser);
@@ -188,7 +252,26 @@ public class EventService implements IEvenementService {
                 pst.setNull(4, Types.INTEGER);
             }
 
-            return pst.executeUpdate() > 0;
+            boolean success = pst.executeUpdate() > 0;
+
+            if (success) {
+                // Notifications
+                User participant = userService.getUserById(idUser);
+
+                if (event != null && participant != null) {
+                    // Pour le participant
+                    notificationService.creerNotificationParticipation(idUser, idEvent, event.getTitre());
+
+                    // Pour l'organisateur
+                    notificationService.creerNotificationNouveauParticipant(
+                            event.getId_organisateur(),
+                            idEvent,
+                            participant.getPrenom() + " " + participant.getNom()
+                    );
+                }
+            }
+
+            return success;
         } catch (SQLException e) {
             System.err.println("❌ Erreur inscription participant: " + e.getMessage());
         }
@@ -197,12 +280,29 @@ public class EventService implements IEvenementService {
 
     @Override
     public boolean desinscrireParticipant(int idEvent, int idUser) {
+        // Récupérer les informations avant suppression
+        Event event = getEventById(idEvent);
+        User participant = userService.getUserById(idUser);
+
         String query = "DELETE FROM participation WHERE id_evenement = ? AND id_user = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idEvent);
             pst.setInt(2, idUser);
-            return pst.executeUpdate() > 0;
+
+            boolean success = pst.executeUpdate() > 0;
+
+            if (success && event != null && participant != null) {
+                // Notifications
+                notificationService.creerNotificationAnnulation(idUser, idEvent, event.getTitre());
+                notificationService.creerNotificationParticipantAnnule(
+                        event.getId_organisateur(),
+                        idEvent,
+                        participant.getPrenom() + " " + participant.getNom()
+                );
+            }
+
+            return success;
         } catch (SQLException e) {
             System.err.println("❌ Erreur désinscription: " + e.getMessage());
         }
@@ -217,7 +317,30 @@ public class EventService implements IEvenementService {
             pst.setString(1, statut);
             pst.setInt(2, idEvent);
             pst.setInt(3, idUser);
-            return pst.executeUpdate() > 0;
+
+            boolean updated = pst.executeUpdate() > 0;
+
+            if (updated) {
+                Event event = getEventById(idEvent);
+                if (event != null) {
+                    String message = "";
+                    switch (statut) {
+                        case "present":
+                            message = "Votre présence a été confirmée";
+                            break;
+                        case "absent":
+                            message = "Votre absence a été enregistrée";
+                            break;
+                        default:
+                            message = "Votre statut a été mis à jour";
+                            break;
+                    }
+
+                    notificationService.creerNotificationModification(idUser, idEvent, event.getTitre(), message);
+                }
+            }
+
+            return updated;
         } catch (SQLException e) {
             System.err.println("❌ Erreur mise à jour statut: " + e.getMessage());
         }
@@ -227,10 +350,11 @@ public class EventService implements IEvenementService {
     @Override
     public List<User> getParticipantsByEvent(int idEvent) {
         List<User> participants = new ArrayList<>();
-        String query = "SELECT u.*, p.contact, p.age, p.statut, p.date_inscription " +
+        String query = "SELECT u.*, p.contact, p.age, p.statut, p.date_inscription, p.id as participation_id " +
                 "FROM users u " +
                 "JOIN participation p ON u.id = p.id_user " +
-                "WHERE p.id_evenement = ?";
+                "WHERE p.id_evenement = ? " +
+                "ORDER BY p.date_inscription DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idEvent);
@@ -248,7 +372,9 @@ public class EventService implements IEvenementService {
 
                 // Ajouter des métadonnées de participation
                 user.setSexe("Contact: " + rs.getString("contact") +
-                        ", Statut: " + rs.getString("statut"));
+                        ", Statut: " + rs.getString("statut") +
+                        ", Age: " + (rs.getInt("age") > 0 ? rs.getInt("age") : "Non spécifié") +
+                        ", ID Participation: " + rs.getInt("participation_id"));
 
                 participants.add(user);
             }
@@ -356,7 +482,153 @@ public class EventService implements IEvenementService {
 
     @Override
     public double getTauxRemplissage(Event event) {
-        return event.getTauxRemplissage();
+        if (event.getCapacite_max() == null || event.getCapacite_max() == 0) return 0;
+        return (double) event.getParticipantsCount() / event.getCapacite_max() * 100;
+    }
+
+    // ============ GESTION VALIDATION ============
+
+    public boolean approuverEvenement(int idEvent, String commentaire) {
+        String query = "UPDATE evenement SET statut_validation = 'approuve', date_validation = CURRENT_TIMESTAMP, " +
+                "commentaire_validation = ? WHERE id_evenement = ?";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setString(1, commentaire);
+            pst.setInt(2, idEvent);
+
+            boolean success = pst.executeUpdate() > 0;
+
+            if (success) {
+                Event event = getEventById(idEvent);
+                if (event != null) {
+                    notificationService.creerNotificationEvenementApprouve(
+                            event.getId_organisateur(),
+                            idEvent,
+                            event.getTitre()
+                    );
+                }
+            }
+
+            return success;
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur approbation événement: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public boolean refuserEvenement(int idEvent, String commentaire) {
+        String query = "UPDATE evenement SET statut_validation = 'refuse', date_validation = CURRENT_TIMESTAMP, " +
+                "commentaire_validation = ? WHERE id_evenement = ?";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setString(1, commentaire);
+            pst.setInt(2, idEvent);
+
+            boolean success = pst.executeUpdate() > 0;
+
+            if (success) {
+                Event event = getEventById(idEvent);
+                if (event != null) {
+                    notificationService.creerNotificationEvenementRefuse(
+                            event.getId_organisateur(),
+                            idEvent,
+                            event.getTitre(),
+                            commentaire
+                    );
+                }
+            }
+
+            return success;
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur refus événement: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public List<Event> getEvenementsEnAttente() {
+        List<Event> events = new ArrayList<>();
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id WHERE e.statut_validation = 'en_attente' ORDER BY e.date_soumission DESC";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
+                events.add(event);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur récupération événements en attente: " + e.getMessage());
+        }
+        return events;
+    }
+
+    public int countEvenementsEnAttente() {
+        String query = "SELECT COUNT(*) FROM evenement WHERE statut_validation = 'en_attente'";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur comptage événements en attente: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    public int countEvenementsApprouves() {
+        String query = "SELECT COUNT(*) FROM evenement WHERE statut_validation = 'approuve'";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur comptage événements approuvés: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    public int countEvenementsRefuses() {
+        String query = "SELECT COUNT(*) FROM evenement WHERE statut_validation = 'refuse'";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur comptage événements refusés: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    public int countTotalEvenements() {
+        String query = "SELECT COUNT(*) FROM evenement";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur comptage total événements: " + e.getMessage());
+        }
+        return 0;
     }
 
     // ============ RECHERCHE ET FILTRES ============
@@ -364,8 +636,10 @@ public class EventService implements IEvenementService {
     @Override
     public List<Event> searchEvents(String keyword) {
         List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement WHERE titre LIKE ? OR lieu LIKE ? " +
-                "ORDER BY date_evenement DESC";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id " +
+                "WHERE e.titre LIKE ? OR e.lieu LIKE ? " +
+                "ORDER BY e.date_evenement DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             String searchPattern = "%" + keyword + "%";
@@ -375,6 +649,14 @@ public class EventService implements IEvenementService {
             ResultSet rs = pst.executeQuery();
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -387,12 +669,22 @@ public class EventService implements IEvenementService {
     @Override
     public List<Event> getUpcomingEvents() {
         List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement WHERE date_evenement > NOW() ORDER BY date_evenement ASC";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id " +
+                "WHERE e.date_evenement > NOW() AND e.statut_validation = 'approuve' ORDER BY e.date_evenement ASC";
 
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -405,12 +697,22 @@ public class EventService implements IEvenementService {
     @Override
     public List<Event> getPastEvents() {
         List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement WHERE date_evenement < NOW() ORDER BY date_evenement DESC";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id " +
+                "WHERE e.date_evenement < NOW() AND e.statut_validation = 'approuve' ORDER BY e.date_evenement DESC";
 
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -423,12 +725,22 @@ public class EventService implements IEvenementService {
     @Override
     public List<Event> getOngoingEvents() {
         List<Event> events = new ArrayList<>();
-        String query = "SELECT * FROM evenement WHERE DATE(date_evenement) = CURDATE()";
+        String query = "SELECT e.*, u.nom as org_nom, u.prenom as org_prenom FROM evenement e " +
+                "LEFT JOIN users u ON e.id_organisateur = u.id " +
+                "WHERE DATE(e.date_evenement) = CURDATE() AND e.statut_validation = 'approuve'";
 
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 Event event = mapResultSetToEvent(rs);
+
+                // Ajouter le nom de l'organisateur
+                String orgPrenom = rs.getString("org_prenom");
+                String orgNom = rs.getString("org_nom");
+                if (orgPrenom != null && orgNom != null) {
+                    event.setOrganisateurNom(orgPrenom + " " + orgNom);
+                }
+
                 loadParticipationStats(event);
                 events.add(event);
             }
@@ -449,7 +761,6 @@ public class EventService implements IEvenementService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime eventDate = event.getDate_evenement();
 
-        // Comparaison des dates
         if (eventDate.toLocalDate().isEqual(now.toLocalDate())) {
             return "En cours";
         } else if (eventDate.isAfter(now)) {
@@ -485,6 +796,12 @@ public class EventService implements IEvenementService {
 
         event.setImage_evenement(rs.getString("image_evenement"));
         event.setCreated_at(rs.getTimestamp("created_at"));
+
+        // Nouveaux champs
+        event.setStatutValidation(rs.getString("statut_validation"));
+        event.setDateSoumission(rs.getTimestamp("date_soumission"));
+        event.setDateValidation(rs.getTimestamp("date_validation"));
+        event.setCommentaireValidation(rs.getString("commentaire_validation"));
 
         return event;
     }
