@@ -10,7 +10,6 @@ import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Worker;
 import javafx.geometry.Insets;
-import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -32,6 +31,7 @@ import netscape.javascript.JSObject;
 import java.io.File;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -56,8 +56,7 @@ public class EventMapView {
     private Label storyOrganizerLabel;
     private ImageView storyImageView;
     private ProgressIndicator storyLoadingIndicator;
-    private Map<Integer, String> imageCache = new HashMap<>();
-    private Map<Integer, Point2D> eventPositions = new HashMap<>();
+    private Map<Integer, Event> eventCache = new HashMap<>();
     private Event currentHoverEvent = null;
     private ComboBox<String> mapStyleSelector;
     private Slider zoomSlider;
@@ -66,11 +65,7 @@ public class EventMapView {
     private ToggleGroup filterGroup;
     private boolean mapReady = false;
     private ProgressIndicator loadingIndicator;
-    private boolean eventsLoaded = false;
-
-    // Coordonnées par défaut (centre du monde)
-    private static final double DEFAULT_LAT = 20.0;
-    private static final double DEFAULT_LNG = 0.0;
+    private List<Event> allEvents = new ArrayList<>();
 
     // Constantes
     private static final String PROJECT_ROOT = System.getProperty("user.dir");
@@ -141,22 +136,20 @@ public class EventMapView {
         zoomInBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
                 "; -fx-text-fill: white; -fx-font-size: 16px; -fx-min-width: 36; -fx-min-height: 36; -fx-background-radius: 18; -fx-cursor: hand;");
         zoomInBtn.setOnAction(e -> {
-            if (mapReady) webEngine.executeScript("map.zoomIn()");
+            if (mapReady) webEngine.executeScript("if(map) map.zoomIn()");
         });
 
         zoomSlider = new Slider(1, 18, 3);
         zoomSlider.setPrefWidth(150);
-        zoomSlider.setShowTickLabels(true);
-        zoomSlider.setShowTickMarks(true);
         zoomSlider.valueProperty().addListener((obs, old, val) -> {
-            if (mapReady) webEngine.executeScript("map.setZoom(" + val.intValue() + ")");
+            if (mapReady) webEngine.executeScript("if(map) map.setZoom(" + val.intValue() + ")");
         });
 
         Button zoomOutBtn = new Button("-");
         zoomOutBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
                 "; -fx-text-fill: white; -fx-font-size: 16px; -fx-min-width: 36; -fx-min-height: 36; -fx-background-radius: 18; -fx-cursor: hand;");
         zoomOutBtn.setOnAction(e -> {
-            if (mapReady) webEngine.executeScript("map.zoomOut()");
+            if (mapReady) webEngine.executeScript("if(map) map.zoomOut()");
         });
 
         zoomControls.getChildren().addAll(zoomInBtn, zoomSlider, zoomOutBtn);
@@ -175,8 +168,6 @@ public class EventMapView {
         mapStyleSelector = new ComboBox<>();
         mapStyleSelector.getItems().addAll("Standard", "Sombre", "Satellite");
         mapStyleSelector.setValue("Standard");
-        mapStyleSelector.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
-                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-background-radius: 6; -fx-border-radius: 6;");
         mapStyleSelector.setOnAction(e -> {
             if (mapReady) changeMapStyle(mapStyleSelector.getValue());
         });
@@ -208,17 +199,15 @@ public class EventMapView {
         Region spacer2 = new Region();
         HBox.setHgrow(spacer2, Priority.ALWAYS);
 
-        Button fitBoundsBtn = new Button("Ajuster la vue");
-        fitBoundsBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
+        Button refreshBtn = new Button("🔄 Actualiser");
+        refreshBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
                 "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 20; -fx-cursor: hand;");
-        fitBoundsBtn.setOnAction(e -> {
-            if (mapReady) fitMapToEvents();
-        });
+        refreshBtn.setOnAction(e -> refreshEvents());
 
         secondRow.getChildren().addAll(
                 styleLabel, mapStyleSelector,
                 filterLabel, filterButtons,
-                spacer2, fitBoundsBtn
+                spacer2, refreshBtn
         );
 
         topBar.getChildren().addAll(firstRow, secondRow);
@@ -326,7 +315,7 @@ public class EventMapView {
         card.setPrefWidth(320);
         card.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "white") +
                 "; -fx-background-radius: 20; -fx-border-color: " + adminDashboard.getAccentColor() +
-                "; -fx-border-width: 2; -fx-border-radius: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 20, 0, 0, 5);");
+                "; -fx-border-width: 2; -fx-border-radius: 20;");
 
         StackPane imageContainer = new StackPane();
         imageContainer.setPrefHeight(180);
@@ -428,88 +417,97 @@ public class EventMapView {
     }
 
     private void loadEvents() {
-        if (!mapReady) return;
+        allEvents = eventService.getAllEvents();
 
-        List<Event> events = eventService.getAllEvents();
-        int count = 0;
-
-        // Nettoyer les anciens marqueurs
-        webEngine.executeScript(
-                "if (window.markers) {" +
-                        "  for(var id in markers) {" +
-                        "    if (map.hasLayer(markers[id])) map.removeLayer(markers[id]);" +
-                        "  }" +
-                        "  markers = {};" +
-                        "}"
-        );
-
-        // Collecter toutes les positions valides
-        StringBuilder boundsScript = new StringBuilder("var bounds = [];");
-
-        for (Event event : events) {
-            if ("approuve".equals(event.getStatutValidation())) {
-                count++;
-                double[] coords = addEventMarker(event);
-                if (coords != null) {
-                    boundsScript.append(String.format(Locale.US,
-                            "bounds.push([%f, %f]);", coords[0], coords[1]));
-                }
+        // Compter les événements avec coordonnées
+        List<Event> eventsWithCoords = new ArrayList<>();
+        for (Event event : allEvents) {
+            if ("approuve".equals(event.getStatutValidation()) && event.hasCoordinates()) {
+                eventsWithCoords.add(event);
+                eventCache.put(event.getId_evenement(), event);
             }
         }
 
-        totalEventsLabel.setText("(" + count + " événements)");
-        System.out.println("✅ " + count + " événements chargés");
+        final int eventCount = eventsWithCoords.size();
 
-        // Ajuster la vue pour voir tous les événements
-        if (count > 0) {
-            Platform.runLater(() -> {
-                webEngine.executeScript(boundsScript.toString() +
-                        "if(bounds.length > 0) map.fitBounds(bounds);");
-            });
+        Platform.runLater(() -> {
+            // Ajouter chaque événement avec un délai
+            for (int i = 0; i < eventsWithCoords.size(); i++) {
+                final Event event = eventsWithCoords.get(i);
+                final int delay = i * 50;
+
+                // Utiliser un Timer pour éviter les problèmes de variables finales
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    Platform.runLater(() -> addEventMarker(event));
+                }).start();
+            }
+
+            totalEventsLabel.setText("(" + eventCount + " événements)");
+            System.out.println("✅ " + eventCount + " événements chargés");
+        });
+    }
+
+    private void refreshEvents() {
+        if (mapReady) {
+            webEngine.executeScript(
+                    "if (window.markers) {" +
+                            "  for(var id in markers) {" +
+                            "    if (map && map.hasLayer(markers[id])) map.removeLayer(markers[id]);" +
+                            "  }" +
+                            "  markers = {};" +
+                            "}"
+            );
+            loadEvents();
         }
     }
 
-    private double[] addEventMarker(Event event) {
-        double[] coords = getEventCoordinates(event);
-        if (coords == null) return null;
+    private void addEventMarker(Event event) {
+        if (!mapReady || !event.hasCoordinates()) return;
+
+        double lat = event.getLatitude();
+        double lng = event.getLongitude();
 
         String imageUrl = getEventImageUrl(event);
-        String statut = event.getStatut();
+        String statut = event.getStatut() != null ? event.getStatut() : "Inconnu";
         String description = event.getDescription() != null ? event.getDescription() : "";
         if (description.length() > 100) {
             description = description.substring(0, 97) + "...";
         }
 
+        String safeTitle = escapeJS(event.getTitre() != null ? event.getTitre() : "Sans titre");
+        String safeDate = escapeJS(event.getFormattedDate() != null ? event.getFormattedDate() : "Date inconnue");
+        String safeLieu = escapeJS(event.getLieu() != null ? event.getLieu() : "Lieu inconnu");
+        String safeDesc = escapeJS(description);
+        String safeImageUrl = imageUrl.replace("'", "\\'");
+
         String script = String.format(Locale.US,
-                "addEventMarker(%d, '%s', %f, %f, '%s', '%s', '%s', '%s', %d, '%s');",
+                "try { addEventMarker(%d, '%s', %f, %f, '%s', '%s', '%s', '%s', %d, '%s'); } catch(e) { console.log('Erreur: '+e); }",
                 event.getId_evenement(),
-                escapeJS(event.getTitre()),
-                coords[0], coords[1],
-                escapeJS(event.getFormattedDate()),
-                escapeJS(event.getLieu()),
-                escapeJS(description),
+                safeTitle,
+                lat,
+                lng,
+                safeDate,
+                safeLieu,
+                safeDesc,
                 statut,
                 event.getParticipantsCount(),
-                imageUrl
+                safeImageUrl
         );
 
         try {
             webEngine.executeScript(script);
-            return coords;
         } catch (Exception e) {
             System.err.println("⚠️ Erreur ajout marqueur: " + e.getMessage());
-            return null;
         }
-    }
-
-    private double[] getEventCoordinates(Event event) {
-        if (event.hasCoordinates()) {
-            return new double[]{event.getLatitude(), event.getLongitude()};
-        }
-        return null; // Pas de coordonnées, ne pas afficher le marqueur
     }
 
     private String getEventImageUrl(Event event) {
+        // Vérifier si l'image existe localement
         if (event.getImage_evenement() != null && !event.getImage_evenement().isEmpty()) {
             String fileName = event.getImage_evenement().substring(event.getImage_evenement().lastIndexOf('/') + 1);
             File imgFile = new File(FULL_IMAGE_PATH + fileName);
@@ -519,20 +517,7 @@ public class EventMapView {
         }
 
         // Image par défaut
-        return "https://via.placeholder.com/300x150/3182ce/ffffff?text=Événement";
-    }
-
-    private void fitMapToEvents() {
-        webEngine.executeScript(
-                "if (typeof markers === 'object') {" +
-                        "  var bounds = [];" +
-                        "  for(var id in markers) {" +
-                        "    var pos = markers[id].getLatLng();" +
-                        "    bounds.push([pos.lat, pos.lng]);" +
-                        "  }" +
-                        "  if(bounds.length > 0) map.fitBounds(bounds);" +
-                        "}"
-        );
+        return "https://via.placeholder.com/300x150/3182ce/ffffff?text=Event";
     }
 
     private void changeMapStyle(String style) {
@@ -542,11 +527,13 @@ public class EventMapView {
         } else if ("Satellite".equals(style)) {
             url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
         }
-        webEngine.executeScript("changeMapStyle('" + url + "')");
+        final String finalUrl = url;
+        webEngine.executeScript("if (typeof changeMapStyle === 'function') changeMapStyle('" + finalUrl + "')");
     }
 
     private void filterEvents(String type) {
-        webEngine.executeScript("filterEvents('" + type + "')");
+        final String finalType = type;
+        webEngine.executeScript("if (typeof filterEvents === 'function') filterEvents('" + finalType + "')");
     }
 
     private String generateMapHtml() {
@@ -566,10 +553,10 @@ public class EventMapView {
                     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
                     .custom-popup .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; }
                     .custom-popup .leaflet-popup-content { margin:0; width:300px; }
-                    .popup-image { width:100%; height:150px; object-fit:cover; }
+                    .popup-image { width:100%; height:150px; object-fit:cover; background:#f0f0f0; }
                     .popup-content { padding:15px; }
                     .popup-title { font-size:18px; font-weight:bold; margin-bottom:8px; color:#333; }
-                    .popup-info { margin:5px 0; color:#666; font-size:13px; }
+                    .popup-info { margin:5px 0; color:#666; font-size:13px; display:flex; align-items:center; gap:5px; }
                     .popup-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:bold; color:white; margin-top:8px; }
                     .popup-footer { margin-top:12px; }
                     .view-details-btn { background:#3182CE; color:white; border:none; padding:10px; border-radius:6px; width:100%; cursor:pointer; font-weight:bold; }
@@ -603,39 +590,43 @@ public class EventMapView {
                     }
                     
                     function addEventMarker(id, title, lat, lng, date, lieu, description, statut, participants, imageUrl) {
-                        var color = statut === 'À venir' ? '#f39c12' : 
-                                   statut === 'En cours' ? '#9b59b6' : '#6c757d';
-                        
-                        var marker = L.marker([lat, lng], {
-                            icon: createIcon(color, false),
-                            eventData: {id:id, title:title, date:date, lieu:lieu, participants:participants, imageUrl:imageUrl, statut:statut}
-                        }).addTo(map);
-                        
-                        allMarkers.push(marker);
-                        
-                        var popupContent = '<div><img src="'+imageUrl+'" class="popup-image" onerror="this.src=\\'https://via.placeholder.com/300x150/3182ce/ffffff?text=LOOPI\\'"><div class="popup-content">' +
-                            '<div class="popup-title">'+title+'</div>' +
-                            '<div class="popup-info">📅 '+date+'</div>' +
-                            '<div class="popup-info">📍 '+lieu+'</div>' +
-                            '<div class="popup-info">👥 '+participants+' participants</div>' +
-                            '<span class="popup-badge" style="background:'+color+'">'+statut+'</span>' +
-                            '<div class="popup-footer">' +
-                            '<button class="view-details-btn" onclick="viewDetails('+id+')">👁️ Voir détails</button></div></div></div>';
-                        
-                        marker.bindPopup(popupContent, {className:'custom-popup', minWidth:300});
-                        
-                        marker.on('mouseover', function() {
-                            this.setIcon(createIcon(color, true));
-                            var d = this.options.eventData;
-                            if (window.javaApp) window.javaApp.showPreview(d.id, d.title, d.date, d.lieu, d.participants, d.imageUrl);
-                        });
-                        
-                        marker.on('mouseout', function() {
-                            this.setIcon(createIcon(color, false));
-                            if (window.javaApp) window.javaApp.hidePreview();
-                        });
-                        
-                        markers[id] = marker;
+                        try {
+                            var color = statut === 'À venir' ? '#f39c12' : 
+                                       statut === 'En cours' ? '#9b59b6' : '#6c757d';
+                            
+                            var marker = L.marker([lat, lng], {
+                                icon: createIcon(color, false),
+                                eventData: {id:id, title:title, date:date, lieu:lieu, participants:participants, imageUrl:imageUrl, statut:statut}
+                            }).addTo(map);
+                            
+                            allMarkers.push(marker);
+                            
+                            var popupContent = '<div><img src="'+imageUrl+'" class="popup-image" onerror="this.src=\\'https://via.placeholder.com/300x150/3182ce/ffffff?text=LOOPI\\'"><div class="popup-content">' +
+                                '<div class="popup-title">'+title+'</div>' +
+                                '<div class="popup-info">📅 '+date+'</div>' +
+                                '<div class="popup-info">📍 '+lieu+'</div>' +
+                                '<div class="popup-info">👥 '+participants+' participants</div>' +
+                                '<span class="popup-badge" style="background:'+color+'">'+statut+'</span>' +
+                                '<div class="popup-footer">' +
+                                '<button class="view-details-btn" onclick="viewDetails('+id+')">👁️ Voir détails</button></div></div></div>';
+                            
+                            marker.bindPopup(popupContent, {className:'custom-popup', minWidth:300});
+                            
+                            marker.on('mouseover', function() {
+                                this.setIcon(createIcon(color, true));
+                                var d = this.options.eventData;
+                                if (window.javaApp) window.javaApp.showPreview(d.id, d.title, d.date, d.lieu, d.participants, d.imageUrl);
+                            });
+                            
+                            marker.on('mouseout', function() {
+                                this.setIcon(createIcon(color, false));
+                                if (window.javaApp) window.javaApp.hidePreview();
+                            });
+                            
+                            markers[id] = marker;
+                        } catch(e) {
+                            console.log('Erreur création marqueur: '+e);
+                        }
                     }
                     
                     function filterEvents(type) {
@@ -651,6 +642,13 @@ public class EventMapView {
                                 if (map.hasLayer(m)) map.removeLayer(m);
                             }
                         });
+                    }
+                    
+                    function fitMapToEvents() {
+                        if (allMarkers.length > 0) {
+                            var group = L.featureGroup(allMarkers);
+                            map.fitBounds(group.getBounds());
+                        }
                     }
                     
                     function viewDetails(id) {
@@ -690,7 +688,12 @@ public class EventMapView {
         public void showPreview(int id, String title, String date, String lieu,
                                 int participants, String imageUrl) {
             Platform.runLater(() -> {
-                Event event = eventService.getEventById(id);
+                Event event = eventCache.get(id);
+                if (event == null) {
+                    event = eventService.getEventById(id);
+                    if (event != null) eventCache.put(id, event);
+                }
+
                 if (event != null) {
                     currentHoverEvent = event;
                     storyTitleLabel.setText(title);
@@ -704,14 +707,25 @@ public class EventMapView {
                     storyLoadingIndicator.setVisible(true);
                     storyImageView.setVisible(false);
 
-                    Image image = new Image(imageUrl, true);
-                    image.progressProperty().addListener((obs, prog, newProg) -> {
-                        if (newProg.doubleValue() >= 1.0) {
+                    try {
+                        final String finalImageUrl = imageUrl;
+                        Image image = new Image(finalImageUrl, true);
+                        image.progressProperty().addListener((obs, prog, newProg) -> {
+                            if (newProg.doubleValue() >= 1.0) {
+                                storyLoadingIndicator.setVisible(false);
+                                storyImageView.setVisible(true);
+                                storyImageView.setImage(image);
+                            }
+                        });
+
+                        image.errorProperty().addListener((obs, oldErr, newErr) -> {
                             storyLoadingIndicator.setVisible(false);
                             storyImageView.setVisible(true);
-                            storyImageView.setImage(image);
-                        }
-                    });
+                        });
+                    } catch (Exception e) {
+                        storyLoadingIndicator.setVisible(false);
+                        storyImageView.setVisible(true);
+                    }
 
                     storyPreviewPane.setVisible(true);
                 }
@@ -727,7 +741,10 @@ public class EventMapView {
 
         public void viewDetails(int id) {
             Platform.runLater(() -> {
-                Event event = eventService.getEventById(id);
+                Event event = eventCache.get(id);
+                if (event == null) {
+                    event = eventService.getEventById(id);
+                }
                 if (event != null) showEventDetails(event);
             });
         }
@@ -760,8 +777,12 @@ public class EventMapView {
 
         String imgUrl = getEventImageUrl(event);
         if (imgUrl != null) {
-            Image img = new Image(imgUrl, true);
-            imgView.setImage(img);
+            try {
+                Image img = new Image(imgUrl, true);
+                imgView.setImage(img);
+            } catch (Exception e) {
+                // Ignorer les erreurs d'image
+            }
         }
 
         GridPane grid = new GridPane();
@@ -769,10 +790,10 @@ public class EventMapView {
         grid.setVgap(12);
 
         grid.add(new Label("📅 Date:"), 0, 0);
-        grid.add(new Label(event.getFormattedDate()), 1, 0);
+        grid.add(new Label(event.getFormattedDate() != null ? event.getFormattedDate() : "Non définie"), 1, 0);
 
         grid.add(new Label("📍 Lieu:"), 0, 1);
-        grid.add(new Label(event.getLieu()), 1, 1);
+        grid.add(new Label(event.getLieu() != null ? event.getLieu() : "Non défini"), 1, 1);
 
         if (event.hasCoordinates()) {
             grid.add(new Label("🌍 Coordonnées:"), 0, 2);
@@ -792,9 +813,10 @@ public class EventMapView {
         grid.add(new Label(org != null ? org.getNomComplet() : "Inconnu"), 1, 5);
 
         grid.add(new Label("📌 Statut:"), 0, 6);
-        Label statutLabel = new Label(event.getStatut());
-        String statutColor = event.getStatut().equals("À venir") ? "#f39c12" :
-                event.getStatut().equals("En cours") ? "#9b59b6" : "#6c757d";
+        String statut = event.getStatut() != null ? event.getStatut() : "Inconnu";
+        Label statutLabel = new Label(statut);
+        String statutColor = statut.equals("À venir") ? "#f39c12" :
+                statut.equals("En cours") ? "#9b59b6" : "#6c757d";
         statutLabel.setStyle("-fx-background-color: " + statutColor +
                 "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
         grid.add(statutLabel, 1, 6);
