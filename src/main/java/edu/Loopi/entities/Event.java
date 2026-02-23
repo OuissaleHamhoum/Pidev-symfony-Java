@@ -15,6 +15,10 @@ public class Event {
     private String image_evenement;
     private Timestamp created_at;
 
+    // Coordonnées géographiques
+    private Double latitude;
+    private Double longitude;
+
     // Nouveaux champs pour validation
     private String statutValidation; // "en_attente", "approuve", "refuse"
     private Timestamp dateSoumission;
@@ -71,6 +75,13 @@ public class Event {
 
     public Timestamp getCreated_at() { return created_at; }
     public void setCreated_at(Timestamp created_at) { this.created_at = created_at; }
+
+    // Coordonnées géographiques
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 
     public String getStatutValidation() { return statutValidation; }
     public void setStatutValidation(String statutValidation) { this.statutValidation = statutValidation; }
@@ -142,5 +153,9 @@ public class Event {
     public double getTauxRemplissage() {
         if (capacite_max == null || capacite_max == 0) return 0;
         return (double) participantsCount / capacite_max * 100;
+    }
+
+    public boolean hasCoordinates() {
+        return latitude != null && longitude != null;
     }
 }

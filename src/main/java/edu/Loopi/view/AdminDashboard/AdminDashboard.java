@@ -17,6 +17,8 @@ import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.web.WebEngine;
+import netscape.javascript.JSObject;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,6 +41,7 @@ public class AdminDashboard {
     private SettingsView settingsView;
     private ProductManagementView productManagementView;
     private EventManagementView eventManagementView;
+    private EventMapView eventMapView;
 
     private StackPane headerProfileContainer;
     private VBox headerProfileInfo;
@@ -89,6 +92,7 @@ public class AdminDashboard {
         this.settingsView = new SettingsView(currentUser, userService, this);
         this.productManagementView = new ProductManagementView(currentUser, userService, this);
         this.eventManagementView = new EventManagementView(currentUser, userService, this);
+        this.eventMapView = new EventMapView(currentUser, userService, this);
     }
 
     public void start(Stage primaryStage) {
@@ -298,6 +302,17 @@ public class AdminDashboard {
         sidebarButtons.put("events", eventsBtn);
         navMenu.getChildren().add(eventsBtn);
 
+        // Section CARTE
+        Label mapSection = new Label("  CARTE");
+        mapSection.setFont(Font.font("System", FontWeight.BOLD, 12));
+        mapSection.setTextFill(Color.web(getTextColorMuted()));
+        mapSection.setPadding(new Insets(15, 0, 5, 12));
+        navMenu.getChildren().add(mapSection);
+
+        Button mapBtn = createSidebarButton("🗺️", "Carte des événements", "map", false);
+        sidebarButtons.put("map", mapBtn);
+        navMenu.getChildren().add(mapBtn);
+
         // Section STATISTIQUES
         Label statsSection = new Label("  STATISTIQUES");
         statsSection.setFont(Font.font("System", FontWeight.BOLD, 12));
@@ -452,6 +467,9 @@ public class AdminDashboard {
             case "events":
                 showEventManagementView();
                 break;
+            case "map":
+                showEventMapView();
+                break;
             case "analytics":
                 showAnalyticsView();
                 break;
@@ -483,6 +501,14 @@ public class AdminDashboard {
 
     public void showEventManagementView() {
         eventManagementView.showEventManagementView(mainContentArea, isDarkMode);
+    }
+
+    public void showEventMapView() {
+        eventMapView.showEventMapView(mainContentArea, isDarkMode);
+        // Configurer le pont Java-JavaScript après l'affichage de la carte
+        if (eventMapView.getWebEngine() != null) {
+            setupJavaBridge(eventMapView.getWebEngine(), eventMapView);
+        }
     }
 
     public void showAnalyticsView() {
@@ -526,6 +552,7 @@ public class AdminDashboard {
             case "users": showUserManagementView(); break;
             case "products": showProductManagementView(); break;
             case "events": showEventManagementView(); break;
+            case "map": showEventMapView(); break;
             case "analytics": showAnalyticsView(); break;
             case "profile": showUserProfileInMain(); break;
             case "settings": showSettingsView(); break;
@@ -705,5 +732,24 @@ public class AdminDashboard {
         } catch (Exception e) {
             System.out.println("Erreur retour login: " + e.getMessage());
         }
+    }
+
+    /**
+     * Configure le pont de communication entre Java et JavaScript pour la carte
+     */
+    public void setupJavaBridge(WebEngine webEngine, EventMapView eventMapView) {
+        webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+            if (newState == javafx.concurrent.Worker.State.SUCCEEDED) {
+                JSObject window = (JSObject) webEngine.executeScript("window");
+
+                // Créer une instance du connecteur
+                EventMapView.JavaConnector connector = eventMapView.new JavaConnector();
+
+                // Exposer l'objet à JavaScript
+                window.setMember("javaApp", connector);
+
+                System.out.println("✅ Pont Java-JavaScript établi avec succès");
+            }
+        });
     }
 }

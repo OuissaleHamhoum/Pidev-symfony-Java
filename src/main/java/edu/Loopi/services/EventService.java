@@ -25,8 +25,8 @@ public class EventService implements IEvenementService {
     @Override
     public boolean addEvent(Event event) {
         String query = "INSERT INTO evenement (titre, description, date_evenement, lieu, " +
-                "id_organisateur, capacite_max, image_evenement, statut_validation, date_soumission) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+                "id_organisateur, capacite_max, image_evenement, statut_validation, date_soumission, latitude, longitude) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)";
 
         try (PreparedStatement pst = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             pst.setString(1, event.getTitre());
@@ -43,6 +43,19 @@ public class EventService implements IEvenementService {
 
             pst.setString(7, event.getImage_evenement());
             pst.setString(8, "en_attente"); // Par défaut en attente
+
+            // Coordonnées géographiques
+            if (event.getLatitude() != null) {
+                pst.setDouble(9, event.getLatitude());
+            } else {
+                pst.setNull(9, Types.DOUBLE);
+            }
+
+            if (event.getLongitude() != null) {
+                pst.setDouble(10, event.getLongitude());
+            } else {
+                pst.setNull(10, Types.DOUBLE);
+            }
 
             int affectedRows = pst.executeUpdate();
 
@@ -68,7 +81,7 @@ public class EventService implements IEvenementService {
     @Override
     public boolean updateEvent(Event event) {
         String query = "UPDATE evenement SET titre = ?, description = ?, date_evenement = ?, " +
-                "lieu = ?, capacite_max = ?, image_evenement = ? WHERE id_evenement = ?";
+                "lieu = ?, capacite_max = ?, image_evenement = ?, latitude = ?, longitude = ? WHERE id_evenement = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setString(1, event.getTitre());
@@ -83,7 +96,21 @@ public class EventService implements IEvenementService {
             }
 
             pst.setString(6, event.getImage_evenement());
-            pst.setInt(7, event.getId_evenement());
+
+            // Coordonnées géographiques
+            if (event.getLatitude() != null) {
+                pst.setDouble(7, event.getLatitude());
+            } else {
+                pst.setNull(7, Types.DOUBLE);
+            }
+
+            if (event.getLongitude() != null) {
+                pst.setDouble(8, event.getLongitude());
+            } else {
+                pst.setNull(8, Types.DOUBLE);
+            }
+
+            pst.setInt(9, event.getId_evenement());
 
             boolean success = pst.executeUpdate() > 0;
 
@@ -796,6 +823,13 @@ public class EventService implements IEvenementService {
 
         event.setImage_evenement(rs.getString("image_evenement"));
         event.setCreated_at(rs.getTimestamp("created_at"));
+
+        // Coordonnées géographiques
+        event.setLatitude(rs.getDouble("latitude"));
+        if (rs.wasNull()) event.setLatitude(null);
+
+        event.setLongitude(rs.getDouble("longitude"));
+        if (rs.wasNull()) event.setLongitude(null);
 
         // Nouveaux champs
         event.setStatutValidation(rs.getString("statut_validation"));

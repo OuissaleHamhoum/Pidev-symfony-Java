@@ -397,3 +397,16 @@ ADD INDEX `idx_date_soumission` (`date_soumission`);
 
 -- Mettre à jour les événements existants comme approuvés (optionnel)
 UPDATE `evenement` SET `statut_validation` = 'approuve', `date_validation` = CURRENT_TIMESTAMP WHERE `statut_validation` IS NULL;
+
+--
+-- Ajouter des colonnes pour les coordonnées géographiques
+ALTER TABLE `evenement`
+    ADD COLUMN `latitude` DOUBLE NULL,
+ADD COLUMN `longitude` DOUBLE NULL,
+ADD INDEX `idx_coordinates` (`latitude`, `longitude`);
+
+-- Mettre à jour avec des coordonnées exemple
+UPDATE `evenement` SET
+                       `latitude` = 36.8065 + (RAND() * 2 - 1),
+                       `longitude` = 10.1815 + (RAND() * 2 - 1)
+WHERE `latitude` IS NULL;
