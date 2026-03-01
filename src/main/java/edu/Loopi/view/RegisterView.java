@@ -1,410 +1,781 @@
 package edu.Loopi.view;
 
 import edu.Loopi.entities.User;
+import edu.Loopi.services.AuthService;
 import edu.Loopi.services.UserService;
+import edu.Loopi.services.RealtimeValidationService;
+import edu.Loopi.services.PhotoService;
+import edu.Loopi.services.CameraService;
+import edu.Loopi.tools.MyConnection;
+import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
+import javafx.animation.TranslateTransition;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
-public class RegisterView {
-    private Stage registerStage;
+import java.awt.image.BufferedImage;
+import java.io.File;
 
-    private TextField prenomField;
+public class RegisterView extends Application {
+
+    private AuthService authService = new AuthService();
+    private UserService userService = new UserService();
+    private RealtimeValidationService validationService = new RealtimeValidationService();
+    private PhotoService photoService = new PhotoService();
+    private CameraService cameraService;
+
+    private Stage primaryStage;
+
     private TextField nomField;
+    private TextField prenomField;
     private TextField emailField;
     private PasswordField passwordField;
+    private TextField visiblePasswordField;
     private PasswordField confirmPasswordField;
-    private ComboBox<String> roleCombo;
-    private ComboBox<String> genreCombo;
-    private Label errorLabel;
-    private Label emailSuggestionLabel;
+    private TextField visibleConfirmPasswordField;
+    private ComboBox<String> genreComboBox;
+    private CheckBox showPasswordCheckBox;
+    private CheckBox showConfirmPasswordCheckBox;
+    private Label emailErrorLabel;
+    private Label passwordStrengthLabel;
+    private Label confirmPasswordErrorLabel;
+    private Label registerErrorLabel;
     private Button registerBtn;
+    private Button backToLoginBtn;
+    private boolean isPasswordVisible = false;
+    private boolean isConfirmPasswordVisible = false;
 
-    private UserService userService;
+    // Nouveaux éléments pour la photo
+    private ImageView profileImageView;
+    private File selectedPhotoFile;
+    private BufferedImage capturedPhoto;
+    private String profilePhotoPath = "default.jpg";
+    private boolean isUsingCamera = false;
 
-    public RegisterView() {
-        this.userService = new UserService();
-    }
+    // Nouveaux éléments pour le rôle
+    private ToggleGroup roleGroup;
+    private RadioButton participantRadio;
+    private RadioButton organisateurRadio;
+    private RadioButton adminRadio; // AJOUT: bouton pour admin
 
-    public void show(Stage parentStage) {
-        registerStage = new Stage();
-        registerStage.setTitle("Loopi - Créer un compte");
-        registerStage.initModality(Modality.WINDOW_MODAL);
-        registerStage.initOwner(parentStage);
-        registerStage.setResizable(false);
+    @Override
+    public void start(Stage primaryStage) {
+        this.primaryStage = primaryStage;
+        this.cameraService = new CameraService();
+
+        if (!MyConnection.testConnection()) {
+            showErrorAlert("Erreur de connexion",
+                    "Impossible de se connecter à la base de données.\nVérifiez que MySQL est démarré.");
+            System.exit(1);
+        }
+
+        primaryStage.setTitle("Loopi - Inscription");
+        primaryStage.setResizable(false);
 
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #4CAF50;");
+        root.setStyle("-fx-background-color: linear-gradient(to bottom right, #059669, #047857);");
 
-        // Header
+        DropShadow dropShadow = new DropShadow();
+        dropShadow.setRadius(20);
+        dropShadow.setColor(Color.rgb(0, 0, 0, 0.2));
+        root.setEffect(dropShadow);
+
         VBox header = createHeader();
         root.setTop(header);
 
-        // Formulaire
-        ScrollPane scrollPane = createRegisterForm();
+        ScrollPane scrollPane = new ScrollPane();
+        scrollPane.setContent(createRegisterForm());
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        scrollPane.setBorder(null);
         root.setCenter(scrollPane);
 
-        Scene scene = new Scene(root, 400, 680);
-        registerStage.setScene(scene);
-        registerStage.show();
+        HBox footer = createFooter();
+        root.setBottom(footer);
+
+        Scene scene = new Scene(root, 550, 900); // Augmenté la hauteur
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(800), root);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.play();
+
+        prenomField.requestFocus();
+        setupValidations();
     }
 
     private VBox createHeader() {
-        VBox header = new VBox(2);
-        header.setPadding(new Insets(30, 20, 15, 20));
+        VBox header = new VBox(10);
+        header.setPadding(new Insets(30, 20, 10, 20));
         header.setAlignment(Pos.CENTER);
 
-        Label title = new Label("Loopi");
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 30));
+        Label iconLabel = new Label("♻️");
+        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 48));
+        iconLabel.setTextFill(Color.WHITE);
+
+        Label title = new Label("Rejoindre Loopi");
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
         title.setTextFill(Color.WHITE);
 
-        Label subtitle = new Label("Créer un compte");
-        subtitle.setFont(Font.font("Arial", 16));
-        subtitle.setTextFill(Color.WHITE);
+        Label subtitle = new Label("Créez votre compte en quelques secondes");
+        subtitle.setFont(Font.font("Segoe UI", 14));
+        subtitle.setTextFill(Color.web("#e0e0e0"));
+        subtitle.setWrapText(true);
+        subtitle.setTextAlignment(TextAlignment.CENTER);
 
-        Label subsubtitle = new Label("Rejoignez la communauté Loopi");
-        subsubtitle.setFont(Font.font("Arial", 12));
-        subsubtitle.setTextFill(Color.WHITE);
-
-        header.getChildren().addAll(title, subtitle, subsubtitle);
+        header.getChildren().addAll(iconLabel, title, subtitle);
         return header;
     }
 
-    private ScrollPane createRegisterForm() {
+    private VBox createRegisterForm() {
         VBox container = new VBox();
         container.setAlignment(Pos.CENTER);
         container.setPadding(new Insets(10, 30, 20, 30));
 
-        VBox card = new VBox(12);
-        card.setMaxWidth(320);
-        card.setPadding(new Insets(20));
-        card.setStyle("-fx-background-color: white;");
+        VBox card = new VBox(15);
+        card.setMaxWidth(500);
+        card.setPadding(new Insets(25));
+        card.setStyle("-fx-background-color: white; -fx-background-radius: 20;");
 
-        // Prénom avec contrôle
-        Label prenomLabel = new Label("Prénom *");
-        prenomLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        Label registerLabel = new Label("Créer un compte");
+        registerLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 24));
+        registerLabel.setTextFill(Color.web("#1e293b"));
+        registerLabel.setAlignment(Pos.CENTER);
+        registerLabel.setMaxWidth(Double.MAX_VALUE);
+
+        Separator sep1 = new Separator();
+        sep1.setPadding(new Insets(5, 0, 10, 0));
+
+        // SECTION PHOTO DE PROFIL
+        VBox photoBox = new VBox(10);
+        photoBox.setAlignment(Pos.CENTER);
+        photoBox.setPadding(new Insets(10, 0, 15, 0));
+
+        Label photoLabel = new Label("📸 Photo de profil");
+        photoLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        photoLabel.setTextFill(Color.web("#1e293b"));
+
+        // Image par défaut
+        profileImageView = new ImageView();
+        profileImageView.setFitWidth(100);
+        profileImageView.setFitHeight(100);
+        profileImageView.setPreserveRatio(true);
+
+        // Créer un cercle de recadrage pour l'image
+        Rectangle clip = new Rectangle(100, 100);
+        clip.setArcWidth(50);
+        clip.setArcHeight(50);
+        profileImageView.setClip(clip);
+
+        // Image par défaut (avatar avec initiales)
+        try {
+            Image defaultImage = new Image("https://ui-avatars.com/api/?name=User&size=100&background=059669&color=fff");
+            profileImageView.setImage(defaultImage);
+        } catch (Exception e) {
+            // Ignorer
+        }
+
+        HBox photoButtons = new HBox(10);
+        photoButtons.setAlignment(Pos.CENTER);
+
+        Button choosePhotoBtn = new Button("📁 Choisir photo");
+        choosePhotoBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 20; -fx-cursor: hand;");
+        choosePhotoBtn.setOnAction(e -> chooseProfilePhoto());
+
+        Button takePhotoBtn = new Button("📷 Prendre photo");
+        takePhotoBtn.setStyle("-fx-background-color: #0284c7; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 20; -fx-cursor: hand;");
+        takePhotoBtn.setOnAction(e -> openCamera());
+
+        photoButtons.getChildren().addAll(choosePhotoBtn, takePhotoBtn);
+        photoBox.getChildren().addAll(photoLabel, profileImageView, photoButtons);
+
+        // Prénom
+        VBox prenomBox = new VBox(5);
+        Label prenomLabel = new Label("👤 Prénom *");
+        prenomLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        prenomLabel.setTextFill(Color.web("#1e293b"));
         prenomField = new TextField();
         prenomField.setPromptText("Votre prénom");
-        prenomField.setPrefHeight(35);
-        prenomField.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
-        prenomField.textProperty().addListener((obs, old, newVal) -> generateEmailSuggestion());
+        prenomField.setPrefHeight(40);
+        prenomField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
+        prenomBox.getChildren().addAll(prenomLabel, prenomField);
 
-        // Nom avec contrôle
-        Label nomLabel = new Label("Nom *");
-        nomLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        // Nom
+        VBox nomBox = new VBox(5);
+        Label nomLabel = new Label("📝 Nom *");
+        nomLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        nomLabel.setTextFill(Color.web("#1e293b"));
         nomField = new TextField();
         nomField.setPromptText("Votre nom");
-        nomField.setPrefHeight(35);
-        nomField.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
-        nomField.textProperty().addListener((obs, old, newVal) -> generateEmailSuggestion());
+        nomField.setPrefHeight(40);
+        nomField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
+        nomBox.getChildren().addAll(nomLabel, nomField);
 
-        // Email avec suggestion
-        Label emailLabel = new Label("Email *");
-        emailLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-
-        HBox emailBox = new HBox(5);
-        emailBox.setAlignment(Pos.CENTER_LEFT);
-
+        // Email
+        VBox emailBox = new VBox(5);
+        Label emailLabel = new Label("📧 Email *");
+        emailLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        emailLabel.setTextFill(Color.web("#1e293b"));
         emailField = new TextField();
-        emailField.setPromptText("votre.email@exemple.com");
-        emailField.setPrefHeight(35);
-        emailField.setPrefWidth(220);
-        emailField.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
+        emailField.setPromptText("votre@email.com");
+        emailField.setPrefHeight(40);
+        emailField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
+        emailErrorLabel = new Label();
+        emailErrorLabel.setFont(Font.font("Segoe UI", 11));
+        emailErrorLabel.setManaged(false);
+        emailErrorLabel.setVisible(false);
+        emailBox.getChildren().addAll(emailLabel, emailField, emailErrorLabel);
 
-        Button suggestBtn = new Button("Suggérer");
-        suggestBtn.setStyle("-fx-background-color: #E0E0E0; -fx-cursor: hand;");
-        suggestBtn.setPrefHeight(35);
-        suggestBtn.setOnAction(e -> applyEmailSuggestion());
+        // Genre
+        VBox genreBox = new VBox(5);
+        Label genreLabel = new Label("⚥ Genre");
+        genreLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        genreLabel.setTextFill(Color.web("#1e293b"));
+        genreComboBox = new ComboBox<>();
+        genreComboBox.getItems().addAll("Homme", "Femme", "Non spécifié");
+        genreComboBox.setValue("Non spécifié");
+        genreComboBox.setPrefHeight(40);
+        genreComboBox.setMaxWidth(Double.MAX_VALUE);
+        genreComboBox.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8;");
+        genreBox.getChildren().addAll(genreLabel, genreComboBox);
 
-        emailBox.getChildren().addAll(emailField, suggestBtn);
+        // SECTION RÔLE - MODIFIÉ (avec ADMIN)
+        VBox roleBox = new VBox(5);
+        Label roleLabel = new Label("👑 Choisir un rôle *");
+        roleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        roleLabel.setTextFill(Color.web("#1e293b"));
 
-        // Label de suggestion
-        emailSuggestionLabel = new Label();
-        emailSuggestionLabel.setFont(Font.font("Arial", 10));
-        emailSuggestionLabel.setTextFill(Color.GREEN);
-        emailSuggestionLabel.setVisible(false);
+        HBox roleButtons = new HBox(20);
+        roleButtons.setAlignment(Pos.CENTER_LEFT);
+
+        roleGroup = new ToggleGroup();
+
+        participantRadio = new RadioButton("Participant");
+        participantRadio.setToggleGroup(roleGroup);
+        participantRadio.setSelected(true);
+        participantRadio.setUserData("participant");
+        participantRadio.setStyle("-fx-font-size: 13px;");
+
+        organisateurRadio = new RadioButton("Organisateur");
+        organisateurRadio.setToggleGroup(roleGroup);
+        organisateurRadio.setUserData("organisateur");
+        organisateurRadio.setStyle("-fx-font-size: 13px;");
+
+        // AJOUT: bouton Admin
+        adminRadio = new RadioButton("Administrateur");
+        adminRadio.setToggleGroup(roleGroup);
+        adminRadio.setUserData("admin");
+        adminRadio.setStyle("-fx-font-size: 13px; -fx-text-fill: #8b5cf6;");
+
+        Label roleInfo = new Label("ℹ️ Les administrateurs ont accès à toutes les fonctionnalités");
+        roleInfo.setFont(Font.font("Segoe UI", 11));
+        roleInfo.setTextFill(Color.web("#64748b"));
+
+        roleButtons.getChildren().addAll(participantRadio, organisateurRadio, adminRadio);
+        roleBox.getChildren().addAll(roleLabel, roleButtons, roleInfo);
 
         // Mot de passe
-        Label passwordLabel = new Label("Mot de passe *");
-        passwordLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        VBox passwordBox = new VBox(5);
+        Label passwordLabel = new Label("🔐 Mot de passe *");
+        passwordLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        passwordLabel.setTextFill(Color.web("#1e293b"));
+
+        StackPane passwordStack = new StackPane();
         passwordField = new PasswordField();
-        passwordField.setPromptText("Minimum 6 caractères");
-        passwordField.setPrefHeight(35);
-        passwordField.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
+        passwordField.setPromptText("••••••••");
+        passwordField.setPrefHeight(40);
+        passwordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
 
-        // Confirmer
-        Label confirmLabel = new Label("Confirmer *");
-        confirmLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        visiblePasswordField = new TextField();
+        visiblePasswordField.setPromptText("••••••••");
+        visiblePasswordField.setPrefHeight(40);
+        visiblePasswordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
+        visiblePasswordField.setManaged(false);
+        visiblePasswordField.setVisible(false);
+
+        showPasswordCheckBox = new CheckBox("👁️");
+        showPasswordCheckBox.setStyle("-fx-font-size: 14px; -fx-cursor: hand;");
+        showPasswordCheckBox.setPadding(new Insets(0, 10, 0, 0));
+        showPasswordCheckBox.setAlignment(Pos.CENTER_RIGHT);
+        showPasswordCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            isPasswordVisible = newVal;
+            togglePasswordVisibility();
+        });
+
+        HBox passwordWrapper = new HBox();
+        passwordWrapper.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(passwordField, Priority.ALWAYS);
+        HBox.setHgrow(visiblePasswordField, Priority.ALWAYS);
+        passwordWrapper.getChildren().addAll(passwordField, visiblePasswordField);
+
+        passwordStack.getChildren().addAll(passwordWrapper, showPasswordCheckBox);
+        StackPane.setAlignment(showPasswordCheckBox, Pos.CENTER_RIGHT);
+
+        passwordStrengthLabel = new Label();
+        passwordStrengthLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+        passwordStrengthLabel.setManaged(false);
+        passwordStrengthLabel.setVisible(false);
+        passwordStrengthLabel.setPadding(new Insets(2, 0, 0, 0));
+
+        passwordBox.getChildren().addAll(passwordLabel, passwordStack, passwordStrengthLabel);
+
+        // Confirmer mot de passe
+        VBox confirmPasswordBox = new VBox(5);
+        Label confirmPasswordLabel = new Label("🔐 Confirmer le mot de passe *");
+        confirmPasswordLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        confirmPasswordLabel.setTextFill(Color.web("#1e293b"));
+
+        StackPane confirmPasswordStack = new StackPane();
         confirmPasswordField = new PasswordField();
-        confirmPasswordField.setPromptText("Retapez votre mot de passe");
-        confirmPasswordField.setPrefHeight(35);
-        confirmPasswordField.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
+        confirmPasswordField.setPromptText("••••••••");
+        confirmPasswordField.setPrefHeight(40);
+        confirmPasswordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
 
-        // Force du mot de passe
-        ProgressBar strengthBar = new ProgressBar(0);
-        strengthBar.setPrefHeight(5);
-        strengthBar.setMaxWidth(Double.MAX_VALUE);
-        strengthBar.setVisible(false);
+        visibleConfirmPasswordField = new TextField();
+        visibleConfirmPasswordField.setPromptText("••••••••");
+        visibleConfirmPasswordField.setPrefHeight(40);
+        visibleConfirmPasswordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 8; " +
+                "-fx-background-radius: 8; -fx-padding: 8 12;");
+        visibleConfirmPasswordField.setManaged(false);
+        visibleConfirmPasswordField.setVisible(false);
 
-        Label strengthLabel = new Label();
-        strengthLabel.setFont(Font.font("Arial", 10));
-
-        passwordField.textProperty().addListener((obs, old, newVal) -> {
-            if (!newVal.isEmpty()) {
-                strengthBar.setVisible(true);
-                int strength = calculatePasswordStrength(newVal);
-                strengthBar.setProgress(strength / 100.0);
-
-                if (strength < 30) {
-                    strengthBar.setStyle("-fx-accent: #F44336;");
-                    strengthLabel.setText("Faible");
-                    strengthLabel.setTextFill(Color.RED);
-                } else if (strength < 60) {
-                    strengthBar.setStyle("-fx-accent: #FF9800;");
-                    strengthLabel.setText("Moyen");
-                    strengthLabel.setTextFill(Color.ORANGE);
-                } else {
-                    strengthBar.setStyle("-fx-accent: #4CAF50;");
-                    strengthLabel.setText("Fort");
-                    strengthLabel.setTextFill(Color.GREEN);
-                }
-            } else {
-                strengthBar.setVisible(false);
-                strengthLabel.setText("");
-            }
+        showConfirmPasswordCheckBox = new CheckBox("👁️");
+        showConfirmPasswordCheckBox.setStyle("-fx-font-size: 14px; -fx-cursor: hand;");
+        showConfirmPasswordCheckBox.setPadding(new Insets(0, 10, 0, 0));
+        showConfirmPasswordCheckBox.setAlignment(Pos.CENTER_RIGHT);
+        showConfirmPasswordCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            isConfirmPasswordVisible = newVal;
+            toggleConfirmPasswordVisibility();
         });
 
-        // Rôle
-        Label roleLabel = new Label("Rôle");
-        roleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        HBox confirmPasswordWrapper = new HBox();
+        confirmPasswordWrapper.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(confirmPasswordField, Priority.ALWAYS);
+        HBox.setHgrow(visibleConfirmPasswordField, Priority.ALWAYS);
+        confirmPasswordWrapper.getChildren().addAll(confirmPasswordField, visibleConfirmPasswordField);
 
-        HBox roleBox = new HBox(5);
-        roleBox.setAlignment(Pos.CENTER_LEFT);
+        confirmPasswordStack.getChildren().addAll(confirmPasswordWrapper, showConfirmPasswordCheckBox);
+        StackPane.setAlignment(showConfirmPasswordCheckBox, Pos.CENTER_RIGHT);
 
-        Button prevRoleBtn = new Button("◀");
-        prevRoleBtn.setPrefSize(30, 35);
-        prevRoleBtn.setStyle("-fx-background-color: #E0E0E0; -fx-cursor: hand;");
+        confirmPasswordErrorLabel = new Label();
+        confirmPasswordErrorLabel.setFont(Font.font("Segoe UI", 11));
+        confirmPasswordErrorLabel.setManaged(false);
+        confirmPasswordErrorLabel.setVisible(false);
+        confirmPasswordErrorLabel.setPadding(new Insets(2, 0, 0, 0));
 
-        roleCombo = new ComboBox<>();
-        roleCombo.getItems().addAll("Participant", "Organisateur", "Admin");
-        roleCombo.setValue("Participant");
-        roleCombo.setPrefHeight(35);
-        roleCombo.setPrefWidth(180);
-        roleCombo.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
+        confirmPasswordBox.getChildren().addAll(confirmPasswordLabel, confirmPasswordStack, confirmPasswordErrorLabel);
 
-        Button nextRoleBtn = new Button("▶");
-        nextRoleBtn.setPrefSize(30, 35);
-        nextRoleBtn.setStyle("-fx-background-color: #E0E0E0; -fx-cursor: hand;");
-
-        prevRoleBtn.setOnAction(e -> {
-            int idx = roleCombo.getSelectionModel().getSelectedIndex();
-            if (idx > 0) roleCombo.getSelectionModel().select(idx - 1);
-        });
-
-        nextRoleBtn.setOnAction(e -> {
-            int idx = roleCombo.getSelectionModel().getSelectedIndex();
-            if (idx < roleCombo.getItems().size() - 1) roleCombo.getSelectionModel().select(idx + 1);
-        });
-
-        roleBox.getChildren().addAll(prevRoleBtn, roleCombo, nextRoleBtn);
-
-        // Genre (ComboBox depuis la BD)
-        Label genreLabel = new Label("Genre");
-        genreLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-
-        genreCombo = new ComboBox<>();
-        genreCombo.getItems().addAll("Homme", "Femme", "Non spécifié");
-        genreCombo.setValue("Non spécifié");
-        genreCombo.setPrefHeight(35);
-        genreCombo.setMaxWidth(Double.MAX_VALUE);
-        genreCombo.setStyle("-fx-border-color: #ddd; -fx-border-radius: 3;");
-
-        // Bouton
+        // Bouton d'inscription
         registerBtn = new Button("Créer mon compte");
-        registerBtn.setPrefHeight(40);
-        registerBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        registerBtn.setPrefHeight(45);
         registerBtn.setMaxWidth(Double.MAX_VALUE);
+        registerBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-font-size: 14px; " +
+                "-fx-background-radius: 25; -fx-cursor: hand;");
         registerBtn.setOnAction(e -> handleRegister());
 
-        // Lien connexion
-        HBox loginLink = new HBox(5);
-        loginLink.setAlignment(Pos.CENTER);
+        registerBtn.setOnMouseEntered(e ->
+                registerBtn.setStyle("-fx-background-color: #047857; -fx-text-fill: white; " +
+                        "-fx-font-weight: bold; -fx-font-size: 14px; " +
+                        "-fx-background-radius: 25; -fx-cursor: hand;"));
+        registerBtn.setOnMouseExited(e ->
+                registerBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                        "-fx-font-weight: bold; -fx-font-size: 14px; " +
+                        "-fx-background-radius: 25; -fx-cursor: hand;"));
 
-        Label haveAccountLabel = new Label("Déjà un compte?");
-        haveAccountLabel.setFont(Font.font("Arial", 12));
-        haveAccountLabel.setTextFill(Color.GRAY);
+        // Lien retour à la connexion
+        VBox loginBox = new VBox(10);
+        loginBox.setAlignment(Pos.CENTER);
+        loginBox.setPadding(new Insets(10, 0, 0, 0));
 
-        Hyperlink loginHyperlink = new Hyperlink("Se connecter");
-        loginHyperlink.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        loginHyperlink.setTextFill(Color.web("#4CAF50"));
-        loginHyperlink.setOnAction(e -> registerStage.close());
+        Label alreadyLabel = new Label("Déjà un compte ?");
+        alreadyLabel.setFont(Font.font("Segoe UI", 12));
+        alreadyLabel.setTextFill(Color.web("#64748b"));
 
-        loginLink.getChildren().addAll(haveAccountLabel, loginHyperlink);
+        backToLoginBtn = new Button("Se connecter");
+        backToLoginBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #059669; " +
+                "-fx-font-weight: bold; -fx-font-size: 13px; -fx-cursor: hand; -fx-border-color: transparent;");
+        backToLoginBtn.setOnAction(e -> goToLogin());
 
-        // Erreur
-        errorLabel = new Label();
-        errorLabel.setTextFill(Color.RED);
-        errorLabel.setVisible(false);
-        errorLabel.setWrapText(true);
-        errorLabel.setAlignment(Pos.CENTER);
+        loginBox.getChildren().addAll(alreadyLabel, backToLoginBtn);
 
+        // Label d'erreur
+        registerErrorLabel = new Label();
+        registerErrorLabel.setFont(Font.font("Segoe UI", 12));
+        registerErrorLabel.setTextFill(Color.web("#ef4444"));
+        registerErrorLabel.setWrapText(true);
+        registerErrorLabel.setAlignment(Pos.CENTER);
+        registerErrorLabel.setMaxWidth(Double.MAX_VALUE);
+        registerErrorLabel.setVisible(false);
+
+        // Ajouter tous les composants à la carte
         card.getChildren().addAll(
-                prenomLabel, prenomField,
-                nomLabel, nomField,
-                emailLabel, emailBox, emailSuggestionLabel,
-                passwordLabel, passwordField, strengthBar, strengthLabel,
-                confirmLabel, confirmPasswordField,
-                roleLabel, roleBox,
-                genreLabel, genreCombo,
-                registerBtn,
-                loginLink,
-                errorLabel
+                registerLabel, sep1,
+                photoBox,
+                prenomBox, nomBox, emailBox, genreBox,
+                roleBox,
+                passwordBox, confirmPasswordBox,
+                registerBtn, loginBox, registerErrorLabel
         );
 
         container.getChildren().add(card);
-
-        ScrollPane scrollPane = new ScrollPane(container);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: transparent;");
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-
-        return scrollPane;
+        return container;
     }
 
-    // Générer une suggestion d'email basée sur prénom.nom@loopi.tn
-    private void generateEmailSuggestion() {
-        String prenom = prenomField.getText().trim().toLowerCase();
-        String nom = nomField.getText().trim().toLowerCase();
+    private HBox createFooter() {
+        HBox footer = new HBox();
+        footer.setPadding(new Insets(15));
+        footer.setAlignment(Pos.CENTER);
 
-        if (!prenom.isEmpty() && !nom.isEmpty()) {
-            // Nettoyer les caractères spéciaux
-            prenom = prenom.replaceAll("[^a-z]", "");
-            nom = nom.replaceAll("[^a-z]", "");
+        Label footerText = new Label("© 2026 Loopi - Plateforme Écologique");
+        footerText.setFont(Font.font("Segoe UI", 11));
+        footerText.setTextFill(Color.web("#e0e0e0"));
 
-            if (!prenom.isEmpty() && !nom.isEmpty()) {
-                String suggestion = prenom + "." + nom + "@loopi.tn";
-                emailSuggestionLabel.setText("Suggestion: " + suggestion);
-                emailSuggestionLabel.setVisible(true);
-            } else {
-                emailSuggestionLabel.setVisible(false);
+        footer.getChildren().add(footerText);
+        return footer;
+    }
+
+    private void setupValidations() {
+        validationService.setupEmailValidation(emailField, emailErrorLabel);
+        validationService.setupPasswordValidation(passwordField, passwordStrengthLabel);
+        validationService.setupPasswordValidation(visiblePasswordField, passwordStrengthLabel);
+        validationService.setupPasswordConfirmation(
+                passwordField, visiblePasswordField,
+                confirmPasswordField, visibleConfirmPasswordField,
+                confirmPasswordErrorLabel);
+    }
+
+    private void chooseProfilePhoto() {
+        File selectedFile = photoService.choosePhotoFromComputer(primaryStage);
+        if (selectedFile != null) {
+            try {
+                Image image = new Image(selectedFile.toURI().toString(), 100, 100, true, true);
+                profileImageView.setImage(image);
+                selectedPhotoFile = selectedFile;
+                isUsingCamera = false;
+                System.out.println("✅ Photo choisie: " + selectedFile.getName());
+            } catch (Exception e) {
+                showRegisterError("❌ Erreur chargement photo");
             }
+        }
+    }
+
+    private void openCamera() {
+        Stage cameraStage = new Stage();
+        cameraStage.setTitle("Prendre une photo");
+        cameraStage.initModality(Modality.APPLICATION_MODAL);
+        cameraStage.initOwner(primaryStage);
+
+        VBox cameraLayout = new VBox(20);
+        cameraLayout.setPadding(new Insets(20));
+        cameraLayout.setStyle("-fx-background-color: #1e293b;");
+        cameraLayout.setAlignment(Pos.CENTER);
+
+        Label title = new Label("📷 Prendre une photo");
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
+        title.setTextFill(Color.WHITE);
+
+        // Zone de la caméra
+        StackPane cameraPane = new StackPane();
+        cameraPane.setPrefSize(320, 240);
+        cameraPane.setStyle("-fx-background-color: #0f172a; -fx-background-radius: 10; " +
+                "-fx-border-color: #059669; -fx-border-radius: 10; -fx-border-width: 2;");
+
+        Label cameraPlaceholder = new Label("📷 CAMÉRA");
+        cameraPlaceholder.setFont(Font.font(20));
+        cameraPlaceholder.setTextFill(Color.web("#64748b"));
+        cameraPane.getChildren().add(cameraPlaceholder);
+
+        ImageView previewImage = new ImageView();
+        previewImage.setFitWidth(300);
+        previewImage.setFitHeight(200);
+        previewImage.setPreserveRatio(true);
+
+        HBox buttons = new HBox(10);
+        buttons.setAlignment(Pos.CENTER);
+
+        Button startBtn = new Button("▶ Démarrer");
+        startBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 20; -fx-cursor: hand;");
+
+        Button captureBtn = new Button("📸 Capturer");
+        captureBtn.setStyle("-fx-background-color: #0284c7; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 20; -fx-cursor: hand;");
+        captureBtn.setDisable(true);
+
+        Button acceptBtn = new Button("✅ Accepter");
+        acceptBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 20; -fx-cursor: hand;");
+        acceptBtn.setVisible(false);
+
+        Button cancelBtn = new Button("❌ Annuler");
+        cancelBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 20; -fx-cursor: hand;");
+        cancelBtn.setOnAction(e -> {
+            cameraService.stopCamera();
+            cameraStage.close();
+        });
+
+        Label statusLabel = new Label();
+        statusLabel.setFont(Font.font("Segoe UI", 12));
+        statusLabel.setTextFill(Color.WHITE);
+
+        // Créer une copie finale de cameraService pour l'utiliser dans les lambdas
+        CameraService finalCameraService = this.cameraService;
+
+        // Variables pour stocker la photo capturée de manière finale
+        final BufferedImage[] capturedPhotoRef = new BufferedImage[1];
+        capturedPhotoRef[0] = null;
+
+        startBtn.setOnAction(e -> {
+            new Thread(() -> {
+                boolean started = finalCameraService.startCamera();
+                Platform.runLater(() -> {
+                    if (started) {
+                        startBtn.setDisable(true);
+                        captureBtn.setDisable(false);
+                        statusLabel.setText("✅ Caméra prête");
+                        cameraPane.getChildren().clear();
+
+                        Label cameraActive = new Label("📷 FLUX ACTIF");
+                        cameraActive.setFont(Font.font(16));
+                        cameraActive.setTextFill(Color.GREEN);
+                        cameraPane.getChildren().add(cameraActive);
+                    } else {
+                        statusLabel.setText("❌ Erreur: Aucune caméra trouvée");
+                    }
+                });
+            }).start();
+        });
+
+        captureBtn.setOnAction(e -> {
+            statusLabel.setText("🔄 Capture...");
+
+            new Thread(() -> {
+                BufferedImage captured = finalCameraService.captureImage();
+                Platform.runLater(() -> {
+                    if (captured != null) {
+                        Image fxImage = SwingFXUtils.toFXImage(captured, null);
+                        previewImage.setImage(fxImage);
+                        capturedPhotoRef[0] = captured;
+
+                        cameraPane.getChildren().clear();
+                        cameraPane.getChildren().add(previewImage);
+
+                        captureBtn.setVisible(false);
+                        acceptBtn.setVisible(true);
+                        statusLabel.setText("✅ Photo capturée");
+                    } else {
+                        statusLabel.setText("❌ Erreur capture");
+                    }
+                });
+            }).start();
+        });
+
+        acceptBtn.setOnAction(e -> {
+            if (capturedPhotoRef[0] != null) {
+                Image fxImage = SwingFXUtils.toFXImage(capturedPhotoRef[0], null);
+                profileImageView.setImage(fxImage);
+                this.capturedPhoto = capturedPhotoRef[0]; // Assigner à la variable d'instance
+                isUsingCamera = true;
+                finalCameraService.stopCamera();
+                cameraStage.close();
+            }
+        });
+
+        buttons.getChildren().addAll(startBtn, captureBtn, acceptBtn, cancelBtn);
+        cameraLayout.getChildren().addAll(title, cameraPane, buttons, statusLabel);
+
+        Scene scene = new Scene(cameraLayout, 400, 450);
+        cameraStage.setScene(scene);
+        cameraStage.setOnCloseRequest(e -> finalCameraService.stopCamera());
+        cameraStage.showAndWait();
+    }
+
+    private void togglePasswordVisibility() {
+        if (isPasswordVisible) {
+            visiblePasswordField.setText(passwordField.getText());
+            visiblePasswordField.setManaged(true);
+            visiblePasswordField.setVisible(true);
+            passwordField.setManaged(false);
+            passwordField.setVisible(false);
         } else {
-            emailSuggestionLabel.setVisible(false);
+            passwordField.setText(visiblePasswordField.getText());
+            passwordField.setManaged(true);
+            passwordField.setVisible(true);
+            visiblePasswordField.setManaged(false);
+            visiblePasswordField.setVisible(false);
         }
     }
 
-    // Appliquer la suggestion d'email
-    private void applyEmailSuggestion() {
-        String prenom = prenomField.getText().trim().toLowerCase();
-        String nom = nomField.getText().trim().toLowerCase();
-
-        if (!prenom.isEmpty() && !nom.isEmpty()) {
-            prenom = prenom.replaceAll("[^a-z]", "");
-            nom = nom.replaceAll("[^a-z]", "");
-
-            if (!prenom.isEmpty() && !nom.isEmpty()) {
-                String suggestion = prenom + "." + nom + "@loopi.tn";
-                emailField.setText(suggestion);
-            }
+    private void toggleConfirmPasswordVisibility() {
+        if (isConfirmPasswordVisible) {
+            visibleConfirmPasswordField.setText(confirmPasswordField.getText());
+            visibleConfirmPasswordField.setManaged(true);
+            visibleConfirmPasswordField.setVisible(true);
+            confirmPasswordField.setManaged(false);
+            confirmPasswordField.setVisible(false);
+        } else {
+            confirmPasswordField.setText(visibleConfirmPasswordField.getText());
+            confirmPasswordField.setManaged(true);
+            confirmPasswordField.setVisible(true);
+            visibleConfirmPasswordField.setManaged(false);
+            visibleConfirmPasswordField.setVisible(false);
         }
-    }
-
-    // Calculer la force du mot de passe
-    private int calculatePasswordStrength(String password) {
-        int strength = 0;
-        if (password.length() >= 6) strength += 20;
-        if (password.length() >= 8) strength += 15;
-        if (password.matches(".*[A-Z].*")) strength += 20;
-        if (password.matches(".*[0-9].*")) strength += 20;
-        if (password.matches(".*[!@#$%^&*].*")) strength += 25;
-        return Math.min(strength, 100);
     }
 
     private void handleRegister() {
         String prenom = prenomField.getText().trim();
         String nom = nomField.getText().trim();
-        String email = emailField.getText().trim().toLowerCase();
-        String password = passwordField.getText();
-        String confirmPassword = confirmPasswordField.getText();
-        String role = roleCombo.getValue().toLowerCase();
-        String genre = genreCombo.getValue();
+        String email = emailField.getText().trim();
+        String genre = genreComboBox.getValue();
 
-        // Map genre vers id_genre
-        int idGenre = 3; // Non spécifié par défaut
-        if ("Homme".equals(genre)) idGenre = 1;
-        else if ("Femme".equals(genre)) idGenre = 2;
+        // Récupérer le rôle sélectionné
+        String role = "participant";
+        if (roleGroup.getSelectedToggle() != null) {
+            role = (String) roleGroup.getSelectedToggle().getUserData();
+        }
 
-        // Validation
-        if (prenom.isEmpty() || nom.isEmpty() || email.isEmpty() ||
-                password.isEmpty() || confirmPassword.isEmpty()) {
-            showError("Tous les champs marqués * sont obligatoires");
+        String password = isPasswordVisible ?
+                visiblePasswordField.getText().trim() : passwordField.getText().trim();
+        String confirmPassword = isConfirmPasswordVisible ?
+                visibleConfirmPasswordField.getText().trim() : confirmPasswordField.getText().trim();
+
+        // Validations
+        if (prenom.isEmpty()) {
+            showRegisterError("⚠ Prénom requis");
             return;
         }
 
-        // Validation prénom (lettres uniquement)
-        if (!prenom.matches("[a-zA-ZÀ-ÿ\\s-]{2,}")) {
-            showError("Prénom invalide (minimum 2 lettres)");
+        if (nom.isEmpty()) {
+            showRegisterError("⚠ Nom requis");
             return;
         }
 
-        // Validation nom (lettres uniquement)
-        if (!nom.matches("[a-zA-ZÀ-ÿ\\s-]{2,}")) {
-            showError("Nom invalide (minimum 2 lettres)");
+        if (email.isEmpty()) {
+            showRegisterError("⚠ Email requis");
             return;
         }
 
-        // Validation email
-        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
-            showError("Format d'email invalide");
+        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            showRegisterError("❌ Format d'email invalide");
             return;
         }
 
-        // Vérifier si l'email existe déjà
-        if (userService.emailExists(email)) {
-            showError("Cet email est déjà utilisé");
-            return;
-        }
-
-        // Validation mot de passe
-        if (!password.equals(confirmPassword)) {
-            showError("Les mots de passe ne correspondent pas");
+        if (password.isEmpty()) {
+            showRegisterError("⚠ Mot de passe requis");
             return;
         }
 
         if (password.length() < 6) {
-            showError("Le mot de passe doit contenir au moins 6 caractères");
+            showRegisterError("⚠ Mot de passe trop court (min 6 caractères)");
             return;
         }
 
-        // Créer l'utilisateur
-        User newUser = new User(nom, prenom, email, password, role);
-        newUser.setIdGenre(idGenre);
-        newUser.setPhoto("default.jpg");
+        if (!password.equals(confirmPassword)) {
+            showRegisterError("❌ Les mots de passe ne correspondent pas");
+            return;
+        }
 
-        // Désactiver le bouton
-        registerBtn.setDisable(true);
+        if (authService.emailExists(email)) {
+            showRegisterError("❌ Cet email est déjà utilisé");
+            return;
+        }
+
+        setButtonsDisabled(true);
         registerBtn.setText("Création en cours...");
+
+        // Créer des copies finales des variables utilisées dans le thread
+        final String finalPrenom = prenom;
+        final String finalNom = nom;
+        final String finalEmail = email;
+        final String finalRole = role;
+        final int finalGenreId = getGenreIdFromString(genre);
+        final boolean finalIsUsingCamera = isUsingCamera;
+        final BufferedImage finalCapturedPhoto = capturedPhoto;
+        final File finalSelectedPhotoFile = selectedPhotoFile;
 
         new Thread(() -> {
             try {
-                Thread.sleep(800);
-                javafx.application.Platform.runLater(() -> {
-                    boolean success = userService.addUser(newUser);
+                Thread.sleep(500);
+                Platform.runLater(() -> {
+                    try {
+                        User newUser = new User();
+                        newUser.setPrenom(finalPrenom);
+                        newUser.setNom(finalNom);
+                        newUser.setEmail(finalEmail);
+                        newUser.setRole(finalRole);
 
-                    if (success) {
-                        showSuccess("Compte créé avec succès !\nBienvenue " + prenom + " !\nVous pouvez maintenant vous connecter.");
-                        registerStage.close();
-                    } else {
-                        showError("Erreur lors de la création du compte");
-                        registerBtn.setDisable(false);
+                        newUser.setIdGenre(finalGenreId);
+                        newUser.setPhoto("default.jpg");
+
+                        // Inscription sans photo d'abord
+                        boolean registered = authService.register(newUser, password);
+
+                        if (registered) {
+                            // Récupérer l'utilisateur créé pour avoir l'ID
+                            User created = authService.getUserByEmail(finalEmail);
+
+                            if (created != null) {
+                                // Sauvegarder la photo si elle existe
+                                if (finalIsUsingCamera && finalCapturedPhoto != null) {
+                                    String photoPath = photoService.saveCameraPhoto(finalCapturedPhoto, created.getId());
+                                    created.setPhoto(photoPath);
+                                    userService.updateUser(created);
+
+                                    // Ajouter le visage pour la reconnaissance faciale
+                                    if (cameraService != null) {
+                                        cameraService.addFaceForTraining(finalCapturedPhoto, created.getId());
+                                    }
+
+                                } else if (finalSelectedPhotoFile != null) {
+                                    String photoPath = photoService.saveProfilePhoto(finalSelectedPhotoFile, created.getId());
+                                    created.setPhoto(photoPath);
+                                    userService.updateUser(created);
+                                }
+                            }
+
+                            System.out.println("✅ Inscription réussie: " + finalEmail + " (rôle: " + finalRole + ")");
+                            showSuccessAlert("Inscription réussie",
+                                    "Votre compte a été créé avec succès !\nVous pouvez maintenant vous connecter.");
+                            goToLogin();
+                        } else {
+                            showRegisterError("❌ Erreur lors de l'inscription");
+                            setButtonsDisabled(false);
+                            registerBtn.setText("Créer mon compte");
+                        }
+                    } catch (Exception ex) {
+                        showRegisterError("❌ Erreur: " + ex.getMessage());
+                        setButtonsDisabled(false);
                         registerBtn.setText("Créer mon compte");
                     }
                 });
@@ -414,25 +785,88 @@ public class RegisterView {
         }).start();
     }
 
-    private void showError(String message) {
-        errorLabel.setText("⚠ " + message);
-        errorLabel.setVisible(true);
-
-        new Thread(() -> {
-            try {
-                Thread.sleep(3000);
-                javafx.application.Platform.runLater(() -> errorLabel.setVisible(false));
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
+    private int getGenreIdFromString(String genre) {
+        if (genre == null) return 3;
+        switch (genre.toLowerCase()) {
+            case "homme": return 1;
+            case "femme": return 2;
+            case "non spécifié":
+            default: return 3;
+        }
     }
 
-    private void showSuccess(String message) {
+    private void goToLogin() {
+        if (cameraService != null) {
+            cameraService.stopCamera();
+        }
+
+        LoginView loginView = new LoginView();
+        try {
+            loginView.start(primaryStage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showRegisterError(String message) {
+        registerErrorLabel.setText(message);
+        registerErrorLabel.setVisible(true);
+
+        TranslateTransition translate = new TranslateTransition(Duration.millis(50), registerErrorLabel);
+        translate.setFromX(0);
+        translate.setToX(10);
+        translate.setAutoReverse(true);
+        translate.setCycleCount(4);
+        translate.play();
+
+        PauseTransition pause = new PauseTransition(Duration.seconds(3));
+        pause.setOnFinished(e -> registerErrorLabel.setVisible(false));
+        pause.play();
+    }
+
+    private void setButtonsDisabled(boolean disabled) {
+        registerBtn.setDisable(disabled);
+        backToLoginBtn.setDisable(disabled);
+        nomField.setDisable(disabled);
+        prenomField.setDisable(disabled);
+        emailField.setDisable(disabled);
+        passwordField.setDisable(disabled);
+        visiblePasswordField.setDisable(disabled);
+        confirmPasswordField.setDisable(disabled);
+        visibleConfirmPasswordField.setDisable(disabled);
+        genreComboBox.setDisable(disabled);
+        showPasswordCheckBox.setDisable(disabled);
+        showConfirmPasswordCheckBox.setDisable(disabled);
+        participantRadio.setDisable(disabled);
+        organisateurRadio.setDisable(disabled);
+        adminRadio.setDisable(disabled); // AJOUT
+    }
+
+    private void showSuccessAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Succès");
+        alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    private void showErrorAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    public void show(Stage parentStage) {
+        try {
+            start(parentStage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }

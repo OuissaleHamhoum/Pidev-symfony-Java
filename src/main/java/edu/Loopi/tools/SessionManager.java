@@ -16,6 +16,7 @@ public class SessionManager {
         loginTime = System.currentTimeMillis();
         token = generateToken(user.getEmail());
         System.out.println("✅ Session démarrée pour: " + user.getEmail());
+        printSessionInfo();
     }
 
     public static void logout() {
@@ -73,13 +74,14 @@ public class SessionManager {
 
     public static void printSessionInfo() {
         if (currentUser != null) {
-            System.out.println("=== SESSION INFO ===");
+            System.out.println("\n=== INFORMATIONS SESSION ===");
             System.out.println("Utilisateur: " + currentUser.getNomComplet());
             System.out.println("Email: " + currentUser.getEmail());
             System.out.println("Rôle: " + currentUser.getRole());
+            System.out.println("ID: " + currentUser.getId());
             System.out.println("Durée: " + getSessionDurationFormatted());
             System.out.println("Token: " + (token != null ? token.substring(0, 20) + "..." : "null"));
-            System.out.println("====================");
+            System.out.println("============================\n");
         } else {
             System.out.println("Aucune session active");
         }
