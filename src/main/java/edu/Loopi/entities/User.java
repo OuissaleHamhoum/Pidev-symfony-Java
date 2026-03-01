@@ -11,22 +11,24 @@ public class User {
     private String photo;
     private String role;
     private int idGenre;
+    private String sexe;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Champ transient pour affichage
-    private String sexe;
+    public User() {
+        this.photo = "default.jpg";
+        this.role = "participant";
+        this.idGenre = 3; // Non spécifié par défaut
+    }
 
-    // Constructeurs
-    public User() {}
-
-    public User(String nom, String prenom, String email, String password, String role) {
+    public User(int id, String nom, String prenom, String email, String role) {
+        this.id = id;
         this.nom = nom;
         this.prenom = prenom;
         this.email = email;
-        this.password = password;
         this.role = role;
         this.photo = "default.jpg";
+        this.idGenre = 3;
     }
 
     // Getters et Setters
@@ -54,30 +56,26 @@ public class User {
     public int getIdGenre() { return idGenre; }
     public void setIdGenre(int idGenre) { this.idGenre = idGenre; }
 
+    public String getSexe() { return sexe; }
+    public void setSexe(String sexe) { this.sexe = sexe; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
-    public String getSexe() { return sexe; }
-    public void setSexe(String sexe) { this.sexe = sexe; }
-
-    // Méthodes utilitaires
+    // Méthode utilitaire pour obtenir le nom complet
     public String getNomComplet() {
-        return prenom + " " + nom;
-    }
-
-    public boolean isAdmin() {
-        return "admin".equalsIgnoreCase(role);
-    }
-
-    public boolean isOrganizer() {
-        return "organisateur".equalsIgnoreCase(role);
-    }
-
-    public boolean isParticipant() {
-        return "participant".equalsIgnoreCase(role);
+        String nomComplet = "";
+        if (prenom != null && !prenom.isEmpty()) {
+            nomComplet += prenom;
+        }
+        if (nom != null && !nom.isEmpty()) {
+            if (!nomComplet.isEmpty()) nomComplet += " ";
+            nomComplet += nom;
+        }
+        return nomComplet.isEmpty() ? email : nomComplet;
     }
 
     @Override
