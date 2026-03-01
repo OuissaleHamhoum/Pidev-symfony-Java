@@ -10,8 +10,6 @@ import edu.Loopi.services.RealtimeValidationService;
 import edu.Loopi.services.CameraService;
 import edu.Loopi.services.QRLoginService;
 import edu.Loopi.services.QRCodeWebServer;
-import edu.Loopi.services.QRLoginService.QRCodeResult;
-import edu.Loopi.services.QRLoginService.QRValidationResult;
 import javafx.animation.*;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -25,6 +23,8 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
@@ -35,8 +35,10 @@ import javafx.util.Duration;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.net.InetAddress;
-import java.util.UUID;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class LoginView extends Application {
 
@@ -61,9 +63,11 @@ public class LoginView extends Application {
     private Button qrLoginBtn;
     private boolean isPasswordVisible = false;
 
-    // Variables pour la caméra
-    private Stage cameraLoginStage;
-    private boolean isCameraRunning = false;
+    // Toggle buttons
+    private Button loginToggleBtn;
+    private Button registerToggleBtn;
+    private HBox toggleBox;
+    private boolean isLoginMode = true;
 
     @Override
     public void start(Stage primaryStage) {
@@ -81,57 +85,21 @@ public class LoginView extends Application {
         primaryStage.setTitle("Loopi - Connexion");
         primaryStage.setResizable(false);
 
-        // Conteneur principal avec gradient
-        StackPane root = new StackPane();
-        root.setStyle("-fx-background-color: linear-gradient(to bottom right, #059669, #047857);");
+        // Conteneur principal avec les deux colonnes
+        HBox root = new HBox();
+        root.setStyle("-fx-background-color: white;");
 
-        // Créer le conteneur du contenu avec l'effet d'ombre
-        BorderPane contentContainer = new BorderPane();
+        // Colonne gauche avec animation réseau
+        VBox leftColumn = createLeftColumn();
+        leftColumn.setPrefWidth(350);
 
-        DropShadow dropShadow = new DropShadow();
-        dropShadow.setRadius(20);
-        dropShadow.setColor(Color.rgb(0, 0, 0, 0.2));
-        contentContainer.setEffect(dropShadow);
+        // Colonne droite avec formulaire
+        VBox rightColumn = createRightColumn();
+        rightColumn.setPrefWidth(400);
 
-        // Créer le contenu principal
-        VBox content = new VBox();
+        root.getChildren().addAll(leftColumn, rightColumn);
 
-        VBox header = createHeader();
-        VBox formContainer = createLoginForm();
-        HBox footer = createFooter();
-
-        content.getChildren().addAll(header, formContainer, footer);
-
-        // Espacement pour éviter que le footer colle au bas
-        VBox.setVgrow(formContainer, Priority.ALWAYS);
-
-        // Créer le ScrollPane
-        ScrollPane scrollPane = new ScrollPane();
-        scrollPane.setContent(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-
-        // Style pour que le ScrollPane soit transparent
-        scrollPane.setStyle(
-                "-fx-background: transparent;" +
-                        "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-scroll-bar-track-color: transparent;" +
-                        "-fx-scroll-bar-thumb-color: rgba(255,255,255,0.3);"
-        );
-
-        contentContainer.setCenter(scrollPane);
-        root.getChildren().add(contentContainer);
-
-        // Ajouter un indicateur de scroll
-        Label scrollHint = createScrollHint();
-        StackPane.setAlignment(scrollHint, Pos.BOTTOM_CENTER);
-        StackPane.setMargin(scrollHint, new Insets(0, 0, 10, 0));
-        root.getChildren().add(scrollHint);
-
-        Scene scene = new Scene(root, 420, 750);
+        Scene scene = new Scene(root, 750, 600);
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -141,134 +109,324 @@ public class LoginView extends Application {
         fadeIn.setToValue(1);
         fadeIn.play();
 
-        emailField.requestFocus();
         setupRealtimeValidation();
     }
 
-    private Label createScrollHint() {
-        Label scrollHint = new Label("▼ Faites défiler ▼");
-        scrollHint.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 10));
-        scrollHint.setTextFill(Color.web("#ffffff", 0.7));
-        scrollHint.setAlignment(Pos.CENTER);
+    private VBox createLeftColumn() {
+        VBox leftColumn = new VBox(15);
+        leftColumn.setStyle("-fx-background-color: linear-gradient(to bottom, #0f172a, #1e293b);");
+        leftColumn.setAlignment(Pos.TOP_CENTER);
+        leftColumn.setPadding(new Insets(25, 15, 15, 15));
 
-        FadeTransition fadeHint = new FadeTransition(Duration.millis(1500), scrollHint);
-        fadeHint.setFromValue(0.3);
-        fadeHint.setToValue(1.0);
-        fadeHint.setCycleCount(Animation.INDEFINITE);
-        fadeHint.setAutoReverse(true);
-        fadeHint.play();
+        // Animation Network Connections
+        Pane networkPane = createNetworkAnimation();
+        networkPane.setPrefHeight(180);
+        networkPane.setMaxHeight(180);
+        networkPane.setMinHeight(180);
 
-        PauseTransition pause = new PauseTransition(Duration.seconds(3));
-        pause.setOnFinished(e -> {
-            fadeHint.stop();
-            scrollHint.setVisible(false);
-        });
-        pause.play();
-
-        return scrollHint;
-    }
-
-    private VBox createHeader() {
-        VBox header = new VBox(10);
-        header.setPadding(new Insets(40, 20, 20, 20));
-        header.setAlignment(Pos.CENTER);
-
-        Label iconLabel = new Label("♻️");
-        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 64));
-        iconLabel.setTextFill(Color.WHITE);
-
-        ScaleTransition scaleTransition = new ScaleTransition(Duration.millis(1000), iconLabel);
-        scaleTransition.setFromX(0.8);
-        scaleTransition.setFromY(0.8);
-        scaleTransition.setToX(1);
-        scaleTransition.setToY(1);
-        scaleTransition.setAutoReverse(true);
-        scaleTransition.setCycleCount(ScaleTransition.INDEFINITE);
-        scaleTransition.play();
-
+        // Titre
         Label title = new Label("Loopi");
-        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
         title.setTextFill(Color.WHITE);
 
         Label subtitle = new Label("Économie Circulaire & Solidarité");
-        subtitle.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
-        subtitle.setTextFill(Color.web("#e0e0e0"));
+        subtitle.setFont(Font.font("Segoe UI", 12));
+        subtitle.setTextFill(Color.web("#94a3b8"));
         subtitle.setWrapText(true);
         subtitle.setTextAlignment(TextAlignment.CENTER);
+        subtitle.setMaxWidth(280);
 
-        header.getChildren().addAll(iconLabel, title, subtitle);
-        return header;
+        // Espace flexible
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        // Logos partenaires en bas
+        HBox partnersBox = createPartnersLogo();
+        partnersBox.setAlignment(Pos.CENTER);
+        partnersBox.setPadding(new Insets(10, 0, 5, 0));
+
+        leftColumn.getChildren().addAll(networkPane, title, subtitle, spacer, partnersBox);
+
+        return leftColumn;
     }
 
-    private VBox createLoginForm() {
-        VBox container = new VBox();
-        container.setAlignment(Pos.CENTER);
-        container.setPadding(new Insets(0, 30, 20, 30));
+    private Pane createNetworkAnimation() {
+        Pane pane = new Pane();
+        pane.setPrefSize(300, 170);
 
-        VBox card = new VBox(20);
-        card.setMaxWidth(350);
-        card.setPadding(new Insets(30));
-        card.setStyle("-fx-background-color: white; -fx-background-radius: 20;");
+        Random random = new Random();
+        List<Circle> nodes = new ArrayList<>();
+        List<Line> lines = new ArrayList<>();
 
-        Label connectLabel = new Label("Bienvenue !");
-        connectLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
-        connectLabel.setTextFill(Color.web("#1e293b"));
-        connectLabel.setAlignment(Pos.CENTER);
-        connectLabel.setMaxWidth(Double.MAX_VALUE);
+        // Créer des nœuds (points de connexion)
+        for (int i = 0; i < 6; i++) {
+            Circle circle = new Circle(4 + random.nextDouble() * 2);
+            circle.setCenterX(40 + random.nextDouble() * 220);
+            circle.setCenterY(20 + random.nextDouble() * 130);
+            circle.setFill(Color.rgb(5, 150, 105, 0.9));
+            circle.setStroke(Color.rgb(255, 255, 255, 0.6));
+            circle.setStrokeWidth(1);
+            nodes.add(circle);
+            pane.getChildren().add(circle);
+        }
 
-        Label connectSubLabel = new Label("Connectez-vous pour continuer");
-        connectSubLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
-        connectSubLabel.setTextFill(Color.web("#64748b"));
-        connectSubLabel.setAlignment(Pos.CENTER);
-        connectSubLabel.setMaxWidth(Double.MAX_VALUE);
+        // Créer des connexions entre les nœuds
+        for (int i = 0; i < nodes.size(); i++) {
+            for (int j = i + 1; j < nodes.size(); j++) {
+                if (random.nextDouble() < 0.4) {
+                    Circle c1 = nodes.get(i);
+                    Circle c2 = nodes.get(j);
 
-        Separator sep1 = new Separator();
-        sep1.setPadding(new Insets(5, 0, 5, 0));
+                    Line line = new Line(
+                            c1.getCenterX(), c1.getCenterY(),
+                            c2.getCenterX(), c2.getCenterY()
+                    );
+                    line.setStroke(Color.rgb(5, 150, 105, 0.3));
+                    line.setStrokeWidth(1);
+                    lines.add(line);
+                    pane.getChildren().add(line);
+                }
+            }
+        }
+
+        // Animation des connexions
+        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(80), e -> {
+            for (Line line : lines) {
+                double opacity = 0.2 + Math.random() * 0.5;
+                line.setStroke(Color.rgb(5, 150, 105, opacity));
+            }
+
+            for (Circle node : nodes) {
+                node.setRadius(3 + Math.random() * 3);
+                node.setFill(Color.rgb(
+                        5 + (int)(Math.random() * 30),
+                        150 + (int)(Math.random() * 40),
+                        105 + (int)(Math.random() * 30),
+                        0.7 + Math.random() * 0.3
+                ));
+            }
+        }));
+
+        timeline.setCycleCount(Animation.INDEFINITE);
+        timeline.play();
+
+        // Petites particules animées (data packets)
+        for (int i = 0; i < 3; i++) {
+            Circle particle = new Circle(2, Color.rgb(255, 255, 255, 0.8));
+            particle.setCenterX(50 + random.nextDouble() * 200);
+            particle.setCenterY(30 + random.nextDouble() * 100);
+            pane.getChildren().add(particle);
+
+            TranslateTransition move = new TranslateTransition(Duration.seconds(2 + random.nextDouble() * 2), particle);
+            move.setByX(40 - random.nextDouble() * 80);
+            move.setByY(30 - random.nextDouble() * 60);
+            move.setCycleCount(Animation.INDEFINITE);
+            move.setAutoReverse(true);
+            move.play();
+
+            FadeTransition fade = new FadeTransition(Duration.seconds(1.5), particle);
+            fade.setFromValue(0.3);
+            fade.setToValue(1.0);
+            fade.setCycleCount(Animation.INDEFINITE);
+            fade.setAutoReverse(true);
+            fade.play();
+        }
+
+        return pane;
+    }
+
+    private HBox createPartnersLogo() {
+        HBox partnersBox = new HBox(20);
+        partnersBox.setAlignment(Pos.CENTER);
+        partnersBox.setPadding(new Insets(10, 0, 10, 0));
+        partnersBox.setMinHeight(60);
+
+        // Effet d'ombre pour les logos
+        DropShadow glow = new DropShadow();
+        glow.setColor(Color.rgb(5, 150, 105, 0.5));
+        glow.setRadius(8);
+
+        // Logo ESPRIT
+        try {
+            URL espritUrl = getClass().getResource("/images/logo/esprit.png");
+            if (espritUrl != null) {
+                System.out.println("✅ Logo ESPRIT trouvé: " + espritUrl);
+                Image logo = new Image(espritUrl.toExternalForm());
+                ImageView espritLogo = new ImageView(logo);
+                espritLogo.setFitWidth(90);
+                espritLogo.setFitHeight(45);
+                espritLogo.setPreserveRatio(true);
+                espritLogo.setSmooth(true);
+                espritLogo.setCache(true);
+                espritLogo.setEffect(glow);
+
+                // Tooltip
+                Tooltip.install(espritLogo, new Tooltip("ESPRIT - Partenaire officiel"));
+                partnersBox.getChildren().add(espritLogo);
+
+                // Animation de respiration
+                ScaleTransition scale = new ScaleTransition(Duration.millis(2000), espritLogo);
+                scale.setFromX(0.95);
+                scale.setFromY(0.95);
+                scale.setToX(1.05);
+                scale.setToY(1.05);
+                scale.setCycleCount(Animation.INDEFINITE);
+                scale.setAutoReverse(true);
+                scale.play();
+            } else {
+                System.err.println("❌ Logo ESPRIT non trouvé au chemin: /images/logo/esprit.png");
+                partnersBox.getChildren().add(createFallbackLogo("ESPRIT"));
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement logo ESPRIT: " + e.getMessage());
+            partnersBox.getChildren().add(createFallbackLogo("ESPRIT"));
+        }
+
+        // Logo Loopi
+        try {
+            URL loopiUrl = getClass().getResource("/images/logo/logo.png");
+            if (loopiUrl != null) {
+                System.out.println("✅ Logo Loopi trouvé: " + loopiUrl);
+                Image logo = new Image(loopiUrl.toExternalForm());
+                ImageView loopiLogo = new ImageView(logo);
+                loopiLogo.setFitWidth(90);
+                loopiLogo.setFitHeight(45);
+                loopiLogo.setPreserveRatio(true);
+                loopiLogo.setSmooth(true);
+                loopiLogo.setCache(true);
+                loopiLogo.setEffect(glow);
+
+                // Tooltip
+                Tooltip.install(loopiLogo, new Tooltip("Loopi - Plateforme Écologique"));
+                partnersBox.getChildren().add(loopiLogo);
+
+                // Animation de respiration
+                ScaleTransition scale = new ScaleTransition(Duration.millis(2000), loopiLogo);
+                scale.setFromX(0.95);
+                scale.setFromY(0.95);
+                scale.setToX(1.05);
+                scale.setToY(1.05);
+                scale.setCycleCount(Animation.INDEFINITE);
+                scale.setAutoReverse(true);
+                scale.play();
+            } else {
+                System.err.println("❌ Logo Loopi non trouvé au chemin: /images/logo/logo.png");
+                partnersBox.getChildren().add(createFallbackLogo("Loopi"));
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement logo Loopi: " + e.getMessage());
+            partnersBox.getChildren().add(createFallbackLogo("Loopi"));
+        }
+
+        return partnersBox;
+    }
+
+    private Label createFallbackLogo(String text) {
+        Label label = new Label(text);
+        label.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        label.setTextFill(Color.WHITE);
+        label.setPadding(new Insets(5, 15, 5, 15));
+        label.setStyle("-fx-background-color: rgba(5, 150, 105, 0.3); " +
+                "-fx-background-radius: 20; " +
+                "-fx-border-color: #059669; " +
+                "-fx-border-radius: 20; " +
+                "-fx-border-width: 1;");
+
+        FadeTransition fade = new FadeTransition(Duration.millis(1500), label);
+        fade.setFromValue(0.7);
+        fade.setToValue(1.0);
+        fade.setCycleCount(Animation.INDEFINITE);
+        fade.setAutoReverse(true);
+        fade.play();
+
+        return label;
+    }
+
+    private VBox createRightColumn() {
+        VBox rightColumn = new VBox(12);
+        rightColumn.setAlignment(Pos.TOP_CENTER);
+        rightColumn.setPadding(new Insets(25, 25, 15, 25));
+        rightColumn.setStyle("-fx-background-color: white;");
+
+        // Toggle Buttons
+        toggleBox = new HBox();
+        toggleBox.setAlignment(Pos.CENTER);
+        toggleBox.setPadding(new Insets(0, 0, 10, 0));
+        toggleBox.setStyle("-fx-background-color: #f1f5f9; -fx-background-radius: 25; -fx-padding: 3;");
+
+        loginToggleBtn = new Button("Se connecter");
+        loginToggleBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 6 18; " +
+                "-fx-background-radius: 22; -fx-cursor: hand; -fx-border: none;");
+        loginToggleBtn.setOnAction(e -> {
+            // Déjà en mode connexion
+        });
+
+        registerToggleBtn = new Button("S'inscrire");
+        registerToggleBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #64748b; " +
+                "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 6 18; " +
+                "-fx-background-radius: 22; -fx-cursor: hand; -fx-border: none;");
+        registerToggleBtn.setOnAction(e -> switchToRegister());
+
+        toggleBox.getChildren().addAll(loginToggleBtn, registerToggleBtn);
+
+        // Titre
+        Label mainTitle = new Label("Bienvenue !");
+        mainTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
+        mainTitle.setTextFill(Color.web("#1e293b"));
+
+        Label welcomeText = new Label("Connectez-vous pour continuer");
+        welcomeText.setFont(Font.font("Segoe UI", 12));
+        welcomeText.setTextFill(Color.web("#64748b"));
+
+        // Formulaire
+        VBox formContainer = new VBox(10);
 
         // Email
-        VBox emailBox = new VBox(5);
-        Label emailLabel = new Label("📧 Email");
-        emailLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        emailLabel.setTextFill(Color.web("#1e293b"));
+        VBox emailBox = new VBox(3);
+        Label emailLabel = new Label("Email");
+        emailLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 11));
+        emailLabel.setTextFill(Color.web("#475569"));
 
         emailField = new TextField();
         emailField.setPromptText("votre@email.com");
-        emailField.setPrefHeight(42);
-        emailField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 10; " +
-                "-fx-background-radius: 10; -fx-padding: 8 15;");
+        emailField.setPrefHeight(35);
+        emailField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 6; " +
+                "-fx-background-radius: 6; -fx-padding: 6 10; -fx-background-color: #f8fafc;");
 
         emailErrorLabel = new Label();
-        emailErrorLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 11));
+        emailErrorLabel.setFont(Font.font("Segoe UI", 10));
+        emailErrorLabel.setTextFill(Color.web("#ef4444"));
         emailErrorLabel.setManaged(false);
         emailErrorLabel.setVisible(false);
 
         emailBox.getChildren().addAll(emailLabel, emailField, emailErrorLabel);
 
         // Mot de passe
-        VBox passwordBox = new VBox(5);
-        Label passwordLabel = new Label("🔐 Mot de passe");
-        passwordLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        passwordLabel.setTextFill(Color.web("#1e293b"));
+        VBox passwordBox = new VBox(3);
+        Label passwordLabel = new Label("Mot de passe");
+        passwordLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 11));
+        passwordLabel.setTextFill(Color.web("#475569"));
 
         StackPane passwordStack = new StackPane();
 
         passwordField = new PasswordField();
         passwordField.setPromptText("••••••••");
-        passwordField.setPrefHeight(42);
-        passwordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 10; " +
-                "-fx-background-radius: 10; -fx-padding: 8 15;");
+        passwordField.setPrefHeight(35);
+        passwordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 6; " +
+                "-fx-background-radius: 6; -fx-padding: 6 10; -fx-background-color: #f8fafc;");
 
         visiblePasswordField = new TextField();
         visiblePasswordField.setPromptText("••••••••");
-        visiblePasswordField.setPrefHeight(42);
-        visiblePasswordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 10; " +
-                "-fx-background-radius: 10; -fx-padding: 8 15;");
+        visiblePasswordField.setPrefHeight(35);
+        visiblePasswordField.setStyle("-fx-border-color: #e2e8f0; -fx-border-radius: 6; " +
+                "-fx-background-radius: 6; -fx-padding: 6 10; -fx-background-color: #f8fafc;");
         visiblePasswordField.setManaged(false);
         visiblePasswordField.setVisible(false);
 
-        showPasswordCheckBox = new CheckBox("👁️");
-        showPasswordCheckBox.setStyle("-fx-font-size: 14px; -fx-cursor: hand;");
-        showPasswordCheckBox.setPadding(new Insets(0, 10, 0, 0));
+        showPasswordCheckBox = new CheckBox("👁");
+        showPasswordCheckBox.setStyle("-fx-font-size: 12px; -fx-cursor: hand; -fx-background-color: transparent;");
+        showPasswordCheckBox.setPadding(new Insets(0, 8, 0, 0));
         showPasswordCheckBox.setAlignment(Pos.CENTER_RIGHT);
 
         showPasswordCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
@@ -280,103 +438,77 @@ public class LoginView extends Application {
         passwordWrapper.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(passwordField, Priority.ALWAYS);
         HBox.setHgrow(visiblePasswordField, Priority.ALWAYS);
-
         passwordWrapper.getChildren().addAll(passwordField, visiblePasswordField);
 
         passwordStack.getChildren().addAll(passwordWrapper, showPasswordCheckBox);
         StackPane.setAlignment(showPasswordCheckBox, Pos.CENTER_RIGHT);
 
         passwordStrengthLabel = new Label();
-        passwordStrengthLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+        passwordStrengthLabel.setFont(Font.font("Segoe UI", 9));
         passwordStrengthLabel.setManaged(false);
         passwordStrengthLabel.setVisible(false);
-        passwordStrengthLabel.setPadding(new Insets(2, 0, 0, 0));
 
+        // Lien mot de passe oublié
         HBox forgotRow = new HBox();
         forgotRow.setAlignment(Pos.CENTER_RIGHT);
 
         Hyperlink forgotLink = new Hyperlink("Mot de passe oublié ?");
-        forgotLink.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 11));
+        forgotLink.setFont(Font.font("Segoe UI", 10));
         forgotLink.setTextFill(Color.web("#059669"));
-        forgotLink.setStyle("-fx-cursor: hand;");
+        forgotLink.setStyle("-fx-cursor: hand; -fx-border-color: transparent;");
         forgotLink.setOnAction(e -> handleForgotPassword());
 
-        forgotRow.getChildren().add(forgotLink);
+        passwordBox.getChildren().addAll(passwordLabel, passwordStack, passwordStrengthLabel, forgotRow);
 
-        passwordBox.getChildren().addAll(passwordLabel, passwordStack,
-                passwordStrengthLabel, forgotRow);
-
-        // Bouton de connexion standard
+        // Bouton connexion
         loginBtn = new Button("Se connecter");
-        loginBtn.setPrefHeight(45);
+        loginBtn.setPrefHeight(38);
         loginBtn.setMaxWidth(Double.MAX_VALUE);
         loginBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-font-size: 14px; " +
-                "-fx-background-radius: 25; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-font-size: 13px; " +
+                "-fx-background-radius: 19; -fx-cursor: hand;");
         loginBtn.setOnAction(e -> handleLogin());
 
-        loginBtn.setOnMouseEntered(e ->
-                loginBtn.setStyle("-fx-background-color: #047857; -fx-text-fill: white; " +
-                        "-fx-font-weight: bold; -fx-font-size: 14px; " +
-                        "-fx-background-radius: 25; -fx-cursor: hand;"));
-        loginBtn.setOnMouseExited(e ->
-                loginBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
-                        "-fx-font-weight: bold; -fx-font-size: 14px; " +
-                        "-fx-background-radius: 25; -fx-cursor: hand;"));
-
         // Séparateur OU
-        HBox orBox = new HBox(10);
+        HBox orBox = new HBox(8);
         orBox.setAlignment(Pos.CENTER);
-        orBox.setPadding(new Insets(10, 0, 10, 0));
+        orBox.setPadding(new Insets(3, 0, 3, 0));
 
         Separator leftSep = new Separator();
-        leftSep.setPrefWidth(100);
+        leftSep.setPrefWidth(70);
         HBox.setHgrow(leftSep, Priority.ALWAYS);
 
         Label orLabel = new Label("OU");
-        orLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
+        orLabel.setFont(Font.font("Segoe UI", 10));
         orLabel.setTextFill(Color.web("#94a3b8"));
 
         Separator rightSep = new Separator();
-        rightSep.setPrefWidth(100);
+        rightSep.setPrefWidth(70);
         HBox.setHgrow(rightSep, Priority.ALWAYS);
 
         orBox.getChildren().addAll(leftSep, orLabel, rightSep);
 
         // Bouton Google
         googleBtn = new Button("Continuer avec Google");
-        googleBtn.setPrefHeight(45);
+        googleBtn.setPrefHeight(35);
         googleBtn.setMaxWidth(Double.MAX_VALUE);
         googleBtn.setStyle("-fx-background-color: white; -fx-text-fill: #1e293b; " +
-                "-fx-font-weight: bold; -fx-font-size: 13px; " +
-                "-fx-border-color: #e2e8f0; -fx-border-radius: 25; " +
-                "-fx-background-radius: 25; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-font-size: 11px; " +
+                "-fx-border-color: #e2e8f0; -fx-border-radius: 17; " +
+                "-fx-background-radius: 17; -fx-cursor: hand; -fx-border-width: 1;");
 
         Label googleIcon = new Label("G");
-        googleIcon.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        googleIcon.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
         googleIcon.setTextFill(Color.web("#ea4335"));
-        googleIcon.setPadding(new Insets(0, 10, 0, 0));
         googleBtn.setGraphic(googleIcon);
-        googleBtn.setGraphicTextGap(8);
+        googleBtn.setGraphicTextGap(6);
         googleBtn.setContentDisplay(ContentDisplay.LEFT);
-
         googleBtn.setOnAction(e -> handleGoogleLogin());
 
-        googleBtn.setOnMouseEntered(e ->
-                googleBtn.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #1e293b; " +
-                        "-fx-font-weight: bold; -fx-font-size: 13px; " +
-                        "-fx-border-color: #cbd5e1; -fx-border-radius: 25; " +
-                        "-fx-background-radius: 25; -fx-cursor: hand;"));
-        googleBtn.setOnMouseExited(e ->
-                googleBtn.setStyle("-fx-background-color: white; -fx-text-fill: #1e293b; " +
-                        "-fx-font-weight: bold; -fx-font-size: 13px; " +
-                        "-fx-border-color: #e2e8f0; -fx-border-radius: 25; " +
-                        "-fx-background-radius: 25; -fx-cursor: hand;"));
-
-        // Autres méthodes de connexion
+        // Autres méthodes
         HBox otherMethodsBox = new HBox(10);
         otherMethodsBox.setAlignment(Pos.CENTER);
-        otherMethodsBox.setPadding(new Insets(10, 0, 5, 0));
+        otherMethodsBox.setPadding(new Insets(5, 0, 5, 0));
 
         faceLoginBtn = new Button("👤 Reconnaissance faciale");
         faceLoginBtn.setStyle("-fx-background-color: #8b5cf6; -fx-text-fill: white; " +
@@ -392,59 +524,60 @@ public class LoginView extends Application {
 
         otherMethodsBox.getChildren().addAll(faceLoginBtn, qrLoginBtn);
 
-        // Lien d'inscription
-        VBox registerBox = new VBox(10);
+        // Lien inscription
+        HBox registerBox = new HBox(5);
         registerBox.setAlignment(Pos.CENTER);
-        registerBox.setPadding(new Insets(10, 0, 0, 0));
+        registerBox.setPadding(new Insets(5, 0, 0, 0));
 
         Label newLabel = new Label("Nouveau sur Loopi ?");
-        newLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
+        newLabel.setFont(Font.font("Segoe UI", 11));
         newLabel.setTextFill(Color.web("#64748b"));
 
         Hyperlink registerLink = new Hyperlink("Créer un compte");
-        registerLink.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        registerLink.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
         registerLink.setTextFill(Color.web("#059669"));
-        registerLink.setStyle("-fx-cursor: hand;");
-        registerLink.setOnAction(e -> openRegister());
+        registerLink.setStyle("-fx-cursor: hand; -fx-border-color: transparent;");
+        registerLink.setOnAction(e -> switchToRegister());
 
         registerBox.getChildren().addAll(newLabel, registerLink);
 
         // Label d'erreur
         loginErrorLabel = new Label();
-        loginErrorLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
+        loginErrorLabel.setFont(Font.font("Segoe UI", 11));
         loginErrorLabel.setTextFill(Color.web("#ef4444"));
         loginErrorLabel.setWrapText(true);
         loginErrorLabel.setAlignment(Pos.CENTER);
         loginErrorLabel.setMaxWidth(Double.MAX_VALUE);
         loginErrorLabel.setVisible(false);
 
+        // Ajout des éléments
+        formContainer.getChildren().addAll(
+                emailBox,
+                passwordBox,
+                loginBtn,
+                orBox,
+                googleBtn,
+                otherMethodsBox,
+                registerBox,
+                loginErrorLabel
+        );
+
         emailField.setOnAction(e -> passwordField.requestFocus());
         passwordField.setOnAction(e -> handleLogin());
         visiblePasswordField.setOnAction(e -> handleLogin());
 
-        card.getChildren().addAll(
-                connectLabel, connectSubLabel, sep1,
-                emailBox, passwordBox, loginBtn,
-                orBox, googleBtn,
-                otherMethodsBox,
-                registerBox, loginErrorLabel
-        );
+        rightColumn.getChildren().addAll(toggleBox, mainTitle, welcomeText, formContainer);
 
-        container.getChildren().add(card);
-        return container;
+        return rightColumn;
     }
 
-    private HBox createFooter() {
-        HBox footer = new HBox();
-        footer.setPadding(new Insets(20));
-        footer.setAlignment(Pos.CENTER);
-
-        Label footerText = new Label("© 2026 Loopi - Plateforme Écologique");
-        footerText.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 11));
-        footerText.setTextFill(Color.web("#e0e0e0"));
-
-        footer.getChildren().add(footerText);
-        return footer;
+    private void switchToRegister() {
+        RegisterView registerView = new RegisterView();
+        try {
+            registerView.start(primaryStage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void setupRealtimeValidation() {
@@ -492,7 +625,7 @@ public class LoginView extends Application {
         }
 
         setButtonsDisabled(true);
-        loginBtn.setText("Connexion en cours...");
+        loginBtn.setText("Connexion...");
 
         new Thread(() -> {
             try {
@@ -563,12 +696,12 @@ public class LoginView extends Application {
         layout.setStyle("-fx-background-color: #1e293b;");
         layout.setAlignment(Pos.CENTER);
 
-        Label title = new Label("👤 Connexion Faciale");
+        Label title = new Label("👤 Reconnaissance Faciale");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
         title.setTextFill(Color.WHITE);
 
         Label instruction = new Label("Placez votre visage devant la caméra\nLa connexion sera automatique après autorisation");
-        instruction.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
+        instruction.setFont(Font.font("Segoe UI", 14));
         instruction.setTextFill(Color.web("#e0e0e0"));
         instruction.setTextAlignment(TextAlignment.CENTER);
 
@@ -595,7 +728,7 @@ public class LoginView extends Application {
         emailBox.setMaxWidth(300);
 
         Label emailLabel = new Label("📧 Email (optionnel - pour associer le visage)");
-        emailLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
+        emailLabel.setFont(Font.font("Segoe UI", 12));
         emailLabel.setTextFill(Color.WHITE);
 
         TextField emailField = new TextField();
@@ -625,12 +758,12 @@ public class LoginView extends Application {
         });
 
         Label statusLabel = new Label();
-        statusLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
+        statusLabel.setFont(Font.font("Segoe UI", 12));
         statusLabel.setTextFill(Color.WHITE);
         statusLabel.setWrapText(true);
         statusLabel.setTextAlignment(TextAlignment.CENTER);
 
-        // Thread pour le flux caméra
+        // Variables pour le thread de la caméra
         final boolean[] isCameraRunning = {false};
         final BufferedImage[] lastFrame = new BufferedImage[1];
 
@@ -691,6 +824,7 @@ public class LoginView extends Application {
                     }
 
                     if (user == null) {
+                        // Utilisateur de démonstration
                         user = authService.getUserByEmail("participant@loopi.tn");
                     }
 
@@ -862,6 +996,7 @@ public class LoginView extends Application {
         pollThread.setDaemon(true);
         pollThread.start();
     }
+
     private void stopCamera() {
         if (cameraService != null) {
             cameraService.stopCamera();
@@ -886,7 +1021,7 @@ public class LoginView extends Application {
 
         TranslateTransition translate = new TranslateTransition(Duration.millis(50), loginErrorLabel);
         translate.setFromX(0);
-        translate.setToX(10);
+        translate.setToX(5);
         translate.setAutoReverse(true);
         translate.setCycleCount(4);
         translate.play();
@@ -936,11 +1071,6 @@ public class LoginView extends Application {
             e.printStackTrace();
             showErrorAlert("Erreur", "Impossible d'ouvrir le dashboard: " + e.getMessage());
         }
-    }
-
-    private void openRegister() {
-        RegisterView registerView = new RegisterView();
-        registerView.show(primaryStage);
     }
 
     private void showErrorAlert(String title, String message) {
