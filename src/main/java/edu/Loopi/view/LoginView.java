@@ -9,7 +9,7 @@ import edu.Loopi.services.GoogleAuthService;
 import edu.Loopi.services.RealtimeValidationService;
 import edu.Loopi.services.CameraService;
 import edu.Loopi.services.QRLoginService;
-import edu.Loopi.services.QRCodeWebService;
+import edu.Loopi.services.QRCodeWebServer;
 import edu.Loopi.services.QRLoginService.QRCodeResult;
 import edu.Loopi.services.QRLoginService.QRValidationResult;
 import javafx.animation.*;
@@ -37,6 +37,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.net.InetAddress;
 import java.util.UUID;
+
 public class LoginView extends Application {
 
     private AuthService authService = new AuthService();
@@ -44,7 +45,6 @@ public class LoginView extends Application {
     private RealtimeValidationService validationService = new RealtimeValidationService();
     private CameraService cameraService;
     private QRLoginService qrLoginService;
-    private QRCodeWebService qrWebService;
 
     private Stage primaryStage;
 
@@ -71,7 +71,6 @@ public class LoginView extends Application {
         this.googleAuthService = new GoogleAuthService(authService);
         this.cameraService = new CameraService();
         this.qrLoginService = new QRLoginService();
-        this.qrWebService = new QRCodeWebService();
 
         if (!MyConnection.testConnection()) {
             showErrorAlert("Erreur de connexion",
@@ -738,139 +737,106 @@ public class LoginView extends Application {
     }
 
     private void openQRLogin() {
-        if (qrLoginService == null) {
-            qrLoginService = new QRLoginService();
-        }
+        QRLoginService qrLoginService = new QRLoginService();
 
-        QRCodeWebService webService = new QRCodeWebService();
-        webService.startServer();
+        QRCodeWebServer webServer = new QRCodeWebServer(qrLoginService, user -> {
+            Platform.runLater(() -> {
+                System.out.println("✅ Connexion QR réussie pour: " + user.getEmail());
+                SessionManager.login(user);
+
+                // Petit délai avant de fermer
+                PauseTransition pause = new PauseTransition(Duration.seconds(1));
+                pause.setOnFinished(e -> openDashboard(user));
+                pause.play();
+            });
+        });
+
+        webServer.start();
 
         Stage qrStage = new Stage();
         qrStage.setTitle("Connexion par QR Code");
         qrStage.initModality(Modality.APPLICATION_MODAL);
         qrStage.initOwner(primaryStage);
-
-        qrStage.setOnCloseRequest(e -> webService.stopServer());
+        qrStage.setOnCloseRequest(e -> webServer.stop());
 
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #1e293b;");
+        root.setStyle("-fx-background-color: #0f172a;");
 
         VBox mainContent = new VBox(20);
         mainContent.setAlignment(Pos.CENTER);
         mainContent.setPadding(new Insets(30));
 
         Label title = new Label("📱 Connexion par QR Code");
-        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 24));
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
         title.setTextFill(Color.WHITE);
 
-        Label instruction = new Label(
-                "Scannez ce QR code avec votre téléphone\n" +
-                        "Une page de connexion s'ouvrira automatiquement"
-        );
-        instruction.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
-        instruction.setTextFill(Color.web("#e0e0e0"));
-        instruction.setTextAlignment(TextAlignment.CENTER);
-        instruction.setWrapText(true);
+        var result = qrLoginService.generateQRCode(webServer.getServerUrl());
 
-        // Utiliser l'URL complète du serveur
-        String serverUrl = webService.getServerUrl();
-        String sessionId = java.util.UUID.randomUUID().toString(); // Import java.util.UUID
-
-        // Construire l'URL complète pour le QR code
-        String loginUrl = serverUrl + "/mobile/login?session=" + sessionId;
-
-        System.out.println("📱 URL générée: " + loginUrl);
-
-        // Générer le QR code avec l'URL
-        QRCodeResult qrResult = qrLoginService.generateLoginQRCode(loginUrl, sessionId);
-
-        if (qrResult == null) {
+        if (result == null) {
             showErrorAlert("Erreur", "Impossible de générer le QR code");
+            webServer.stop();
             qrStage.close();
-            webService.stopServer();
             return;
         }
 
-        // Afficher le QR code
-        ImageView qrImageView = new ImageView(qrResult.getFXImage());
+        ImageView qrImageView = new ImageView(result.getFXImage());
         qrImageView.setFitWidth(280);
         qrImageView.setFitHeight(280);
         qrImageView.setPreserveRatio(true);
-        qrImageView.setSmooth(true);
 
         StackPane qrContainer = new StackPane(qrImageView);
-        qrContainer.setStyle("-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15;");
-        qrContainer.setMaxWidth(320);
-        qrContainer.setMaxHeight(320);
+        qrContainer.setStyle("-fx-background-color: white; -fx-background-radius: 16; -fx-padding: 16;");
 
-        // Informations
-        VBox infoBox = new VBox(10);
-        infoBox.setAlignment(Pos.CENTER);
+        Label instruction = new Label(
+                "1. Scannez ce QR code avec votre téléphone\n" +
+                        "2. Connectez-vous sur votre téléphone\n" +
+                        "3. La connexion sera automatique"
+        );
+        instruction.setFont(Font.font("Segoe UI", 14));
+        instruction.setTextFill(Color.web("#94a3b8"));
+        instruction.setTextAlignment(TextAlignment.CENTER);
 
-        Label urlInfo = new Label("URL: " + loginUrl);
-        urlInfo.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 10));
-        urlInfo.setTextFill(Color.CYAN);
-        urlInfo.setWrapText(true);
-
-        Label sessionLabel = new Label("⏳ QR Code valable 2 minutes");
-        sessionLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
-        sessionLabel.setTextFill(Color.YELLOW);
-
-        Label statusLabel = new Label("En attente de scan...");
-        statusLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        Label statusLabel = new Label("⏳ En attente de scan...");
+        statusLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
         statusLabel.setTextFill(Color.ORANGE);
-        statusLabel.setWrapText(true);
-        statusLabel.setTextAlignment(TextAlignment.CENTER);
 
         Button cancelBtn = new Button("❌ Fermer");
         cancelBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 25; -fx-cursor: hand;");
-        cancelBtn.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+                "-fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 30;");
         cancelBtn.setOnAction(e -> {
-            webService.stopServer();
+            webServer.stop();
             qrStage.close();
         });
 
-        infoBox.getChildren().addAll(urlInfo, sessionLabel, statusLabel);
-        mainContent.getChildren().addAll(title, instruction, qrContainer, infoBox, cancelBtn);
+        mainContent.getChildren().addAll(title, instruction, qrContainer, statusLabel, cancelBtn);
         root.setCenter(mainContent);
 
-        // Démarrer la vérification périodique
-        startQRPolling(sessionId, qrStage, statusLabel, webService);
+        startQRPolling(result.sessionId, qrLoginService, qrStage, statusLabel, webServer);
 
-        Scene scene = new Scene(root, 500, 700);
+        Scene scene = new Scene(root, 500, 650);
         qrStage.setScene(scene);
         qrStage.showAndWait();
-    }    private void startQRPolling(String sessionId, Stage qrStage, Label statusLabel, QRCodeWebService webService) {
-        Thread pollingThread = new Thread(() -> {
-            int attempts = 0;
-            int maxAttempts = 40; // 2 minutes / 3 secondes
+    }
 
-            while (attempts < maxAttempts && qrStage.isShowing()) {
+    private void startQRPolling(String sessionId, QRLoginService service, Stage stage,
+                                Label statusLabel, QRCodeWebServer webServer) {
+        Thread pollThread = new Thread(() -> {
+            int attempts = 0;
+            int maxAttempts = 40;
+
+            while (attempts < maxAttempts && stage.isShowing()) {
                 try {
                     Thread.sleep(3000);
 
-                    QRValidationResult result = qrLoginService.checkSessionStatus(sessionId);
+                    var result = service.checkSessionStatus(sessionId);
 
-                    if (result.isSuccess()) {
+                    if (result.success) {
                         Platform.runLater(() -> {
                             statusLabel.setText("✅ Connexion réussie!");
                             statusLabel.setTextFill(Color.GREEN);
-
-                            User user = result.getUser();
-                            SessionManager.login(user);
-
-                            PauseTransition pause = new PauseTransition(Duration.seconds(1));
-                            pause.setOnFinished(e -> {
-                                webService.stopServer();
-                                qrStage.close();
-                                openDashboard(user);
-                            });
-                            pause.play();
                         });
                         break;
                     }
-
                     attempts++;
                 } catch (InterruptedException e) {
                     break;
@@ -881,12 +847,13 @@ public class LoginView extends Application {
                 Platform.runLater(() -> {
                     statusLabel.setText("⏰ QR code expiré");
                     statusLabel.setTextFill(Color.RED);
-                    webService.stopServer();
+                    webServer.stop();
                 });
             }
         });
-        pollingThread.setDaemon(true);
-        pollingThread.start();
+
+        pollThread.setDaemon(true);
+        pollThread.start();
     }
 
     private void stopCamera() {
