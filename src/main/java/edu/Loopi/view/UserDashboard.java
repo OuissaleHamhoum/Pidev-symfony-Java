@@ -232,7 +232,9 @@ public class UserDashboard {
 
         menuItems.getChildren().addAll(
                 eventsSection, eventsBtn, myParticipationsBtn,
+
                 shopSection, browseBtn, recBtn, favorisBtn,  // recBtn ajouté ici
+
                 donationsSection, campaignsBtn, myDonationsBtn, myCouponsBtn,
                 profileSection, profileBtn, settingsBtn
         );
@@ -386,8 +388,6 @@ public class UserDashboard {
             showComingSoon("Paramètres", "⚙️");
         }
     }
-
-
 
 
     // Vue pour les coupons

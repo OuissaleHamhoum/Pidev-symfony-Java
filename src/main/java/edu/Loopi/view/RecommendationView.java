@@ -88,9 +88,11 @@ public class RecommendationView {
 
         typeSelector = new ComboBox<>();
         typeSelector.getItems().addAll(
+
                 "🎯 Pour vous ",
                 "🔥 Tendance ",
                 "⭐ Les mieux notés "
+
         );
         typeSelector.setValue("🎯 Pour vous (Basé sur vos favoris)");
         typeSelector.setStyle("-fx-background-radius: 8; -fx-padding: 8 15; -fx-font-size: 14px;");
@@ -106,6 +108,7 @@ public class RecommendationView {
             } else if (selected.contains("mieux notés")) {
                 loadRecommendations("mieuxnotes");
                 descriptionLabel.setText("Les produits avec les meilleures notes de tous les temps");
+
             }
         });
 
@@ -120,6 +123,7 @@ public class RecommendationView {
                 loadRecommendations("tendance");
             } else if (selected.contains("mieux notés")) {
                 loadRecommendations("mieuxnotes");
+
             }
         });
 
@@ -163,6 +167,7 @@ public class RecommendationView {
                 recommendations = recommendationService.getRecommandationsTendance(limit);
             } else if ("mieuxnotes".equals(type)) {
                 recommendations = recommendationService.getRecommandationsMieuxNotes(limit);
+
             } else {
                 recommendations = recommendationService.getRecommandationsPopulaires(limit);
             }
@@ -230,6 +235,7 @@ public class RecommendationView {
         } else if ("mieuxnotes".equals(type)) {
             badgeText = "⭐ Mieux noté";
             badgeColor = "#f59e0b";
+
         }
 
         if (!badgeText.isEmpty()) {
@@ -309,6 +315,7 @@ public class RecommendationView {
             icon = "⭐";
             message = "Aucun produit mieux noté";
             suggestion = "Soyez le premier à noter des produits !";
+
         }
 
         Label iconLabel = new Label(icon);

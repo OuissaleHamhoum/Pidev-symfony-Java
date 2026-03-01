@@ -8,7 +8,9 @@ import edu.Loopi.services.ProduitService;
 import edu.Loopi.services.FavorisService;
 import edu.Loopi.tools.SessionManager;
 import javafx.geometry.Insets;
+
 import javafx.geometry.Orientation;
+
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -19,6 +21,7 @@ import javafx.stage.Stage;
 import javafx.animation.ScaleTransition;
 import javafx.util.Duration;
 
+
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;
 import com.google.zxing.qrcode.QRCodeWriter;
@@ -26,6 +29,7 @@ import com.google.zxing.common.BitMatrix;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
+
 
 import java.io.File;
 import java.net.URLEncoder;
@@ -72,7 +76,7 @@ public class ProductDetailView {
         // === SECTION PRODUIT ===
         VBox productSection = createProductSection();
 
-        // === SECTION RESEAUX SOCIAUX ET QR CODE ===
+
         HBox socialShareSection = createSocialShareSection();
 
         // === SECTION FEEDBACK ===
@@ -163,7 +167,11 @@ public class ProductDetailView {
     }
 
     /**
+<<<<<<< HEAD
      * Crée la section de partage sur les réseaux sociaux et QR code
+=======
+     * Crée la section de partage sur les réseaux sociaux
+>>>>>>> 1e615f748ff84fe73d51f4e96046ed760d677f91
      */
     private HBox createSocialShareSection() {
         HBox socialSection = new HBox(20);
@@ -193,6 +201,7 @@ public class ProductDetailView {
         // BOUTON QR CODE (NOIR)
         Button qrButton = createQRCodeButton();
 
+
         // Bouton Copier le lien
         Button copyBtn = createSocialButton("Copier le lien", "#6c757d", "📋");
         copyBtn.setOnAction(e -> copyLinkToClipboard());
@@ -200,11 +209,14 @@ public class ProductDetailView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
+
         socialSection.getChildren().addAll(shareLabel, facebookBtn, twitterBtn, whatsappBtn, sep1, qrButton, spacer, copyBtn);
+
         return socialSection;
     }
 
     /**
+<<<<<<< HEAD
      * Crée un bouton noir avec QR code intégré
      */
     private Button createQRCodeButton() {
@@ -367,6 +379,8 @@ public class ProductDetailView {
     }
 
     /**
+=======
+>>>>>>> 1e615f748ff84fe73d51f4e96046ed760d677f91
      * Crée un bouton de réseau social stylisé
      */
     private Button createSocialButton(String text, String color, String icon) {
@@ -445,6 +459,8 @@ public class ProductDetailView {
     }
 
     /**
+
+
      * Copie le lien du produit dans le presse-papiers
      */
     private void copyLinkToClipboard() {
@@ -460,9 +476,11 @@ public class ProductDetailView {
     }
 
     /**
+<<<<<<< HEAD
      * Génère une URL pour le produit
      */
     private String getProductUrl() {
+
         return "https://www.loopi.tn/produit/" + produit.getId() + "/" +
                 produit.getNom().toLowerCase().replace(" ", "-");
     }
@@ -521,11 +539,13 @@ public class ProductDetailView {
 
     private void updateFavorisButton(Button btn) {
         if (estFavoris) {
+
             btn.setText("❤");
             btn.setStyle("-fx-background-color: transparent; -fx-font-size: 28px; -fx-text-fill: #e74c3c; -fx-cursor: hand;");
         } else {
             btn.setText("❤");
             btn.setStyle("-fx-background-color: transparent; -fx-font-size: 28px; -fx-text-fill: #95a5a6; -fx-cursor: hand;");
+
         }
     }
 
@@ -544,7 +564,9 @@ public class ProductDetailView {
         formBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-background-radius: 5;");
 
         Label rateLabel = new Label("Donnez votre avis :");
+
         rateLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
 
         // Étoiles
         HBox starBox = new HBox(5);
@@ -687,7 +709,9 @@ public class ProductDetailView {
         header.setAlignment(Pos.CENTER_LEFT);
 
         Label userLabel = new Label(f.getUserName());
+
         userLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #2c3e50;");
+
 
         HBox stars = new HBox(2);
         for (int i = 1; i <= 5; i++) {
@@ -887,4 +911,6 @@ public class ProductDetailView {
         alert.setContentText(message);
         alert.showAndWait();
     }
+
 }
+

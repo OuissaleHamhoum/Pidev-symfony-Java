@@ -36,6 +36,7 @@ import com.itextpdf.layout.borders.Border;
 
 import java.io.File;
 import java.io.FileOutputStream;
+
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -48,8 +49,10 @@ public class ProductManagementView {
     private ProduitService produitService = new ProduitService();
     private FeedbackService feedbackService = new FeedbackService();
 
+
     // Détecteur de mots inappropriés
     private BadWordDetector badWordDetector = new BadWordDetector();
+
 
     // Composants UI
     private TableView<Produit> productTable;
@@ -60,7 +63,9 @@ public class ProductManagementView {
     private Label totalProductsValue;
     private Label totalFeedbacksValue;
     private Label avgRatingValue;
+
     private Label flaggedFeedbacksValue;
+
     private VBox statsBox;
     private TabPane tabPane;
 
@@ -216,6 +221,7 @@ public class ProductManagementView {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         statsRow.getChildren().addAll(totalProductsBox, sep1, totalFeedbacksBox, sep2, avgRatingBox, sep3, flaggedFeedbacksBox, spacer);
+
         return statsRow;
     }
 
@@ -243,6 +249,7 @@ public class ProductManagementView {
         searchBox.getChildren().addAll(searchIcon, searchField);
 
         // Filtre organisateur
+
         VBox orgFilterBox = new VBox(5);
         Label orgLabel = new Label("Organisateur");
         orgLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
@@ -254,6 +261,7 @@ public class ProductManagementView {
         organisateurFilter.setOnAction(e -> loadProducts());
 
         // Filtre catégorie
+
         VBox catFilterBox = new VBox(5);
         Label catLabel = new Label("Catégorie");
         catLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
@@ -298,6 +306,7 @@ public class ProductManagementView {
             }
         });
 
+
         // Bouton Rafraîchir compact
         Button refreshBtn = new Button("🔄");
         refreshBtn.setStyle("-fx-background-color: " + dashboard.getAccentColor() + ";" +
@@ -316,15 +325,18 @@ public class ProductManagementView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
+
         filtersRow.getChildren().addAll(searchBox, organisateurFilter, categoryFilter, showFlaggedOnlyBtn, spacer, refreshBtn);
         return filtersRow;
     }
 
     // ==================== MÉTHODE createProductsTab ====================
 
+
     private VBox createProductsTab(boolean isDarkMode) {
         VBox content = new VBox(15);
         content.setPadding(new Insets(15, 0, 0, 0));
+
 
         // Tableau des produits (agrandi)
         productTable = new TableView<>();
@@ -442,7 +454,9 @@ public class ProductManagementView {
                 organisateurCol, feedbacksCol, actionsCol);
 
         VBox.setVgrow(productTable, Priority.ALWAYS);
+
         content.getChildren().add(productTable);
+
 
         return content;
     }
@@ -450,6 +464,7 @@ public class ProductManagementView {
     private VBox createFeedbacksTab(boolean isDarkMode) {
         VBox content = new VBox(15);
         content.setPadding(new Insets(15, 0, 0, 0));
+
 
         // Tableau des feedbacks (agrandi)
         feedbackTable = new TableView<>();
@@ -489,6 +504,7 @@ public class ProductManagementView {
         TableColumn<Feedback, String> commentCol = new TableColumn<>("Commentaire");
         commentCol.setCellValueFactory(cellData ->
                 new SimpleStringProperty(cellData.getValue().getCommentaire()));
+
         commentCol.setCellFactory(col -> new TableCell<Feedback, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -510,12 +526,14 @@ public class ProductManagementView {
                 }
             }
         });
+
         commentCol.setPrefWidth(300);
 
         TableColumn<Feedback, String> dateCol = new TableColumn<>("Date");
         dateCol.setCellValueFactory(cellData ->
                 new SimpleStringProperty(formatDate(cellData.getValue().getDateCommentaire())));
         dateCol.setPrefWidth(120);
+
 
         TableColumn<Feedback, String> flaggedCol = new TableColumn<>("Signalé");
         flaggedCol.setCellValueFactory(cellData -> {
@@ -547,6 +565,7 @@ public class ProductManagementView {
             private final Button reportBtn = new Button("📄 Rapport PDF");
             private final HBox pane = new HBox(5, reviewBtn, reportBtn, deleteBtn);
 
+
             {
                 deleteBtn.setStyle("-fx-background-color: " + dashboard.getDangerColor() + ";" +
                         "-fx-text-fill: white;" +
@@ -554,6 +573,7 @@ public class ProductManagementView {
                         "-fx-padding: 5 10;" +
                         "-fx-background-radius: 3;" +
                         "-fx-cursor: hand;");
+
 
                 reviewBtn.setStyle("-fx-background-color: " + dashboard.getWarningColor() + ";" +
                         "-fx-text-fill: white;" +
@@ -569,10 +589,12 @@ public class ProductManagementView {
                         "-fx-background-radius: 3;" +
                         "-fx-cursor: hand;");
 
+
                 deleteBtn.setOnAction(e -> {
                     Feedback f = getTableView().getItems().get(getIndex());
                     confirmDeleteFeedback(f);
                 });
+
 
                 reviewBtn.setOnAction(e -> {
                     Feedback f = getTableView().getItems().get(getIndex());
@@ -583,11 +605,13 @@ public class ProductManagementView {
                     Feedback f = getTableView().getItems().get(getIndex());
                     generateFeedbackReport(f);
                 });
+
             }
 
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
+
                 setGraphic(empty ? null : pane);
             }
         });
@@ -597,6 +621,7 @@ public class ProductManagementView {
 
         VBox.setVgrow(feedbackTable, Priority.ALWAYS);
         content.getChildren().add(feedbackTable);
+
 
         return content;
     }
@@ -832,6 +857,7 @@ public class ProductManagementView {
         table.addCell(valueCell);
     }
 
+
     private void loadOrganisateurs() {
         List<User> organisateurs = userService.getUsersByRole("organisateur");
 
@@ -919,6 +945,7 @@ public class ProductManagementView {
         feedbackTable.setItems(FXCollections.observableArrayList(flaggedFeedbacks));
     }
 
+
     private void updateStats() {
         List<Produit> allProducts = produitService.getAll();
         List<Feedback> allFeedbacks = new ArrayList<>();
@@ -930,6 +957,7 @@ public class ProductManagementView {
         long flaggedCount = allFeedbacks.stream()
                 .filter(f -> badWordDetector.containsBadWords(f.getCommentaire()))
                 .count();
+
 
         if (totalProductsValue != null) {
             totalProductsValue.setText(String.valueOf(allProducts.size()));
@@ -951,6 +979,7 @@ public class ProductManagementView {
         if (flaggedFeedbacksValue != null) {
             flaggedFeedbacksValue.setText(String.valueOf(flaggedCount));
         }
+
     }
 
     private void confirmDeleteProduct(Produit p) {
@@ -1083,6 +1112,7 @@ public class ProductManagementView {
 
         dialog.showAndWait();
     }
+
 
     private void showProductDetails(Produit p) {
         Dialog<Void> dialog = new Dialog<>();
@@ -1273,4 +1303,5 @@ public class ProductManagementView {
             }
         }
     }
+
 }
