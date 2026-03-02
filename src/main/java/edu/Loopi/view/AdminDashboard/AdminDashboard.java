@@ -648,27 +648,46 @@ public class AdminDashboard {
     }
 
     public ImageView loadProfileImage(User user, double size) {
-        if (user.getPhoto() != null && !user.getPhoto().isEmpty() && !user.getPhoto().equals("default.jpg")) {
-            try {
-                String photoPath = user.getPhoto();
-                File imageFile = new File(photoPath);
+        if (user == null) return null;
 
-                if (!imageFile.exists() && photoPath.contains("profiles")) {
-                    imageFile = new File("profiles/" + photoPath.replace("profiles/", "").replace("profiles\\", ""));
-                }
+        String photoPath = user.getPhoto();
+        if (photoPath == null || photoPath.isEmpty() || photoPath.equals("default.jpg")) {
+            return null;
+        }
 
-                if (imageFile.exists()) {
-                    Image avatarImage = new Image(new FileInputStream(imageFile), size, size, true, true);
-                    ImageView avatarImageView = new ImageView(avatarImage);
-                    avatarImageView.setFitWidth(size);
-                    avatarImageView.setFitHeight(size);
-                    avatarImageView.setPreserveRatio(true);
-                    avatarImageView.setStyle("-fx-background-radius: 50%;");
-                    return avatarImageView;
+        try {
+            File imageFile = null;
+
+            // Essayer différents chemins possibles
+            if (photoPath.startsWith("profiles/")) {
+                imageFile = new File("src/main/resources/" + photoPath);
+                if (!imageFile.exists()) {
+                    imageFile = new File(photoPath);
                 }
-            } catch (Exception e) {
-                System.out.println("Erreur chargement image: " + e.getMessage());
+            } else {
+                imageFile = new File("src/main/resources/profiles/" + photoPath);
+                if (!imageFile.exists()) {
+                    imageFile = new File("profiles/" + photoPath);
+                }
             }
+
+            if (imageFile.exists() && imageFile.isFile()) {
+                Image avatarImage = new Image(new FileInputStream(imageFile), size, size, true, true);
+                ImageView avatarImageView = new ImageView(avatarImage);
+                avatarImageView.setFitWidth(size);
+                avatarImageView.setFitHeight(size);
+                avatarImageView.setPreserveRatio(true);
+
+                // Forme circulaire
+                Circle clip = new Circle(size/2, size/2, size/2);
+                avatarImageView.setClip(clip);
+
+                return avatarImageView;
+            } else {
+                System.out.println("⚠️ Fichier non trouvé: " + photoPath);
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Erreur chargement image: " + e.getMessage());
         }
         return null;
     }

@@ -10,6 +10,7 @@ import edu.Loopi.services.RealtimeValidationService;
 import edu.Loopi.services.CameraService;
 import edu.Loopi.services.QRLoginService;
 import edu.Loopi.services.QRCodeWebServer;
+import edu.Loopi.services.UserService;
 import javafx.animation.*;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -24,7 +25,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line;
+import javafx.scene.shape.Line; // AJOUTER CET IMPORT
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
@@ -40,6 +41,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+// Import pour les dashboards (à créer si nécessaire)
+ import edu.Loopi.view.OrganizerDashboard;
+ import edu.Loopi.view.UserDashboard;
+
 public class LoginView extends Application {
 
     private AuthService authService = new AuthService();
@@ -47,6 +52,7 @@ public class LoginView extends Application {
     private RealtimeValidationService validationService = new RealtimeValidationService();
     private CameraService cameraService;
     private QRLoginService qrLoginService;
+    private UserService userService = new UserService();
 
     private Stage primaryStage;
 
@@ -700,7 +706,7 @@ public class LoginView extends Application {
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
         title.setTextFill(Color.WHITE);
 
-        Label instruction = new Label("Placez votre visage devant la caméra\nLa connexion sera automatique après autorisation");
+        Label instruction = new Label("Placez votre visage devant la caméra\nLa reconnaissance sera automatique");
         instruction.setFont(Font.font("Segoe UI", 14));
         instruction.setTextFill(Color.web("#e0e0e0"));
         instruction.setTextAlignment(TextAlignment.CENTER);
@@ -722,20 +728,6 @@ public class LoginView extends Application {
         cameraFeed.setPreserveRatio(true);
         cameraFeed.setVisible(false);
 
-        // Champ email (optionnel, pour associer le visage)
-        VBox emailBox = new VBox(5);
-        emailBox.setPadding(new Insets(10, 0, 0, 0));
-        emailBox.setMaxWidth(300);
-
-        Label emailLabel = new Label("📧 Email (optionnel - pour associer le visage)");
-        emailLabel.setFont(Font.font("Segoe UI", 12));
-        emailLabel.setTextFill(Color.WHITE);
-
-        TextField emailField = new TextField();
-        emailField.setPromptText("Votre email");
-        emailField.setStyle("-fx-background-radius: 10; -fx-padding: 8;");
-        emailField.setMaxWidth(300);
-
         // Boutons
         HBox buttons = new HBox(10);
         buttons.setAlignment(Pos.CENTER);
@@ -744,10 +736,10 @@ public class LoginView extends Application {
         startBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-padding: 10 15; -fx-background-radius: 25; -fx-cursor: hand;");
 
-        Button authorizeBtn = new Button("✅ Autoriser et connecter");
-        authorizeBtn.setStyle("-fx-background-color: #8b5cf6; -fx-text-fill: white; " +
+        Button recognizeBtn = new Button("🔍 Reconnaître");
+        recognizeBtn.setStyle("-fx-background-color: #8b5cf6; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-padding: 10 15; -fx-background-radius: 25; -fx-cursor: hand;");
-        authorizeBtn.setDisable(true);
+        recognizeBtn.setDisable(true);
 
         Button cancelBtn = new Button("❌ Annuler");
         cancelBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
@@ -774,8 +766,8 @@ public class LoginView extends Application {
                     if (started) {
                         isCameraRunning[0] = true;
                         startBtn.setDisable(true);
-                        authorizeBtn.setDisable(false);
-                        statusLabel.setText("✅ Caméra prête - Regardez la caméra et cliquez sur Autoriser");
+                        recognizeBtn.setDisable(false);
+                        statusLabel.setText("✅ Caméra prête - Cliquez sur Reconnaître");
                         cameraPane.getChildren().clear();
                         cameraFeed.setVisible(true);
                         cameraPane.getChildren().add(cameraFeed);
@@ -803,66 +795,61 @@ public class LoginView extends Application {
             }).start();
         });
 
-        authorizeBtn.setOnAction(e -> {
+        recognizeBtn.setOnAction(e -> {
             if (lastFrame[0] == null) {
                 statusLabel.setText("❌ Aucune image capturée");
                 return;
             }
 
-            authorizeBtn.setDisable(true);
-            statusLabel.setText("🔄 Autorisation en cours...");
+            recognizeBtn.setDisable(true);
+            statusLabel.setText("🔄 Reconnaissance en cours...");
 
             new Thread(() -> {
                 try {
-                    Thread.sleep(2000);
+                    // Simuler un temps de traitement
+                    Thread.sleep(1500);
 
-                    String email = emailField.getText().trim();
-                    User user = null;
-
-                    if (!email.isEmpty()) {
-                        user = authService.getUserByEmail(email);
-                    }
-
-                    if (user == null) {
-                        // Utilisateur de démonstration
-                        user = authService.getUserByEmail("participant@loopi.tn");
-                    }
-
-                    final User finalUser = user;
+                    // Authentifier par reconnaissance faciale
+                    int userId = cameraService.authenticateByFace(lastFrame[0], userService);
 
                     Platform.runLater(() -> {
-                        if (finalUser != null) {
-                            statusLabel.setText("✅ Autorisation réussie! Connexion...");
+                        if (userId != -1) {
+                            // Récupérer l'utilisateur par son ID
+                            User user = userService.getUserById(userId);
 
-                            SessionManager.login(finalUser);
+                            if (user != null) {
+                                statusLabel.setText("✅ Reconnaissance réussie! Connexion...");
 
-                            if (lastFrame[0] != null) {
-                                cameraService.addFaceForTraining(lastFrame[0], finalUser.getId());
+                                // Connecter l'utilisateur
+                                SessionManager.login(user);
+
+                                PauseTransition pause = new PauseTransition(Duration.seconds(1));
+                                pause.setOnFinished(event -> {
+                                    stopCamera();
+                                    faceStage.close();
+                                    openDashboard(user);
+                                });
+                                pause.play();
+                            } else {
+                                statusLabel.setText("❌ Utilisateur non trouvé dans la base");
+                                recognizeBtn.setDisable(false);
                             }
-
-                            PauseTransition pause = new PauseTransition(Duration.seconds(1));
-                            pause.setOnFinished(event -> {
-                                stopCamera();
-                                faceStage.close();
-                                openDashboard(finalUser);
-                            });
-                            pause.play();
                         } else {
-                            statusLabel.setText("❌ Utilisateur non trouvé");
-                            authorizeBtn.setDisable(false);
+                            statusLabel.setText("❌ Visage non reconnu - Essayez à nouveau");
+                            recognizeBtn.setDisable(false);
                         }
                     });
                 } catch (InterruptedException ex) {
                     Platform.runLater(() -> {
-                        statusLabel.setText("❌ Erreur lors de l'autorisation");
-                        authorizeBtn.setDisable(false);
+                        statusLabel.setText("❌ Erreur lors de la reconnaissance");
+                        recognizeBtn.setDisable(false);
                     });
                 }
             }).start();
         });
 
-        buttons.getChildren().addAll(startBtn, authorizeBtn, cancelBtn);
-        layout.getChildren().addAll(title, instruction, cameraPane, emailBox, buttons, statusLabel);
+        buttons.getChildren().addAll(startBtn, recognizeBtn, cancelBtn);
+        layout.getChildren().addAll(title, instruction, cameraPane, buttons, statusLabel);
 
         Scene scene = new Scene(layout, 500, 600);
         faceStage.setScene(scene);
@@ -1057,12 +1044,13 @@ public class LoginView extends Application {
                 case "admin":
                     new AdminDashboard(user).start(dashboardStage);
                     break;
-                case "organisateur":
-                    new OrganizerDashboard(user).start(dashboardStage);
-                    break;
-                case "participant":
-                    new UserDashboard(user).start(dashboardStage);
-                    break;
+                // Décommentez ces lignes quand vous aurez créé ces classes
+                 case "organisateur":
+                     new OrganizerDashboard(user).start(dashboardStage);
+                     break;
+                 case "participant":
+                     new UserDashboard(user).start(dashboardStage);
+                     break;
                 default:
                     showErrorAlert("Erreur", "Rôle non reconnu: " + role);
             }

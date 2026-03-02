@@ -1134,6 +1134,8 @@ public class RegisterView extends Application {
         return isValid;
     }
 
+    // Remplacer la méthode handleRegister() par celle-ci :
+
     private void handleRegister() {
         if (!validateAllFields()) {
             showRegisterError("❌ Veuillez corriger les erreurs");
@@ -1185,15 +1187,24 @@ public class RegisterView extends Application {
                             User created = authService.getUserByEmail(finalEmail);
 
                             if (created != null) {
+                                // Sauvegarder la photo si elle existe
                                 if (finalIsUsingCamera && finalCapturedPhoto != null) {
-                                    String photoPath = photoService.saveCameraPhoto(finalCapturedPhoto, created.getId());
+                                    // Utiliser CameraService pour sauvegarder
+                                    String photoPath = cameraService.saveProfilePhoto(finalCapturedPhoto, created.getId());
                                     created.setPhoto(photoPath);
                                     userService.updateUser(created);
+                                    System.out.println("✅ Photo caméra sauvegardée: " + photoPath);
+
                                 } else if (finalSelectedPhotoFile != null) {
+                                    // Utiliser PhotoService pour les fichiers
                                     String photoPath = photoService.saveProfilePhoto(finalSelectedPhotoFile, created.getId());
                                     created.setPhoto(photoPath);
                                     userService.updateUser(created);
+                                    System.out.println("✅ Photo fichier sauvegardée: " + photoPath);
                                 }
+
+                                // Recharger l'utilisateur avec la photo
+                                created = userService.getUserById(created.getId());
                             }
 
                             String roleDisplay = "";
