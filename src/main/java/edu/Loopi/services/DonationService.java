@@ -33,9 +33,11 @@ public class DonationService {
 
             unlockedBadge = updateUserAchievements(d.getId_user(), d.getId_collection(), d.getAmount());
             updateOrganizerImpact(d.getId_collection(), d.getAmount());
+
+            // 1. Update the total amount in the database
             collectionService.updateCurrentAmount(d.getId_collection());
 
-            // --- EMAIL NOTIFICATION WHEN GOAL IS MET ---
+            // 2. Check for goal completion and send email
             checkGoalAndNotifyOrganizer(d.getId_collection());
 
         } catch (SQLException e) { e.printStackTrace(); }
@@ -101,9 +103,14 @@ public class DonationService {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    // --- UPDATED METHOD FOR TESTING ---
+    // --- UPDATED METHOD WITH DEBUG LOGS ---
     private void checkGoalAndNotifyOrganizer(int collectionId) {
+        // Fetch fresh data from DB
         Collection col = collectionService.getCollectionById(collectionId);
+
+        // DEBUG LOGS
+        System.out.println("DEBUG: Checking Goal for '" + col.getTitle() + "'");
+        System.out.println("DEBUG: Current: " + col.getCurrent_amount() + " / Goal: " + col.getGoal_amount());
 
         if (col.getCurrent_amount() >= col.getGoal_amount()) {
             User organizer = userService.getUserById(col.getId_user());
@@ -116,7 +123,10 @@ public class DonationService {
             // --- TESTING: Hardcoded email to ensure arrival ---
             String testingEmail = "mehdirblacktornadou@gmail.com";
             emailService.sendEmail(testingEmail, subject, body);
+
             System.out.println("DEBUG: Goal email sent to " + testingEmail);
+        } else {
+            System.out.println("DEBUG: Goal not yet reached.");
         }
     }
 
@@ -140,6 +150,7 @@ public class DonationService {
         } catch (SQLException e) { e.printStackTrace(); }
         return list;
     }
+
     public List<Donation> getDonationsByCollection(int collectionId) {
         List<Donation> list = new ArrayList<>();
         String query = "SELECT d.*, u.nom, u.prenom FROM donation d " +

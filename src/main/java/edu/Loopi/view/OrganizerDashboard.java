@@ -204,6 +204,7 @@ public class OrganizerDashboard {
         profileBox.setOnMouseExited(e ->
                 profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0; -fx-background-color: transparent; -fx-padding: 0 15 20 15;"));
 
+        // --- FIXED: Single definition of menuItems ---
         VBox menuItems = new VBox(5);
         menuItems.setPadding(new Insets(10, 10, 10, 10));
 
@@ -252,7 +253,7 @@ public class OrganizerDashboard {
         Button statsBtn = createMenuButton("📊 Tableau de bord");
         statsBtn.setOnAction(e -> showStatistics());
 
-        // Section NOTIFICATIONS - MODIFIÉ POUR AFFICHER DANS LE CONTENU PRINCIPAL
+        // Section NOTIFICATIONS
         Label notifLabel = new Label("  NOTIFICATIONS");
         notifLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
         notifLabel.setTextFill(Color.web("#bdc3c7"));
@@ -271,6 +272,17 @@ public class OrganizerDashboard {
         Button profileBtn = createMenuButton("👤 Mon profil");
         profileBtn.setOnAction(e -> showProfile());
 
+        // --- FIXED: Add all items to the single menuItems VBox ---
+        menuItems.getChildren().addAll(
+                produitsLabel, productsBtn,
+                eventsLabel, eventsBtn,
+                participantsLabel, participantsBtn,
+                collectesLabel, donationsBtn,
+                statsLabel, statsBtn,
+                notifLabel, notificationsBtn,
+                profilLabel, profileBtn
+        );
+
         // Espaceur
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -280,18 +292,6 @@ public class OrganizerDashboard {
         logoutBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; " +
                 "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
         logoutBtn.setOnAction(e -> logout(stage));
-
-        VBox menuItems = new VBox(5);
-        menuItems.setPadding(new Insets(10, 10, 10, 10));
-        menuItems.getChildren().addAll(
-                produitsLabel, productsBtn,
-                eventsLabel, eventsBtn, // UN SEUL BOUTON
-                participantsLabel, participantsBtn,
-                collectesLabel, donationsBtn,
-                statsLabel, statsBtn,
-                notifLabel, notificationsBtn,
-                profilLabel, profileBtn
-        );
 
         sidebar.getChildren().addAll(profileBox, menuItems, spacer, logoutBtn);
         return sidebar;

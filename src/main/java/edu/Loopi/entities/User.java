@@ -11,12 +11,11 @@ public class User {
     private String photo;
     private String role;
     private int idGenre;
+    private String sexe; // Unified from duplicates
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-        private String sexe;
-        private LocalDateTime createdAt;
-        private LocalDateTime updatedAt;
-
-    // --- NEW FIELDS FOR BADGE MÉTIER AVANCÉ ---
+    // --- FIELDS FOR BADGE MÉTIER AVANCÉ (Yours) ---
     private double totalPlastic;
     private double totalPaper;
     private double totalGlass;
@@ -26,16 +25,21 @@ public class User {
     private double totalCardboard;
     private boolean hasDonatedFirstTime;
 
-    // Champ transient pour affichage
-    private String sexe;
+    // --- CONSTRUCTORS (Unified) ---
     public User() {
-            this.photo = "default.jpg";
-            this.role = "participant";
-            this.idGenre = 3; // Non spécifié par défaut
-        }
-
-    // Constructeurs
-    public User() {}
+        this.photo = "default.jpg";
+        this.role = "participant";
+        this.idGenre = 3; // Non spécifié par défaut
+        // Initialize new fields for safety
+        this.totalPlastic = 0;
+        this.totalPaper = 0;
+        this.totalGlass = 0;
+        this.totalMetal = 0;
+        this.totalCardboard = 0;
+        this.hasDonatedFirstTime = false;
+        this.totalImpactCollected = 0;
+        this.isCertified = false;
+    }
 
     public User(int id, String nom, String prenom, String email, String password, String role) {
         this.id = id;
@@ -53,9 +57,11 @@ public class User {
         this.totalMetal = 0;
         this.totalCardboard = 0;
         this.hasDonatedFirstTime = false;
+        this.totalImpactCollected = 0;
+        this.isCertified = false;
     }
 
-    // Getters et Setters
+    // --- GETTERS AND SETTERS (Unified & Cleaned) ---
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
@@ -80,32 +86,16 @@ public class User {
     public int getIdGenre() { return idGenre; }
     public void setIdGenre(int idGenre) { this.idGenre = idGenre; }
 
-
-        public String getSexe() { return sexe; }
-        public void setSexe(String sexe) { this.sexe = sexe; }
-
-        public LocalDateTime getCreatedAt() { return createdAt; }
-        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
-        public LocalDateTime getUpdatedAt() { return updatedAt; }
-        public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-
     public String getSexe() { return sexe; }
     public void setSexe(String sexe) { this.sexe = sexe; }
 
-            // Méthode utilitaire pour obtenir le nom complet
-            public String getNomComplet() {
-                String nomComplet = "";
-                if (prenom != null && !prenom.isEmpty()) {
-                    nomComplet += prenom;
-                }
-                if (nom != null && !nom.isEmpty()) {
-                    if (!nomComplet.isEmpty()) nomComplet += " ";
-                    nomComplet += nom;
-                }
-                return nomComplet.isEmpty() ? email : nomComplet;
-            }
-    // --- NEW GETTERS AND SETTERS FOR BADGE MÉTIER AVANCÉ ---
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    // --- GETTERS AND SETTERS FOR BADGE MÉTIER AVANCÉ (Yours) ---
     public double getTotalPlastic() { return totalPlastic; }
     public void setTotalPlastic(double totalPlastic) { this.totalPlastic = totalPlastic; }
 
@@ -124,28 +114,29 @@ public class User {
     public boolean isHasDonatedFirstTime() { return hasDonatedFirstTime; }
     public void setHasDonatedFirstTime(boolean hasDonatedFirstTime) { this.hasDonatedFirstTime = hasDonatedFirstTime; }
 
-    public double getTotalImpactCollected() {
-        return totalImpactCollected;
-    }
+    public double getTotalImpactCollected() { return totalImpactCollected; }
+    public void setTotalImpactCollected(double totalImpactCollected) { this.totalImpactCollected = totalImpactCollected; }
 
-    public void setTotalImpactCollected(double totalImpactCollected) {
-        this.totalImpactCollected = totalImpactCollected;
-    }
-    // Méthodes utilitaires
+    public boolean isCertified() { return isCertified; }
+    public void setCertified(boolean certified) { isCertified = certified; }
+
+    // --- UTILITY METHODS (Unified) ---
+
+    // Combined logic to ensure name is never null
     public String getNomComplet() {
-        return prenom + " " + nom;
+        String nomComplet = "";
+        if (prenom != null && !prenom.isEmpty()) {
+            nomComplet += prenom;
+        }
+        if (nom != null && !nom.isEmpty()) {
+            if (!nomComplet.isEmpty()) nomComplet += " ";
+            nomComplet += nom;
+        }
+        return nomComplet.isEmpty() ? email : nomComplet;
     }
 
     public boolean isAdmin() {
         return "admin".equalsIgnoreCase(role);
-    }
-
-    public boolean isCertified() {
-        return isCertified;
-    }
-
-    public void setCertified(boolean certified) {
-        isCertified = certified;
     }
 
     public boolean isOrganizer() {
