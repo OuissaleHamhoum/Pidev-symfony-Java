@@ -1,8 +1,9 @@
 package edu.Loopi.view;
 
 import edu.Loopi.entities.Collection;
-import edu.Loopi.entities.User;
 import edu.Loopi.services.CollectionService;
+import edu.Loopi.services.UserService; // --- ADDED IMPORT ---
+import edu.Loopi.entities.User;
 import javafx.animation.ScaleTransition;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -22,7 +23,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -33,8 +34,13 @@ public class CollectionView {
     private FlowPane cardsContainer;
     private HBox statsBar;
     private CollectionService service = new CollectionService();
+    private UserService userService = new UserService(); // --- 1. ADDED SERVICE ---
     private List<Collection> allData;
     private String selectedImagePath = "";
+    private ComboBox<String> sortComboBox;
+    private String currentSearchQuery = "";
+    // NEW: For Tree Image
+    private ImageView treeImageView;
 
     public CollectionView(User user) {
         this.currentUser = user;
@@ -49,14 +55,29 @@ public class CollectionView {
         mainLayout.setPadding(new Insets(30, 40, 30, 40));
         mainLayout.setStyle("-fx-background-color: #f7fee7;");
 
+        // --- HERO SECTION WITH TREE ---
+        HBox heroWrapper = new HBox(20);
+        heroWrapper.setAlignment(Pos.CENTER_LEFT);
+
         VBox heroSection = new VBox(2);
         Label bigTitle = new Label("Tableau de Recyclage");
         bigTitle.setFont(Font.font("System", FontWeight.BOLD, 28));
         bigTitle.setTextFill(Color.web("#064e3b"));
 
-        Label subTitle = new Label("Suivez l'impact de vos collectes en temps réel.");
+        Label subTitle = new Label("Suivez l'impact de vos collectes et faites grandir votre arbre.");
         subTitle.setTextFill(Color.web("#059669"));
         heroSection.getChildren().addAll(bigTitle, subTitle);
+
+        // --- TREE IMAGE SECTION ---
+        treeImageView = new ImageView();
+        treeImageView.setFitWidth(80);
+        treeImageView.setFitHeight(80);
+        treeImageView.setPreserveRatio(true);
+        // Load initial tree image
+        updateTreeImage();
+
+        heroWrapper.getChildren().addAll(heroSection, new Region(), treeImageView);
+        HBox.setHgrow(new Region(), Priority.ALWAYS);
 
         statsBar.setAlignment(Pos.CENTER_LEFT);
         statsBar.setPadding(new Insets(0, 0, 10, 0));
@@ -67,9 +88,26 @@ public class CollectionView {
         TextField searchField = new TextField();
         searchField.setPromptText("🔍 Rechercher une collecte...");
         searchField.setPrefHeight(40);
-        searchField.setPrefWidth(350);
+        searchField.setPrefWidth(250);
         searchField.setStyle("-fx-background-radius: 10; -fx-background-color: white; -fx-border-color: #dcfce7; -fx-border-radius: 10;");
-        searchField.textProperty().addListener((obs, old, nv) -> filterData(nv));
+        searchField.textProperty().addListener((obs, old, nv) -> {
+            currentSearchQuery = nv;
+            processAndDisplayData();
+        });
+
+        sortComboBox = new ComboBox<>();
+        sortComboBox.getItems().addAll(
+                "Titre (A-Z)",
+                "Titre (Z-A)",
+                "Montant Actuel (⬇️)",
+                "Montant Actuel (⬆️)",
+                "Objectif (⬇️)",
+                "Objectif (⬆️)"
+        );
+        sortComboBox.setPromptText("Trier par...");
+        sortComboBox.setPrefHeight(40);
+        sortComboBox.setStyle("-fx-background-radius: 10; -fx-background-color: white;");
+        sortComboBox.setOnAction(e -> processAndDisplayData());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -79,7 +117,7 @@ public class CollectionView {
         addBtn.setPrefHeight(40);
         addBtn.setOnAction(e -> openDialog(null));
 
-        actionBar.getChildren().addAll(searchField, spacer, addBtn);
+        actionBar.getChildren().addAll(searchField, sortComboBox, spacer, addBtn);
 
         cardsContainer = new FlowPane();
         cardsContainer.setHgap(20);
@@ -91,13 +129,69 @@ public class CollectionView {
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
-        mainLayout.getChildren().addAll(heroSection, statsBar, actionBar, scrollPane);
+        mainLayout.getChildren().addAll(heroWrapper, statsBar, actionBar, scrollPane);
+    }
+
+    // --- NEW: Tree Logic ---
+    private void updateTreeImage() {
+        String imagePath;
+        double impact = currentUser.getTotalImpactCollected();
+
+        if (impact < 100) {
+            imagePath = "/images/tree_stage1_sapling.png";
+        } else if (impact < 500) {
+            imagePath = "/images/tree_stage2_small.png";
+        } else if (impact < 2000) {
+            imagePath = "/images/tree_stage3_large.png";
+        } else {
+            imagePath = "/images/tree_stage4_glowing.png";
+        }
+
+        try {
+            treeImageView.setImage(new Image(getClass().getResourceAsStream(imagePath)));
+        } catch (Exception e) {
+            System.err.println("Tree image not found: " + imagePath);
+        }
     }
 
     private void loadData() {
         allData = service.getCollectionsByUser(currentUser.getId());
-        updateStats(allData);
-        displayCards(allData);
+
+        // --- 2. REFRESH USER DATA FROM DB ---
+        currentUser = userService.getUserById(currentUser.getId());
+
+        updateTreeImage();
+        processAndDisplayData();
+    }
+
+    private void processAndDisplayData() {
+        if (allData == null) return;
+        List<Collection> processedList = allData.stream()
+                .filter(c -> c.getTitle().toLowerCase().contains(currentSearchQuery.toLowerCase()) ||
+                        c.getMaterial_type().toLowerCase().contains(currentSearchQuery.toLowerCase()))
+                .collect(Collectors.toList());
+
+        String sortOption = sortComboBox.getValue();
+        if (sortOption != null) {
+            switch (sortOption) {
+                case "Titre (A-Z)": processedList.sort(Comparator.comparing(Collection::getTitle, String.CASE_INSENSITIVE_ORDER)); break;
+                case "Titre (Z-A)": processedList.sort(Comparator.comparing(Collection::getTitle, String.CASE_INSENSITIVE_ORDER).reversed()); break;
+                case "Montant Actuel (⬇️)": processedList.sort(Comparator.comparingDouble(Collection::getCurrent_amount)); break;
+                case "Montant Actuel (⬆️)": processedList.sort(Comparator.comparingDouble(Collection::getCurrent_amount).reversed()); break;
+                case "Objectif (⬇️)": processedList.sort(Comparator.comparingDouble(Collection::getGoal_amount)); break;
+                case "Objectif (⬆️)": processedList.sort(Comparator.comparingDouble(Collection::getGoal_amount).reversed()); break;
+            }
+        }
+        processedList.sort((c1, c2) -> {
+            boolean c1Completed = c1.getCurrent_amount() >= c1.getGoal_amount();
+            boolean c2Completed = c2.getCurrent_amount() >= c2.getGoal_amount();
+            if (c1Completed && !c2Completed) return 1;
+            if (!c1Completed && c2Completed) return -1;
+            return 0;
+        });
+
+        updateStats(processedList);
+        displayCards(processedList);
     }
 
     private void updateStats(List<Collection> visibleData) {
@@ -126,15 +220,6 @@ public class CollectionView {
         return card;
     }
 
-    private void filterData(String query) {
-        List<Collection> filtered = allData.stream()
-                .filter(c -> c.getTitle().toLowerCase().contains(query.toLowerCase()) ||
-                        c.getMaterial_type().toLowerCase().contains(query.toLowerCase()))
-                .collect(Collectors.toList());
-        displayCards(filtered);
-        updateStats(filtered);
-    }
-
     private void displayCards(List<Collection> list) {
         cardsContainer.getChildren().clear();
         if (list != null) {
@@ -144,7 +229,7 @@ public class CollectionView {
 
     private VBox createStylishCard(Collection c) {
         VBox card = new VBox(0);
-        card.setPrefSize(250, 360);
+        card.setPrefSize(250, 380);
         String normalStyle = "-fx-background-color: white; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 4);";
         card.setStyle(normalStyle);
 
@@ -191,6 +276,12 @@ public class CollectionView {
         pb.setPrefWidth(225); pb.setPrefHeight(8);
         pb.setStyle("-fx-accent: #10b981;");
 
+        Label lblStatus = new Label();
+        if (c.getCurrent_amount() >= c.getGoal_amount()) {
+            lblStatus.setText("✅ Objectif Atteint !");
+            lblStatus.setStyle("-fx-text-fill: #047857; -fx-font-weight: bold; -fx-font-size: 10;");
+        }
+
         HBox actions = new HBox(8);
         actions.setPadding(new Insets(5, 0, 0, 0));
         Button btnEdit = new Button("Modifier"); applyButtonEffect(btnEdit, "#f59e0b", "#d97706");
@@ -200,7 +291,7 @@ public class CollectionView {
         btnDelete.setOnAction(e -> { service.deleteEntity(c.getId_collection()); loadData(); });
 
         actions.getChildren().addAll(btnEdit, btnDelete);
-        content.getChildren().addAll(lblType, lblTitle, progressInfo, pb, actions);
+        content.getChildren().addAll(lblType, lblTitle, progressInfo, pb, lblStatus, actions);
         card.getChildren().addAll(imgContainer, content);
         return card;
     }
@@ -257,7 +348,6 @@ public class CollectionView {
         save.setMaxWidth(Double.MAX_VALUE);
         save.setStyle("-fx-background-color: #059669; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 12; -fx-background-radius: 10; -fx-cursor: hand;");
 
-        // --- VALIDATION LOGIC RESTORED ---
         save.setOnAction(e -> {
             if (fTitle.getText().trim().isEmpty() || fMat.getValue() == null || fGoal.getText().trim().isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.WARNING);

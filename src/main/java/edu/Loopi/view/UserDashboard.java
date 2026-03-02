@@ -351,18 +351,44 @@ public class UserDashboard {
         }
     }
 
+    // ... inside UserDashboard class ...
+
+    private void showBadgeUnlockedAlert(String badgeName) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("🎉 Nouvelle Réussite !");
+        alert.setHeaderText("Félicitations, " + currentUser.getPrenom() + " !");
+        alert.setContentText("Vous venez de débloquer le badge : " + badgeName + "\n" +
+                "Allez dans 'Mes dons' pour voir votre collection !");
+
+        // Add a custom style if you want
+        DialogPane dialogPane = alert.getDialogPane();
+        dialogPane.setStyle("-fx-background-color: #ecfdf5;");
+
+        alert.showAndWait();
+    }
+
     private void showDonations() {
         try {
-            if (donationHistoryView == null) {
-                donationHistoryView = new DonationHistoryView(currentUser);
-            }
+            // 1. RE-FETCH FRESH USER DATA
+            // This ensures we have the latest 'total_metal', 'total_cardboard', etc.
+            edu.Loopi.services.UserService userService = new edu.Loopi.services.UserService();
+            this.currentUser = userService.getUserById(currentUser.getId());
+
+            // 2. CREATE A FRESH VIEW INSTANCE
+            // This triggers the constructor of DonationHistoryView which calls loadBadges()
+            this.donationHistoryView = new DonationHistoryView(currentUser);
+
+            // 3. UPDATE THE UI
             root.setCenter(donationHistoryView.getView());
-            System.out.println("✅ Historique des dons affiché");
+
+            System.out.println("✅ Historique des dons rafraîchi et affiché");
         } catch (Exception e) {
             System.err.println("❌ Erreur chargement dons: " + e.getMessage());
             showComingSoon("Mes dons", "❤️");
         }
     }
+
+// ... rest of the class ...
 
     private void showCoupons() {
         try {

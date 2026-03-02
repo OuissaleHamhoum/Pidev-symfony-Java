@@ -42,6 +42,8 @@ public class AdminDashboard {
     private ProductManagementView productManagementView;
     private EventManagementView eventManagementView;
     private EventMapView eventMapView;
+    // --- ADDED: Reference to new view ---
+    private CollectionDashboardView collectionDashboardView;
 
     private StackPane headerProfileContainer;
     private VBox headerProfileInfo;
@@ -72,6 +74,7 @@ public class AdminDashboard {
     private static final String DARK_TEXT_MUTED = "#A0AEC0";
     private static final String DARK_BORDER = "#2D3748";
     private static final String DARK_CARD = "#1A202C";
+    private ScrollPane sidebarScrollPane;
     private static final String DARK_HOVER = "#2D3748";
 
     private static final String ACCENT_COLOR = "#3182CE";
@@ -88,11 +91,14 @@ public class AdminDashboard {
         this.dashboardView = new DashboardView(currentUser, userService, this);
         this.userManagementView = new UserManagementView(currentUser, userService, this);
         this.userProfileView = new UserProfileView(currentUser, userService, this);
+
         this.analyticsView = new AnalyticsView(currentUser, userService, this);
         this.settingsView = new SettingsView(currentUser, userService, this);
         this.productManagementView = new ProductManagementView(currentUser, userService, this);
         this.eventManagementView = new EventManagementView(currentUser, userService, this);
         this.eventMapView = new EventMapView(currentUser, userService, this);
+        // --- ADDED: Initialize new view ---
+        this.collectionDashboardView = new CollectionDashboardView(currentUser, userService, this);
     }
 
     public void start(Stage primaryStage) {
@@ -102,19 +108,31 @@ public class AdminDashboard {
         try {
             File logoFile = new File("logo.png");
             if (logoFile.exists()) {
+                // FIX: Load directly from the File object
                 Image icon = new Image(new FileInputStream(logoFile));
                 primaryStage.getIcons().add(icon);
             }
         } catch (Exception e) {
-            System.out.println("Logo non trouvé");
+            System.out.println("Logo non trouvé: " + e.getMessage());
         }
 
         root = new BorderPane();
 
+        // 1. Create the sidebar content
         sidebar = createSidebar();
+
+        // 2. Wrap the sidebar in a ScrollPane for scrolling capability
+        ScrollPane sidebarScrollPane = new ScrollPane(sidebar);
+        sidebarScrollPane.setFitToWidth(true); // Content fills width
+        sidebarScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); // No horizontal scroll
+        sidebarScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED); // Vertical scroll if needed
+        // Setting background to transparent to ensure it looks integrated
+        sidebarScrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+
         VBox header = createHeader();
 
-        root.setLeft(sidebar);
+        // 3. Set the ScrollPane as the Left component
+        root.setLeft(sidebarScrollPane);
         root.setTop(header);
 
         mainContentArea = new StackPane();
@@ -130,7 +148,6 @@ public class AdminDashboard {
 
         applyTheme();
     }
-
     private VBox createHeader() {
         VBox header = new VBox();
         header.setPadding(new Insets(12, 24, 12, 24));
@@ -302,6 +319,16 @@ public class AdminDashboard {
         sidebarButtons.put("events", eventsBtn);
         navMenu.getChildren().add(eventsBtn);
 
+        // --- ADDED: Sidebar button for Collection Dashboard ---
+        Label collectionSection = new Label("  COLLECTIONS");
+        collectionSection.setFont(Font.font("System", FontWeight.BOLD, 12));
+        collectionSection.setTextFill(Color.web(getTextColorMuted()));
+        collectionSection.setPadding(new Insets(15, 0, 5, 12));
+        navMenu.getChildren().add(collectionSection);
+        Button collectionsBtn = createSidebarButton("📦", "Tableau Collection", "collectionDashboard", false);
+        sidebarButtons.put("collectionDashboard", collectionsBtn);
+        navMenu.getChildren().add(collectionsBtn);
+
         // Section CARTE
         Label mapSection = new Label("  CARTE");
         mapSection.setFont(Font.font("System", FontWeight.BOLD, 12));
@@ -409,6 +436,7 @@ public class AdminDashboard {
 
         Label iconLabel = new Label(icon);
         iconLabel.setFont(Font.font("System", 16));
+        iconLabel.setTextFill(Color.LIMEGREEN);
         btn.setGraphic(iconLabel);
 
         if (active) {
@@ -467,6 +495,10 @@ public class AdminDashboard {
             case "events":
                 showEventManagementView();
                 break;
+            // --- ADDED: Handle new view navigation ---
+            case "collectionDashboard":
+                showCollectionDashboardView();
+                break;
             case "map":
                 showEventMapView();
                 break;
@@ -501,6 +533,11 @@ public class AdminDashboard {
 
     public void showEventManagementView() {
         eventManagementView.showEventManagementView(mainContentArea, isDarkMode);
+    }
+
+    // --- ADDED: Method to show the new view ---
+    public void showCollectionDashboardView() {
+        collectionDashboardView.showCollectionDashboardView(mainContentArea, isDarkMode);
     }
 
     public void showEventMapView() {
@@ -552,6 +589,8 @@ public class AdminDashboard {
             case "users": showUserManagementView(); break;
             case "products": showProductManagementView(); break;
             case "events": showEventManagementView(); break;
+            // --- ADDED: Refresh new view ---
+            case "collectionDashboard": showCollectionDashboardView(); break;
             case "map": showEventMapView(); break;
             case "analytics": showAnalyticsView(); break;
             case "profile": showUserProfileInMain(); break;
@@ -674,10 +713,15 @@ public class AdminDashboard {
     }
 
     private void toggleSidebar() {
-        if (sidebar.getPrefWidth() > 100) {
-            sidebar.setPrefWidth(70);
+        // Get the ScrollPane from the BorderPane
+        ScrollPane sidebarScrollPane = (ScrollPane) root.getLeft();
+
+        if (sidebarScrollPane.getPrefWidth() > 100) {
+            sidebarScrollPane.setPrefWidth(70);
+            sidebarScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         } else {
-            sidebar.setPrefWidth(260);
+            sidebarScrollPane.setPrefWidth(260);
+            sidebarScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         }
     }
 

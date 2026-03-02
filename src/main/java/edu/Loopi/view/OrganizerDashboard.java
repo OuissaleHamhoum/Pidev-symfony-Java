@@ -2,9 +2,11 @@ package edu.Loopi.view;
 
 import edu.Loopi.entities.Notification;
 import edu.Loopi.entities.User;
+import edu.Loopi.services.CollectionService; // --- IMPORTED ---
 import edu.Loopi.services.EventService;
 import edu.Loopi.services.NotificationService;
 import edu.Loopi.services.ProduitService;
+import edu.Loopi.services.UserService; // --- IMPORTED ---
 import edu.Loopi.tools.SessionManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -24,6 +26,7 @@ public class OrganizerDashboard {
     private EventService eventService;
     private ProduitService produitService;
     private NotificationService notificationService;
+    private UserService userService; // --- ADDED ---
     private NotificationsContentView notificationsContentView;
 
     public OrganizerDashboard(User user) {
@@ -31,6 +34,7 @@ public class OrganizerDashboard {
         this.eventService = new EventService();
         this.produitService = new ProduitService();
         this.notificationService = new NotificationService();
+        this.userService = new UserService(); // --- INITIALIZED ---
         this.notificationsContentView = new NotificationsContentView(user, notificationService);
         SessionManager.login(user);
         System.out.println("✅ OrganizerDashboard initialisé pour: " + user.getEmail());
@@ -362,8 +366,12 @@ public class OrganizerDashboard {
         VBox eventsCard = createInfoCard("📅", "Événements", nbEvenements + " événements");
         VBox notificationsCard = createInfoCard("🔔", "Notifications", nbNotifications + " non lues");
 
+        // --- UPDATED STATS CARD FOR BADGE ---
+        String status = currentUser.isCertified() ? "✅ Certifié" : "Non certifié";
+        VBox statusCard = createInfoCard("🏆", "Statut", status);
+
         statsBox.getChildren().clear();
-        statsBox.getChildren().addAll(productsCard, eventsCard, notificationsCard);
+        statsBox.getChildren().addAll(productsCard, eventsCard, notificationsCard, statusCard);
 
         // Actions rapides
         VBox quickActions = new VBox(10);
@@ -468,8 +476,6 @@ public class OrganizerDashboard {
         }
     }
 
-    // Dans OrganizerDashboard.java, assurez-vous que la méthode showMyEvents() est correcte :
-
     private void showMyEvents() {
         try {
             Class.forName("edu.Loopi.view.EventView");
@@ -505,7 +511,13 @@ public class OrganizerDashboard {
     private void showCollections() {
         try {
             Class.forName("edu.Loopi.view.CollectionView");
-            CollectionView collectionView = new CollectionView(currentUser);
+
+            // --- FIX FOR DATA REFRESH ---
+            // Fetch fresh user data from database before creating the view
+            User freshUser = userService.getUserById(currentUser.getId());
+            this.currentUser = freshUser; // Update local reference
+
+            CollectionView collectionView = new CollectionView(freshUser);
             root.setCenter(collectionView.getView());
             System.out.println("✅ CollectionView chargée avec succès");
         } catch (ClassNotFoundException e) {
