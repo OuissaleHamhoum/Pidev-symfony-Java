@@ -2,6 +2,7 @@ package edu.Loopi.view;
 
 import edu.Loopi.entities.User;
 import edu.Loopi.services.ParticipationService;
+import edu.Loopi.services.UserService;
 import edu.Loopi.tools.SessionManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -9,27 +10,37 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+
+import java.io.File;
+import java.io.FileInputStream;
 
 // Imports des vues existantes
 import edu.Loopi.view.ProductGalleryView;
 import edu.Loopi.view.ParticipantCampaignView;
 import edu.Loopi.view.DonationHistoryView;
 import edu.Loopi.view.FavorisView;
+import edu.Loopi.view.RecommendationView;
 
 public class UserDashboard {
     private User currentUser;
     private BorderPane root;
     private ParticipationService participationService;
+    private UserService userService;
     private EventViewParticipant eventView;
     private ProductGalleryView productGalleryView;
     private ParticipantCampaignView campaignView;
     private DonationHistoryView donationHistoryView;
+    private UserProfileView userProfileView;
 
     public UserDashboard(User user) {
         this.currentUser = user;
+        this.userService = new UserService();
         this.participationService = new ParticipationService();
         SessionManager.login(user);
 
@@ -38,6 +49,7 @@ public class UserDashboard {
         this.productGalleryView = new ProductGalleryView();
         this.campaignView = new ParticipantCampaignView(currentUser);
         this.donationHistoryView = new DonationHistoryView(currentUser);
+        this.userProfileView = new UserProfileView(user, userService, this);
     }
 
     public void start(Stage stage) {
@@ -144,14 +156,32 @@ public class UserDashboard {
         sidebar.setPrefWidth(250);
         sidebar.setPadding(new Insets(20, 0, 0, 0));
 
+        // PROFIL BOX AVEC IMAGE
         HBox profileBox = new HBox(15);
         profileBox.setPadding(new Insets(0, 15, 20, 15));
         profileBox.setAlignment(Pos.CENTER_LEFT);
         profileBox.setStyle("-fx-border-color: #065f46; -fx-border-width: 0 0 1 0;");
 
-        Label avatar = new Label("👤");
-        avatar.setFont(Font.font("Arial", 32));
-        avatar.setTextFill(Color.WHITE);
+        // Conteneur pour l'avatar avec image ou initiales
+        StackPane avatarContainer = new StackPane();
+        avatarContainer.setPrefSize(50, 50);
+
+        // Cercle de fond
+        Circle avatarCircle = new Circle(25);
+        avatarCircle.setFill(Color.web("#059669"));
+
+        // Charger l'image de profil si elle existe
+        ImageView profileImageView = loadProfileImageForSidebar(currentUser, 46);
+        if (profileImageView != null) {
+            avatarContainer.getChildren().add(profileImageView);
+        } else {
+            // Sinon afficher les initiales
+            String initials = getInitials(currentUser);
+            Label avatarText = new Label(initials);
+            avatarText.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+            avatarText.setTextFill(Color.WHITE);
+            avatarContainer.getChildren().addAll(avatarCircle, avatarText);
+        }
 
         VBox profileInfo = new VBox(2);
         Label profileName = new Label(currentUser.getPrenom());
@@ -163,7 +193,15 @@ public class UserDashboard {
         profileEmail.setTextFill(Color.web("#bdc3c7"));
 
         profileInfo.getChildren().addAll(profileName, profileEmail);
-        profileBox.getChildren().addAll(avatar, profileInfo);
+        profileBox.getChildren().addAll(avatarContainer, profileInfo);
+
+        // Ajouter un effet de clic pour ouvrir le profil
+        profileBox.setCursor(javafx.scene.Cursor.HAND);
+        profileBox.setOnMouseClicked(e -> showProfile());
+        profileBox.setOnMouseEntered(e ->
+                profileBox.setStyle("-fx-border-color: #065f46; -fx-border-width: 0 0 1 0; -fx-background-color: #065f46; -fx-background-radius: 8; -fx-padding: 0 15 20 15;"));
+        profileBox.setOnMouseExited(e ->
+                profileBox.setStyle("-fx-border-color: #065f46; -fx-border-width: 0 0 1 0; -fx-background-color: transparent; -fx-padding: 0 15 20 15;"));
 
         VBox menuItems = new VBox(5);
         menuItems.setPadding(new Insets(10, 10, 10, 10));
@@ -187,16 +225,13 @@ public class UserDashboard {
         Button browseBtn = createMenuButton("🛒 Galerie");
         browseBtn.setOnAction(e -> showProducts());
 
-        // NOUVEAU BOUTON RECOMMANDATIONS
         Button recBtn = createMenuButton("🎯 Recommandations");
         recBtn.setOnAction(e -> showRecommendations());
 
-        // NOUVEAU BOUTON FAVORIS
         Button favorisBtn = createMenuButton("❤️ Mes favoris");
         favorisBtn.setOnAction(e -> showFavoris());
 
-        Button ordersBtn = createMenuButton("📦 Mes commandes");
-        ordersBtn.setOnAction(e -> showOrders());
+
 
         Label donationsSection = new Label("  COLLECTES");
         donationsSection.setFont(Font.font("Arial", FontWeight.BOLD, 12));
@@ -233,25 +268,13 @@ public class UserDashboard {
 
         menuItems.getChildren().addAll(
                 eventsSection, eventsBtn, myParticipationsBtn,
-                shopSection, browseBtn, recBtn, favorisBtn, ordersBtn, // recBtn ajouté ici
+                shopSection, browseBtn, recBtn, favorisBtn,
                 donationsSection, campaignsBtn, myDonationsBtn, myCouponsBtn,
                 profileSection, profileBtn, settingsBtn
         );
 
         sidebar.getChildren().addAll(profileBox, menuItems, spacer, logoutBtn);
         return sidebar;
-    }
-
-    // Ajouter la méthode :
-    private void showRecommendations() {
-        try {
-            RecommendationView recView = new RecommendationView();
-            root.setCenter(recView.getView());
-            System.out.println("✅ Recommandations affichées");
-        } catch (Exception e) {
-            System.err.println("❌ Erreur chargement recommandations: " + e.getMessage());
-            showComingSoon("Recommandations", "🎯");
-        }
     }
 
     private Button createMenuButton(String text) {
@@ -273,7 +296,17 @@ public class UserDashboard {
     }
 
     // ============ MÉTHODES DE NAVIGATION ============
-// Dans UserDashboard.java, assurez-vous que les méthodes sont correctes :
+
+    private void showRecommendations() {
+        try {
+            RecommendationView recView = new RecommendationView();
+            root.setCenter(recView.getView());
+            System.out.println("✅ Recommandations affichées");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur chargement recommandations: " + e.getMessage());
+            showComingSoon("Recommandations", "🎯");
+        }
+    }
 
     private void showEvents() {
         try {
@@ -315,7 +348,6 @@ public class UserDashboard {
         }
     }
 
-    // NOUVELLE MÉTHODE POUR LES FAVORIS
     private void showFavoris() {
         try {
             FavorisView favorisView = new FavorisView();
@@ -327,16 +359,7 @@ public class UserDashboard {
         }
     }
 
-    private void showOrders() {
-        try {
-            VBox ordersView = createOrdersView();
-            root.setCenter(ordersView);
-            System.out.println("✅ Commandes affichées");
-        } catch (Exception e) {
-            System.err.println("❌ Erreur chargement commandes: " + e.getMessage());
-            showComingSoon("Mes commandes", "📦");
-        }
-    }
+
 
     private void showCampaigns() {
         try {
@@ -377,11 +400,12 @@ public class UserDashboard {
 
     private void showProfile() {
         try {
-            VBox profileView = createProfileView();
+            VBox profileView = userProfileView.createUserProfileView();
             root.setCenter(profileView);
             System.out.println("✅ Profil affiché");
         } catch (Exception e) {
             System.err.println("❌ Erreur chargement profil: " + e.getMessage());
+            e.printStackTrace();
             showComingSoon("Mon profil", "👤");
         }
     }
@@ -397,32 +421,7 @@ public class UserDashboard {
         }
     }
 
-    // Vue pour les commandes
-    private VBox createOrdersView() {
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(40));
-        content.setAlignment(Pos.TOP_CENTER);
-        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
 
-        Label title = new Label("📦 Mes Commandes");
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
-        title.setTextFill(Color.web("#064e3b"));
-
-        VBox ordersList = new VBox(10);
-        ordersList.setPadding(new Insets(20));
-        ordersList.setStyle("-fx-background-color: #f9f9f9; -fx-background-radius: 8;");
-
-        Label order1 = new Label("✅ Commande #12345 - 15/02/2024 - 3 articles - 45.99€ (Livrée)");
-        Label order2 = new Label("🔄 Commande #12344 - 10/02/2024 - 1 article - 12.50€ (En cours)");
-        Label order3 = new Label("✅ Commande #12343 - 05/02/2024 - 2 articles - 28.75€ (Livrée)");
-        Label order4 = new Label("⏳ Commande #12342 - 28/01/2024 - 4 articles - 67.30€ (En préparation)");
-
-        ordersList.getChildren().addAll(order1, order2, order3, order4);
-
-        content.getChildren().addAll(title, ordersList);
-        return content;
-    }
 
     // Vue pour les coupons
     private VBox createCouponsView() {
@@ -485,49 +484,6 @@ public class UserDashboard {
 
         card.getChildren().addAll(codeLabel, descLabel, validLabel, copyBtn);
         return card;
-    }
-
-    // Vue pour le profil
-    private VBox createProfileView() {
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(40));
-        content.setAlignment(Pos.TOP_CENTER);
-        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
-
-        Label title = new Label("👤 Mon Profil");
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 28));
-        title.setTextFill(Color.web("#064e3b"));
-
-        GridPane profileInfo = new GridPane();
-        profileInfo.setHgap(20);
-        profileInfo.setVgap(15);
-        profileInfo.setPadding(new Insets(30));
-        profileInfo.setStyle("-fx-background-color: #f9f9f9; -fx-background-radius: 8;");
-        profileInfo.setAlignment(Pos.CENTER);
-
-        profileInfo.add(new Label("Nom complet:"), 0, 0);
-        profileInfo.add(new Label(currentUser.getNomComplet()), 1, 0);
-
-        profileInfo.add(new Label("Email:"), 0, 1);
-        profileInfo.add(new Label(currentUser.getEmail()), 1, 1);
-
-        profileInfo.add(new Label("Rôle:"), 0, 2);
-        profileInfo.add(new Label(currentUser.getRole()), 1, 2);
-
-        profileInfo.add(new Label("Téléphone:"), 0, 3);
-        profileInfo.add(new Label("+216 XX XXX XXX"), 1, 3);
-
-        profileInfo.add(new Label("Adresse:"), 0, 4);
-        profileInfo.add(new Label("Tunis, Tunisie"), 1, 4);
-
-        Button editBtn = new Button("✏️ Modifier le profil");
-        editBtn.setStyle("-fx-background-color: #059669; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8;");
-        editBtn.setOnAction(e -> showAlert("Modification", "Fonctionnalité de modification à venir..."));
-
-        content.getChildren().addAll(title, profileInfo, editBtn);
-        return content;
     }
 
     // Vue pour les paramètres
@@ -630,5 +586,102 @@ public class UserDashboard {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    // ============ MÉTHODES POUR L'AVATAR ============
+
+    private String getInitials(User user) {
+        String initials = "";
+        if (user.getPrenom() != null && !user.getPrenom().isEmpty()) {
+            initials += String.valueOf(user.getPrenom().charAt(0)).toUpperCase();
+        }
+        if (user.getNom() != null && !user.getNom().isEmpty()) {
+            initials += String.valueOf(user.getNom().charAt(0)).toUpperCase();
+        }
+        return initials.isEmpty() ? "U" : initials;
+    }
+
+    private ImageView loadProfileImageForSidebar(User user, double size) {
+        if (user.getPhoto() != null && !user.getPhoto().isEmpty() && !user.getPhoto().equals("default.jpg")) {
+            try {
+                File imageFile = new File(user.getPhoto());
+                if (!imageFile.exists() && user.getPhoto().contains("profiles")) {
+                    imageFile = new File("profiles/" + user.getPhoto().replace("profiles/", "").replace("profiles\\", ""));
+                }
+                if (imageFile.exists()) {
+                    Image image = new Image(new FileInputStream(imageFile), size, size, true, true);
+                    ImageView imageView = new ImageView(image);
+                    imageView.setFitWidth(size);
+                    imageView.setFitHeight(size);
+                    imageView.setPreserveRatio(true);
+
+                    // Créer un cercle de clipping pour arrondir l'image
+                    Circle clip = new Circle(size/2, size/2, size/2);
+                    imageView.setClip(clip);
+
+                    return imageView;
+                }
+            } catch (Exception e) {
+                System.out.println("Erreur chargement image sidebar: " + e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    // ============ MÉTHODES POUR LE PROFIL ============
+
+    public void showMainContent() {
+        try {
+            showEvents(); // Retour à la vue par défaut des événements
+        } catch (Exception e) {
+            System.err.println("❌ Erreur affichage contenu principal: " + e.getMessage());
+        }
+    }
+
+    public void updateUserInfo(User updatedUser) {
+        this.currentUser = updatedUser;
+        this.userProfileView = new UserProfileView(updatedUser, userService, this);
+
+        // Mettre à jour l'affichage dans le header
+        HBox header = (HBox) root.getTop();
+        if (header != null && header.getChildren().size() >= 3) {
+            VBox userInfo = (VBox) header.getChildren().get(2);
+            if (userInfo != null && userInfo.getChildren().size() >= 2) {
+                ((Label) userInfo.getChildren().get(0)).setText(updatedUser.getNomComplet());
+            }
+        }
+
+        // Mettre à jour le profil dans la sidebar avec l'image
+        VBox sidebar = (VBox) root.getLeft();
+        if (sidebar != null && sidebar.getChildren().size() > 0) {
+            HBox profileBox = (HBox) sidebar.getChildren().get(0);
+            if (profileBox != null) {
+                // Mettre à jour l'avatar
+                StackPane avatarContainer = (StackPane) profileBox.getChildren().get(0);
+                avatarContainer.getChildren().clear();
+
+                ImageView profileImageView = loadProfileImageForSidebar(updatedUser, 46);
+                if (profileImageView != null) {
+                    avatarContainer.getChildren().add(profileImageView);
+                } else {
+                    Circle avatarCircle = new Circle(23);
+                    avatarCircle.setFill(Color.web("#059669"));
+                    String initials = getInitials(updatedUser);
+                    Label avatarText = new Label(initials);
+                    avatarText.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+                    avatarText.setTextFill(Color.WHITE);
+                    avatarContainer.getChildren().addAll(avatarCircle, avatarText);
+                }
+
+                // Mettre à jour les informations
+                if (profileBox.getChildren().size() >= 2) {
+                    VBox profileInfo = (VBox) profileBox.getChildren().get(1);
+                    if (profileInfo != null && profileInfo.getChildren().size() >= 2) {
+                        ((Label) profileInfo.getChildren().get(0)).setText(updatedUser.getPrenom());
+                        ((Label) profileInfo.getChildren().get(1)).setText(updatedUser.getEmail());
+                    }
+                }
+            }
+        }
     }
 }

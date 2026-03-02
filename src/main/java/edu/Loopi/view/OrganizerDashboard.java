@@ -5,6 +5,7 @@ import edu.Loopi.entities.User;
 import edu.Loopi.services.EventService;
 import edu.Loopi.services.NotificationService;
 import edu.Loopi.services.ProduitService;
+import edu.Loopi.services.UserService;
 import edu.Loopi.tools.SessionManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,10 +13,15 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.List;
 
 public class OrganizerDashboard {
@@ -24,14 +30,18 @@ public class OrganizerDashboard {
     private EventService eventService;
     private ProduitService produitService;
     private NotificationService notificationService;
+    private UserService userService;
     private NotificationsContentView notificationsContentView;
+    private OrganizerProfileView organizerProfileView;
 
     public OrganizerDashboard(User user) {
         this.currentUser = user;
+        this.userService = new UserService();
         this.eventService = new EventService();
         this.produitService = new ProduitService();
         this.notificationService = new NotificationService();
         this.notificationsContentView = new NotificationsContentView(user, notificationService);
+        this.organizerProfileView = new OrganizerProfileView(user, userService, this);
         SessionManager.login(user);
         System.out.println("✅ OrganizerDashboard initialisé pour: " + user.getEmail());
     }
@@ -145,8 +155,55 @@ public class OrganizerDashboard {
         sidebar.setPrefWidth(260);
         sidebar.setPadding(new Insets(20, 0, 0, 0));
 
-        // Profil utilisateur
-        HBox profileBox = createProfileBox();
+        // PROFIL BOX AVEC IMAGE
+        HBox profileBox = new HBox(15);
+        profileBox.setPadding(new Insets(0, 15, 20, 15));
+        profileBox.setAlignment(Pos.CENTER_LEFT);
+        profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0;");
+
+        // Conteneur pour l'avatar avec image ou initiales
+        StackPane avatarContainer = new StackPane();
+        avatarContainer.setPrefSize(50, 50);
+
+        // Cercle de fond
+        Circle avatarCircle = new Circle(25);
+        avatarCircle.setFill(Color.web("#2196F3"));
+
+        // Charger l'image de profil si elle existe
+        ImageView profileImageView = loadProfileImageForSidebar(currentUser, 46);
+        if (profileImageView != null) {
+            avatarContainer.getChildren().add(profileImageView);
+        } else {
+            // Sinon afficher les initiales
+            String initials = getInitials(currentUser);
+            Label avatarText = new Label(initials);
+            avatarText.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+            avatarText.setTextFill(Color.WHITE);
+            avatarContainer.getChildren().addAll(avatarCircle, avatarText);
+        }
+
+        VBox profileInfo = new VBox(2);
+        Label profileName = new Label(currentUser.getPrenom() + " " + currentUser.getNom());
+        profileName.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        profileName.setTextFill(Color.WHITE);
+
+        Label profileEmail = new Label(currentUser.getEmail());
+        profileEmail.setFont(Font.font("Arial", 11));
+        profileEmail.setTextFill(Color.web("#bdc3c7"));
+
+        profileInfo.getChildren().addAll(profileName, profileEmail);
+        profileBox.getChildren().addAll(avatarContainer, profileInfo);
+
+        // Ajouter un effet de clic pour ouvrir le profil
+        profileBox.setCursor(javafx.scene.Cursor.HAND);
+        profileBox.setOnMouseClicked(e -> showProfile());
+        profileBox.setOnMouseEntered(e ->
+                profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0; -fx-background-color: #34495e; -fx-background-radius: 8; -fx-padding: 0 15 20 15;"));
+        profileBox.setOnMouseExited(e ->
+                profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0; -fx-background-color: transparent; -fx-padding: 0 15 20 15;"));
+
+        VBox menuItems = new VBox(5);
+        menuItems.setPadding(new Insets(10, 10, 10, 10));
 
         // Section PRODUITS
         Label produitsLabel = new Label("  PRODUITS");
@@ -157,7 +214,7 @@ public class OrganizerDashboard {
         Button productsBtn = createMenuButton("📦 Mes produits");
         productsBtn.setOnAction(e -> showMyProducts());
 
-        // Section ÉVÉNEMENTS - UN SEUL BOUTON
+        // Section ÉVÉNEMENTS
         Label eventsLabel = new Label("  ÉVÉNEMENTS");
         eventsLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
         eventsLabel.setTextFill(Color.web("#bdc3c7"));
@@ -193,7 +250,7 @@ public class OrganizerDashboard {
         Button statsBtn = createMenuButton("📊 Tableau de bord");
         statsBtn.setOnAction(e -> showStatistics());
 
-        // Section NOTIFICATIONS - MODIFIÉ POUR AFFICHER DANS LE CONTENU PRINCIPAL
+        // Section NOTIFICATIONS
         Label notifLabel = new Label("  NOTIFICATIONS");
         notifLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
         notifLabel.setTextFill(Color.web("#bdc3c7"));
@@ -222,11 +279,9 @@ public class OrganizerDashboard {
                 "-fx-font-size: 14px; -fx-alignment: center-left; -fx-padding: 0 20; -fx-cursor: hand;");
         logoutBtn.setOnAction(e -> logout(stage));
 
-        VBox menuItems = new VBox(5);
-        menuItems.setPadding(new Insets(10, 10, 10, 10));
         menuItems.getChildren().addAll(
                 produitsLabel, productsBtn,
-                eventsLabel, eventsBtn, // UN SEUL BOUTON
+                eventsLabel, eventsBtn,
                 participantsLabel, participantsBtn,
                 collectesLabel, donationsBtn,
                 statsLabel, statsBtn,
@@ -236,31 +291,6 @@ public class OrganizerDashboard {
 
         sidebar.getChildren().addAll(profileBox, menuItems, spacer, logoutBtn);
         return sidebar;
-    }
-
-    private HBox createProfileBox() {
-        HBox profileBox = new HBox(15);
-        profileBox.setPadding(new Insets(0, 15, 20, 15));
-        profileBox.setAlignment(Pos.CENTER_LEFT);
-        profileBox.setStyle("-fx-border-color: #34495e; -fx-border-width: 0 0 1 0;");
-
-        Label avatar = new Label("👤");
-        avatar.setFont(Font.font("Arial", 32));
-        avatar.setTextFill(Color.WHITE);
-
-        VBox profileInfo = new VBox(2);
-        Label profileName = new Label(currentUser.getPrenom() + " " + currentUser.getNom());
-        profileName.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-        profileName.setTextFill(Color.WHITE);
-
-        Label profileEmail = new Label(currentUser.getEmail());
-        profileEmail.setFont(Font.font("Arial", 11));
-        profileEmail.setTextFill(Color.web("#bdc3c7"));
-
-        profileInfo.getChildren().addAll(profileName, profileEmail);
-        profileBox.getChildren().addAll(avatar, profileInfo);
-
-        return profileBox;
     }
 
     private Button createMenuButton(String text) {
@@ -313,7 +343,6 @@ public class OrganizerDashboard {
         }
     }
 
-    // NOUVELLE MÉTHODE - Afficher les notifications dans le contenu principal
     private void showNotificationsInContent() {
         VBox content = notificationsContentView.getView();
         content.setOnMouseClicked(e -> refreshDashboard());
@@ -321,7 +350,7 @@ public class OrganizerDashboard {
         refreshDashboard();
     }
 
-    private VBox createMainContent() {
+    public VBox createMainContent() {
         VBox content = new VBox(30);
         content.setPadding(new Insets(40));
         content.setAlignment(Pos.CENTER);
@@ -468,8 +497,6 @@ public class OrganizerDashboard {
         }
     }
 
-    // Dans OrganizerDashboard.java, assurez-vous que la méthode showMyEvents() est correcte :
-
     private void showMyEvents() {
         try {
             Class.forName("edu.Loopi.view.EventView");
@@ -485,6 +512,7 @@ public class OrganizerDashboard {
             showAlert("Erreur", "Erreur lors du chargement des événements: " + e.getMessage());
         }
     }
+
     private void showParticipantsManagement() {
         try {
             Class.forName("edu.Loopi.view.ParticipantsView");
@@ -522,7 +550,8 @@ public class OrganizerDashboard {
     }
 
     private void showProfile() {
-        showComingSoon("Mon Profil", "👤");
+        VBox profileView = organizerProfileView.createOrganizerProfileView();
+        root.setCenter(profileView);
     }
 
     private void showComingSoon(String title, String icon) {
@@ -571,5 +600,99 @@ public class OrganizerDashboard {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    // ============ MÉTHODES POUR L'AVATAR ============
+
+    private String getInitials(User user) {
+        String initials = "";
+        if (user.getPrenom() != null && !user.getPrenom().isEmpty()) {
+            initials += String.valueOf(user.getPrenom().charAt(0)).toUpperCase();
+        }
+        if (user.getNom() != null && !user.getNom().isEmpty()) {
+            initials += String.valueOf(user.getNom().charAt(0)).toUpperCase();
+        }
+        return initials.isEmpty() ? "U" : initials;
+    }
+
+    private ImageView loadProfileImageForSidebar(User user, double size) {
+        if (user.getPhoto() != null && !user.getPhoto().isEmpty() && !user.getPhoto().equals("default.jpg")) {
+            try {
+                File imageFile = new File(user.getPhoto());
+                if (!imageFile.exists() && user.getPhoto().contains("profiles")) {
+                    imageFile = new File("profiles/" + user.getPhoto().replace("profiles/", "").replace("profiles\\", ""));
+                }
+                if (imageFile.exists()) {
+                    Image image = new Image(new FileInputStream(imageFile), size, size, true, true);
+                    ImageView imageView = new ImageView(image);
+                    imageView.setFitWidth(size);
+                    imageView.setFitHeight(size);
+                    imageView.setPreserveRatio(true);
+
+                    // Créer un cercle de clipping pour arrondir l'image
+                    Circle clip = new Circle(size/2, size/2, size/2);
+                    imageView.setClip(clip);
+
+                    return imageView;
+                }
+            } catch (Exception e) {
+                System.out.println("Erreur chargement image sidebar: " + e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    // ============ MÉTHODES POUR LE PROFIL ============
+
+    public void showMainContent() {
+        VBox content = createMainContent();
+        root.setCenter(content);
+    }
+
+    public void updateUserInfo(User updatedUser) {
+        this.currentUser = updatedUser;
+        this.organizerProfileView = new OrganizerProfileView(updatedUser, userService, this);
+
+        // Mettre à jour l'affichage dans le header
+        HBox header = (HBox) root.getTop();
+        if (header != null && header.getChildren().size() >= 3) {
+            VBox userInfo = (VBox) header.getChildren().get(2);
+            if (userInfo != null && userInfo.getChildren().size() >= 2) {
+                ((Label) userInfo.getChildren().get(0)).setText(updatedUser.getNomComplet());
+            }
+        }
+
+        // Mettre à jour le profil dans la sidebar avec l'image
+        VBox sidebar = (VBox) root.getLeft();
+        if (sidebar != null && sidebar.getChildren().size() > 0) {
+            HBox profileBox = (HBox) sidebar.getChildren().get(0);
+            if (profileBox != null) {
+                // Mettre à jour l'avatar
+                StackPane avatarContainer = (StackPane) profileBox.getChildren().get(0);
+                avatarContainer.getChildren().clear();
+
+                ImageView profileImageView = loadProfileImageForSidebar(updatedUser, 46);
+                if (profileImageView != null) {
+                    avatarContainer.getChildren().add(profileImageView);
+                } else {
+                    Circle avatarCircle = new Circle(23);
+                    avatarCircle.setFill(Color.web("#2196F3"));
+                    String initials = getInitials(updatedUser);
+                    Label avatarText = new Label(initials);
+                    avatarText.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+                    avatarText.setTextFill(Color.WHITE);
+                    avatarContainer.getChildren().addAll(avatarCircle, avatarText);
+                }
+
+                // Mettre à jour les informations
+                if (profileBox.getChildren().size() >= 2) {
+                    VBox profileInfo = (VBox) profileBox.getChildren().get(1);
+                    if (profileInfo != null && profileInfo.getChildren().size() >= 2) {
+                        ((Label) profileInfo.getChildren().get(0)).setText(updatedUser.getPrenom() + " " + updatedUser.getNom());
+                        ((Label) profileInfo.getChildren().get(1)).setText(updatedUser.getEmail());
+                    }
+                }
+            }
+        }
     }
 }

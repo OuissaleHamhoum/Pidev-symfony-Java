@@ -544,7 +544,7 @@ public class ProductDetailView {
         formBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-background-radius: 5;");
 
         Label rateLabel = new Label("Donnez votre avis :");
-        rateLabel.setStyle("-fx-font-weight: bold;");
+        rateLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
 
         // Étoiles
         HBox starBox = new HBox(5);
@@ -578,7 +578,7 @@ public class ProductDetailView {
 
         if (feedbacks.isEmpty()) {
             Label noComments = new Label("Aucun avis pour le moment. Soyez le premier à commenter !");
-            noComments.setStyle("-fx-font-style: italic; -fx-text-fill: #999;");
+            noComments.setStyle("-fx-font-style: italic; -fx-text-fill: #999; ");
             commentsList.getChildren().add(noComments);
         } else {
             for (Feedback f : feedbacks) {
