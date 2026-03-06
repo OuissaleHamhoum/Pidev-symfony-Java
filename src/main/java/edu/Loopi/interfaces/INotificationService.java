@@ -11,8 +11,10 @@ public interface INotificationService {
     void creerNotificationRappel(int idUser, int idEvenement, String eventTitre);
 
     // Création de notifications pour les organisateurs
-    void creerNotificationNouveauParticipant(int idOrganisateur, int idEvenement, String eventTitre, String participantNom, String participantEmail);
-    void creerNotificationParticipantAnnule(int idOrganisateur, int idEvenement, String eventTitre, String participantNom, String participantEmail);
+    void creerNotificationNouveauParticipant(int idOrganisateur, int idEvenement, String eventTitre,
+                                             String participantNom, String participantEmail);
+    void creerNotificationParticipantAnnule(int idOrganisateur, int idEvenement, String eventTitre,
+                                            String participantNom, String participantEmail);
 
     // Gestion des notifications
     List<Notification> getNotificationsByUser(int idUser);

@@ -94,6 +94,54 @@ public class Notification {
         return createdAt.toLocalDateTime().format(formatter);
     }
 
+    public String getIcon() {
+        switch (type) {
+            case "EVENEMENT_APPROUVE":
+                return "✅";
+            case "EVENEMENT_REFUSE":
+                return "❌";
+            case "EVENEMENT_PUBLIE":
+                return "📢";
+            case "NOUVEAU_PARTICIPANT":
+                return "👤";
+            case "PARTICIPANT_ANNULE":
+                return "🚫";
+            case "PARTICIPATION":
+                return "✅";
+            case "ANNULATION":
+                return "❌";
+            case "EVENEMENT_MODIFIE":
+                return "✏️";
+            case "NOUVEL_EVENEMENT_ADMIN":
+                return "📅";
+            default:
+                return "🔔";
+        }
+    }
+
+    public String getColor() {
+        switch (type) {
+            case "EVENEMENT_APPROUVE":
+            case "PARTICIPATION":
+                return "#10b981";
+            case "EVENEMENT_REFUSE":
+            case "ANNULATION":
+                return "#ef4444";
+            case "EVENEMENT_PUBLIE":
+                return "#8b5cf6";
+            case "NOUVEAU_PARTICIPANT":
+                return "#3b82f6";
+            case "PARTICIPANT_ANNULE":
+                return "#f97316";
+            case "EVENEMENT_MODIFIE":
+                return "#f59e0b";
+            case "NOUVEL_EVENEMENT_ADMIN":
+                return "#9b59b6";
+            default:
+                return "#6b7280";
+        }
+    }
+
     @Override
     public String toString() {
         return "Notification{" +

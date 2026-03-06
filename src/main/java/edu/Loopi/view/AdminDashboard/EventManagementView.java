@@ -1,7 +1,6 @@
 package edu.Loopi.view.AdminDashboard;
 
 import edu.Loopi.entities.Event;
-import edu.Loopi.entities.Notification;
 import edu.Loopi.entities.User;
 import edu.Loopi.entities.Participation;
 import edu.Loopi.services.EventService;
@@ -33,7 +32,9 @@ import javafx.util.Duration;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -158,6 +159,7 @@ public class EventManagementView {
         HBox statsBar = new HBox(15);
         statsBar.setPadding(new Insets(15, 0, 5, 0));
         statsBar.setAlignment(Pos.CENTER_LEFT);
+        statsBar.setStyle("-fx-background-color: transparent;");
 
         totalEventsLabel = new Label("0");
         pendingEventsLabel = new Label("0");
@@ -168,7 +170,7 @@ public class EventManagementView {
         totalParticipantsLabel = new Label("0");
 
         statsBar.getChildren().addAll(
-                createStatCard("📊", "Total événements", totalEventsLabel, adminDashboard.getAccentColor()),
+                createStatCard("📊", "Total", totalEventsLabel, adminDashboard.getAccentColor()),
                 createStatCard("⏳", "En attente", pendingEventsLabel, "#f39c12"),
                 createStatCard("✅", "Approuvés", approvedEventsLabel, "#2ecc71"),
                 createStatCard("❌", "Refusés", rejectedEventsLabel, "#e74c3c"),
@@ -186,7 +188,8 @@ public class EventManagementView {
         card.setStyle("-fx-background-color: " + adminDashboard.getCardBg() +
                 "; -fx-background-radius: 12; -fx-border-color: " + color + "; -fx-border-width: 0 0 0 4;");
         card.setAlignment(Pos.CENTER_LEFT);
-        card.setPrefWidth(130);
+        card.setPrefWidth(120);
+        card.setMinWidth(120);
 
         HBox header = new HBox(8);
         header.setAlignment(Pos.CENTER_LEFT);
@@ -211,31 +214,66 @@ public class EventManagementView {
         HBox filterBar = new HBox(15);
         filterBar.setPadding(new Insets(15, 0, 10, 0));
         filterBar.setAlignment(Pos.CENTER_LEFT);
+        filterBar.setStyle("-fx-background-color: transparent;");
 
+        // Bouton d'actualisation avec style amélioré
         Button refreshBtn = new Button("🔄");
         refreshBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
-                "; -fx-text-fill: white; -fx-font-size: 18px; -fx-padding: 8 12; -fx-background-radius: 8; -fx-cursor: hand;");
-        refreshBtn.setTooltip(new Tooltip("Actualiser"));
+                "; -fx-text-fill: white; -fx-font-size: 18px; -fx-min-width: 40px; -fx-min-height: 40px; " +
+                "-fx-background-radius: 8; -fx-cursor: hand; -fx-padding: 0; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 4, 0, 0, 2);");
+        refreshBtn.setTooltip(new Tooltip("Actualiser les données"));
         refreshBtn.setOnAction(e -> refreshData());
 
+        // Barre de recherche améliorée
         HBox searchBox = new HBox(8);
         searchBox.setAlignment(Pos.CENTER_LEFT);
-        searchBox.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#F3F4F6") +
-                "; -fx-background-radius: 20; -fx-padding: 5 15;");
-        searchBox.setPrefWidth(250);
+        searchBox.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
+                "; -fx-background-radius: 25; -fx-padding: 5 15; -fx-border-color: " + adminDashboard.getBorderColor() +
+                "; -fx-border-radius: 25; -fx-border-width: 1;");
+        searchBox.setPrefWidth(300);
+        searchBox.setMinWidth(250);
 
         Label searchIcon = new Label("🔍");
-        searchIcon.setFont(Font.font("System", 14));
+        searchIcon.setFont(Font.font("System", 16));
+        searchIcon.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+        searchIcon.setMinWidth(20);
+        searchIcon.setAlignment(Pos.CENTER);
 
         searchField = new TextField();
         searchField.setPromptText("Rechercher un événement...");
-        searchField.setStyle("-fx-background-color: transparent; -fx-pref-width: 200px; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+        searchField.setStyle("-fx-background-color: transparent; -fx-pref-width: 220px; -fx-font-size: 13px; " +
+                "-fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-prompt-text-fill: " + adminDashboard.getTextColorMuted() + ";");
         searchField.textProperty().addListener((obs, old, nv) -> applyFilters());
 
-        searchBox.getChildren().addAll(searchIcon, searchField);
+        // Bouton pour effacer la recherche
+        Button clearSearchBtn = new Button("✕");
+        clearSearchBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColorMuted() +
+                "; -fx-font-size: 14px; -fx-padding: 0 5; -fx-cursor: hand; -fx-min-width: 20px;");
+        clearSearchBtn.setManaged(false);
+        clearSearchBtn.setVisible(false);
+        clearSearchBtn.setOnAction(e -> {
+            searchField.clear();
+            clearSearchBtn.setManaged(false);
+            clearSearchBtn.setVisible(false);
+        });
+
+        searchField.textProperty().addListener((obs, old, nv) -> {
+            if (nv != null && !nv.isEmpty()) {
+                clearSearchBtn.setManaged(true);
+                clearSearchBtn.setVisible(true);
+            } else {
+                clearSearchBtn.setManaged(false);
+                clearSearchBtn.setVisible(false);
+            }
+        });
+
+        searchBox.getChildren().addAll(searchIcon, searchField, clearSearchBtn);
+        HBox.setHgrow(searchField, Priority.ALWAYS);
 
         Separator sep1 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep1.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() + ";");
+        sep1.setPrefHeight(30);
 
         VBox statusBox = new VBox(2);
         Label statusLabel = new Label("Statut (date)");
@@ -245,14 +283,17 @@ public class EventManagementView {
         statusFilter.getItems().addAll("Tous", "À venir", "En cours", "Passés");
         statusFilter.setValue("Tous");
         statusFilter.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
-                "; -fx-background-radius: 10; -fx-padding: 6 12; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+                "; -fx-background-radius: 20; -fx-padding: 6 15; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 20; -fx-border-width: 1;");
         statusFilter.setPrefWidth(120);
+        statusFilter.setMinWidth(100);
         statusFilter.setOnAction(e -> applyFilters());
 
         statusBox.getChildren().addAll(statusLabel, statusFilter);
 
         Separator sep2 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep2.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() + ";");
+        sep2.setPrefHeight(30);
 
         VBox validationBox = new VBox(2);
         Label validationLabel = new Label("Validation");
@@ -262,14 +303,17 @@ public class EventManagementView {
         validationFilter.getItems().addAll("Tous", "En attente", "Approuvés", "Refusés");
         validationFilter.setValue("Tous");
         validationFilter.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
-                "; -fx-background-radius: 10; -fx-padding: 6 12; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+                "; -fx-background-radius: 20; -fx-padding: 6 15; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 20; -fx-border-width: 1;");
         validationFilter.setPrefWidth(120);
+        validationFilter.setMinWidth(100);
         validationFilter.setOnAction(e -> applyFilters());
 
         validationBox.getChildren().addAll(validationLabel, validationFilter);
 
         Separator sep3 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep3.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() + ";");
+        sep3.setPrefHeight(30);
 
         VBox publicationBox = new VBox(2);
         Label publicationLabel = new Label("Publication");
@@ -279,14 +323,17 @@ public class EventManagementView {
         publicationFilter.getItems().addAll("Tous", "Brouillon", "Publiés");
         publicationFilter.setValue("Tous");
         publicationFilter.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
-                "; -fx-background-radius: 10; -fx-padding: 6 12; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+                "; -fx-background-radius: 20; -fx-padding: 6 15; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 20; -fx-border-width: 1;");
         publicationFilter.setPrefWidth(120);
+        publicationFilter.setMinWidth(100);
         publicationFilter.setOnAction(e -> applyFilters());
 
         publicationBox.getChildren().addAll(publicationLabel, publicationFilter);
 
         Separator sep4 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep4.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() + ";");
+        sep4.setPrefHeight(30);
 
         VBox orgBox = new VBox(2);
         Label orgLabel = new Label("Organisateur");
@@ -302,8 +349,10 @@ public class EventManagementView {
 
         organisateurFilter.setValue("Tous");
         organisateurFilter.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#FFFFFF") +
-                "; -fx-background-radius: 10; -fx-padding: 6 12; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+                "; -fx-background-radius: 20; -fx-padding: 6 15; -fx-font-size: 12px; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 20; -fx-border-width: 1;");
         organisateurFilter.setPrefWidth(150);
+        organisateurFilter.setMinWidth(120);
         organisateurFilter.setOnAction(e -> applyFilters());
 
         orgBox.getChildren().addAll(orgLabel, organisateurFilter);
@@ -311,18 +360,22 @@ public class EventManagementView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button exportBtn = new Button("📥 Exporter CSV");
+        Button exportBtn = new Button("📥 Exporter");
         exportBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 20; -fx-cursor: hand;");
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 20; -fx-cursor: hand; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 4, 0, 0, 2);");
+        exportBtn.setTooltip(new Tooltip("Exporter en CSV"));
         exportBtn.setOnAction(e -> exportEvents());
 
         Button resetBtn = new Button("✕ Réinitialiser");
         resetBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getDangerColor() +
-                "; -fx-border-color: " + adminDashboard.getDangerColor() + "; -fx-border-radius: 20; -fx-padding: 8 16; " +
-                "-fx-cursor: hand; -fx-font-weight: bold;");
+                "; -fx-border-color: " + adminDashboard.getDangerColor() + "; -fx-border-radius: 20; -fx-padding: 8 20; " +
+                "-fx-cursor: hand; -fx-font-weight: bold; -fx-font-size: 12px; -fx-border-width: 1.5;");
+        resetBtn.setTooltip(new Tooltip("Réinitialiser tous les filtres"));
         resetBtn.setOnAction(e -> resetFilters());
 
         filterBar.getChildren().addAll(refreshBtn, searchBox, sep1, statusBox, sep2, validationBox, sep3, publicationBox, sep4, orgBox, spacer, exportBtn, resetBtn);
+
         return filterBar;
     }
 
@@ -343,8 +396,16 @@ public class EventManagementView {
 
         createEventsTable(isDarkMode);
 
-        VBox.setVgrow(eventsTable, Priority.ALWAYS);
-        tableContainer.getChildren().addAll(tableTitle, eventsTable);
+        ScrollPane tableScrollPane = new ScrollPane(eventsTable);
+        tableScrollPane.setFitToWidth(true);
+        tableScrollPane.setFitToHeight(true);
+        tableScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        tableScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        tableScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+        tableScrollPane.setPrefHeight(600);
+
+        VBox.setVgrow(tableScrollPane, Priority.ALWAYS);
+        tableContainer.getChildren().addAll(tableTitle, tableScrollPane);
         centerSection.getChildren().add(tableContainer);
 
         return centerSection;
@@ -354,12 +415,16 @@ public class EventManagementView {
     private void createEventsTable(boolean isDarkMode) {
         eventsTable = new TableView<>();
         eventsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        eventsTable.setPrefHeight(550);
+        eventsTable.setPrefHeight(600);
+        eventsTable.setMinHeight(500);
         eventsTable.setStyle("-fx-background-color: transparent; -fx-border-color: " + adminDashboard.getBorderColor() +
                 "; -fx-border-radius: 8;");
 
+        // Colonne Image
         TableColumn<Event, String> imageCol = new TableColumn<>("Image");
         imageCol.setPrefWidth(80);
+        imageCol.setMinWidth(80);
+        imageCol.setMaxWidth(80);
         imageCol.setCellFactory(col -> new TableCell<Event, String>() {
             private final ImageView imageView = new ImageView();
             {
@@ -386,16 +451,13 @@ public class EventManagementView {
                             if (imgFile.exists()) {
                                 imageView.setImage(new Image(imgFile.toURI().toString()));
                             } else {
-                                imageView.setImage(new Image("https://via.placeholder.com/60x50/" +
-                                        adminDashboard.getAccentColor().substring(1) + "/ffffff?text=📅"));
+                                imageView.setImage(new Image("https://via.placeholder.com/60x50/3182ce/ffffff?text=📅"));
                             }
                         } else {
-                            imageView.setImage(new Image("https://via.placeholder.com/60x50/" +
-                                    adminDashboard.getAccentColor().substring(1) + "/ffffff?text=📅"));
+                            imageView.setImage(new Image("https://via.placeholder.com/60x50/3182ce/ffffff?text=📅"));
                         }
                     } catch (Exception e) {
-                        imageView.setImage(new Image("https://via.placeholder.com/60x50/" +
-                                adminDashboard.getAccentColor().substring(1) + "/ffffff?text=📅"));
+                        imageView.setImage(new Image("https://via.placeholder.com/60x50/3182ce/ffffff?text=📅"));
                     }
                     setGraphic(imageView);
                     setAlignment(Pos.CENTER);
@@ -403,14 +465,19 @@ public class EventManagementView {
             }
         });
 
+        // Colonne ID
         TableColumn<Event, Integer> idCol = new TableColumn<>("ID");
         idCol.setCellValueFactory(new PropertyValueFactory<>("id_evenement"));
         idCol.setPrefWidth(50);
-        idCol.setStyle("-fx-alignment: CENTER;");
+        idCol.setMinWidth(50);
+        idCol.setMaxWidth(50);
+        idCol.setStyle("-fx-alignment: CENTER; -fx-font-weight: bold;");
 
+        // Colonne Titre
         TableColumn<Event, String> titreCol = new TableColumn<>("Titre");
         titreCol.setCellValueFactory(new PropertyValueFactory<>("titre"));
-        titreCol.setPrefWidth(200);
+        titreCol.setPrefWidth(180);
+        titreCol.setMinWidth(150);
         titreCol.setCellFactory(col -> new TableCell<Event, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -419,20 +486,20 @@ public class EventManagementView {
                     setText(null);
                 } else {
                     setText(item);
-                    setWrapText(true);
                     setTooltip(new Tooltip(item));
                 }
             }
         });
 
+        // Colonne Organisateur
         TableColumn<Event, String> organisateurCol = new TableColumn<>("Organisateur");
         organisateurCol.setCellValueFactory(cellData -> {
             User org = userService.getUserById(cellData.getValue().getId_organisateur());
-            return new javafx.beans.property.SimpleStringProperty(
-                    org != null ? org.getPrenom() + " " + org.getNom() : "Inconnu"
-            );
+            String nomComplet = org != null ? org.getPrenom() + " " + org.getNom() : "Inconnu";
+            return new javafx.beans.property.SimpleStringProperty(nomComplet);
         });
-        organisateurCol.setPrefWidth(150);
+        organisateurCol.setPrefWidth(140);
+        organisateurCol.setMinWidth(120);
         organisateurCol.setCellFactory(col -> new TableCell<Event, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -441,35 +508,26 @@ public class EventManagementView {
                     setText(null);
                 } else {
                     setText(item);
-                    setWrapText(true);
                     setTooltip(new Tooltip(item));
                 }
             }
         });
 
+        // Colonne Date
         TableColumn<Event, String> dateCol = new TableColumn<>("Date");
         dateCol.setCellValueFactory(cellData ->
                 new javafx.beans.property.SimpleStringProperty(
                         cellData.getValue().getFormattedDate()
                 ));
-        dateCol.setPrefWidth(150);
+        dateCol.setPrefWidth(130);
+        dateCol.setMinWidth(120);
         dateCol.setStyle("-fx-alignment: CENTER;");
-        dateCol.setCellFactory(col -> new TableCell<Event, String>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item);
-                    setTooltip(new Tooltip(item));
-                }
-            }
-        });
 
+        // Colonne Lieu
         TableColumn<Event, String> lieuCol = new TableColumn<>("Lieu");
         lieuCol.setCellValueFactory(new PropertyValueFactory<>("lieu"));
-        lieuCol.setPrefWidth(150);
+        lieuCol.setPrefWidth(130);
+        lieuCol.setMinWidth(120);
         lieuCol.setCellFactory(col -> new TableCell<Event, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -477,26 +535,30 @@ public class EventManagementView {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(item);
-                    setWrapText(true);
+                    setText(item.length() > 20 ? item.substring(0, 17) + "..." : item);
                     setTooltip(new Tooltip(item));
                 }
             }
         });
 
+        // Colonne Participants
         TableColumn<Event, Integer> participantsCol = new TableColumn<>("Participants");
         participantsCol.setCellValueFactory(new PropertyValueFactory<>("participantsCount"));
-        participantsCol.setPrefWidth(90);
+        participantsCol.setPrefWidth(85);
+        participantsCol.setMinWidth(80);
         participantsCol.setStyle("-fx-alignment: CENTER;");
 
+        // Colonne Capacité
         TableColumn<Event, String> capaciteCol = new TableColumn<>("Capacité");
         capaciteCol.setCellValueFactory(cellData -> {
             Integer cap = cellData.getValue().getCapacite_max();
             return new javafx.beans.property.SimpleStringProperty(cap != null ? cap.toString() : "Illimité");
         });
-        capaciteCol.setPrefWidth(80);
+        capaciteCol.setPrefWidth(70);
+        capaciteCol.setMinWidth(70);
         capaciteCol.setStyle("-fx-alignment: CENTER;");
 
+        // Colonne Statut (date)
         TableColumn<Event, String> statutDateCol = new TableColumn<>("Statut");
         statutDateCol.setCellValueFactory(cellData ->
                 new javafx.beans.property.SimpleStringProperty(cellData.getValue().getStatut()));
@@ -510,10 +572,17 @@ public class EventManagementView {
                     Event event = getTableView().getItems().get(getIndex());
                     String color;
                     switch (item.toLowerCase()) {
-                        case "à venir": color = "#f39c12"; break;
-                        case "en cours": color = "#9b59b6"; break;
-                        case "passé": color = "#6c757d"; break;
-                        default: color = "#6c757d";
+                        case "à venir":
+                            color = "#f39c12";
+                            break;
+                        case "en cours":
+                            color = "#9b59b6";
+                            break;
+                        case "passé":
+                            color = "#6c757d";
+                            break;
+                        default:
+                            color = "#6c757d";
                     }
                     Label badge = new Label(item);
                     badge.setFont(Font.font("System", FontWeight.BOLD, 11));
@@ -521,14 +590,15 @@ public class EventManagementView {
                     badge.setPadding(new Insets(4, 10, 4, 10));
                     badge.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 15;");
                     badge.setTooltip(new Tooltip("Statut: " + item));
-
                     setGraphic(badge);
                     setAlignment(Pos.CENTER);
                 }
             }
         });
-        statutDateCol.setPrefWidth(80);
+        statutDateCol.setPrefWidth(75);
+        statutDateCol.setMinWidth(70);
 
+        // Colonne Validation
         TableColumn<Event, String> validationCol = new TableColumn<>("Validation");
         validationCol.setCellValueFactory(cellData ->
                 new javafx.beans.property.SimpleStringProperty(cellData.getValue().getStatutValidationFr()));
@@ -551,8 +621,10 @@ public class EventManagementView {
                 }
             }
         });
-        validationCol.setPrefWidth(90);
+        validationCol.setPrefWidth(85);
+        validationCol.setMinWidth(80);
 
+        // Colonne Publication
         TableColumn<Event, String> publicationCol = new TableColumn<>("Publication");
         publicationCol.setCellValueFactory(cellData ->
                 new javafx.beans.property.SimpleStringProperty(cellData.getValue().getStatutPublicationFr()));
@@ -576,19 +648,27 @@ public class EventManagementView {
                 }
             }
         });
-        publicationCol.setPrefWidth(90);
+        publicationCol.setPrefWidth(85);
+        publicationCol.setMinWidth(80);
 
+        // Colonne Actions
         TableColumn<Event, Void> actionsCol = new TableColumn<>("Actions");
-        actionsCol.setPrefWidth(400);
+        actionsCol.setPrefWidth(450);
+        actionsCol.setMinWidth(400);
         actionsCol.setCellFactory(col -> new TableCell<Event, Void>() {
             private final Button viewBtn = createActionButton("👁️", "Voir détails", adminDashboard.getAccentColor());
             private final Button editBtn = createActionButton("✏️", "Modifier", adminDashboard.getWarningColor());
             private final Button approveBtn = createActionButton("✅", "Approuver", adminDashboard.getSuccessColor());
             private final Button rejectBtn = createActionButton("❌", "Refuser", adminDashboard.getDangerColor());
             private final Button participantsBtn = createActionButton("👥", "Participants", "#9b59b6");
+            private final Button publishBtn = createActionButton("📢", "Publier", "#2ecc71");
+            private final Button unpublishBtn = createActionButton("🔒", "Dépublier", "#95a5a6");
             private final Button deleteBtn = createActionButton("🗑️", "Supprimer", "#6c757d");
-            private final HBox buttons = new HBox(5, viewBtn, editBtn, approveBtn, rejectBtn, participantsBtn, deleteBtn);
+            private final HBox buttons = new HBox(5, viewBtn, editBtn, approveBtn, rejectBtn, participantsBtn, publishBtn, unpublishBtn, deleteBtn);
+
             {
+                buttons.setAlignment(Pos.CENTER);
+
                 viewBtn.setOnAction(e -> {
                     Event event = getTableView().getItems().get(getIndex());
                     showEventDetails(event);
@@ -614,6 +694,16 @@ public class EventManagementView {
                     showEventParticipants(event);
                 });
 
+                publishBtn.setOnAction(e -> {
+                    Event event = getTableView().getItems().get(getIndex());
+                    confirmPublish(event);
+                });
+
+                unpublishBtn.setOnAction(e -> {
+                    Event event = getTableView().getItems().get(getIndex());
+                    confirmUnpublish(event);
+                });
+
                 deleteBtn.setOnAction(e -> {
                     Event event = getTableView().getItems().get(getIndex());
                     confirmDelete(event);
@@ -628,12 +718,29 @@ public class EventManagementView {
                 } else {
                     Event event = getTableView().getItems().get(getIndex());
 
+                    // Activer/désactiver les boutons selon le statut
                     if ("approuve".equals(event.getStatutValidation())) {
                         approveBtn.setDisable(true);
                         approveBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+
+                        if (event.isEstPublie()) {
+                            publishBtn.setDisable(true);
+                            publishBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                            unpublishBtn.setDisable(false);
+                            unpublishBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                        } else {
+                            publishBtn.setDisable(false);
+                            publishBtn.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                            unpublishBtn.setDisable(true);
+                            unpublishBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                        }
                     } else {
                         approveBtn.setDisable(false);
                         approveBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                        publishBtn.setDisable(true);
+                        publishBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                        unpublishBtn.setDisable(true);
+                        unpublishBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
                     }
 
                     if ("refuse".equals(event.getStatutValidation())) {
@@ -651,15 +758,40 @@ public class EventManagementView {
 
         eventsTable.getColumns().addAll(imageCol, idCol, titreCol, organisateurCol, dateCol, lieuCol,
                 participantsCol, capaciteCol, statutDateCol, validationCol, publicationCol, actionsCol);
+
+        eventsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
     }
 
     private Button createActionButton(String icon, String tooltip, String color) {
         Button btn = new Button(icon);
         btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
         btn.setTooltip(new Tooltip(tooltip));
-        btn.setMinWidth(35);
-        btn.setPrefWidth(35);
+        btn.setMinWidth(40);
+        btn.setPrefWidth(40);
+
+        // Effet hover
+        btn.setOnMouseEntered(e -> {
+            btn.setStyle("-fx-background-color: " + darkenColor(color) + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand; -fx-scale-x: 1.1; -fx-scale-y: 1.1;");
+        });
+
+        btn.setOnMouseExited(e -> {
+            btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+        });
+
         return btn;
+    }
+
+    private String darkenColor(String color) {
+        switch (color) {
+            case "#3182CE": return "#2c5282";
+            case "#f59e0b": return "#b45309";
+            case "#2ecc71": return "#27ae60";
+            case "#ef4444": return "#dc2626";
+            case "#9b59b6": return "#7e3a8b";
+            case "#95a5a6": return "#7f8c8d";
+            case "#6c757d": return "#4b5563";
+            default: return color;
+        }
     }
 
     private void loadEvents() {
@@ -770,32 +902,33 @@ public class EventManagementView {
 
         VBox content = new VBox(20);
         content.setPadding(new Insets(25));
-        content.setPrefWidth(900);
-        content.setPrefHeight(650);
+        content.setPrefWidth(1000);
+        content.setPrefHeight(700);
         content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
 
         Label iconLabel = new Label("👥");
-        iconLabel.setFont(Font.font("System", 32));
+        iconLabel.setFont(Font.font("System", 48));
 
         VBox headerText = new VBox(5);
         Label titleLabel = new Label(event.getTitre() + " - Participants");
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 24));
         titleLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
         Label countLabel = new Label(event.getParticipantsCount() + " participant(s)");
-        countLabel.setFont(Font.font("System", 14));
+        countLabel.setFont(Font.font("System", 16));
         countLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
 
         headerText.getChildren().addAll(titleLabel, countLabel);
         header.getChildren().addAll(iconLabel, headerText);
 
-        HBox statsBox = new HBox(15);
-        statsBox.setPadding(new Insets(15));
+        HBox statsBox = new HBox(20);
+        statsBox.setPadding(new Insets(20));
         statsBox.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#F3F4F6") +
                 "; -fx-background-radius: 12;");
+        statsBox.setAlignment(Pos.CENTER);
 
         VBox inscritsBox = createParticipantStat("📝 Inscrits", String.valueOf(event.getParticipantsInscrits()), "#3b82f6");
         VBox presentsBox = createParticipantStat("✅ Présents", String.valueOf(event.getParticipantsPresents()), "#10b981");
@@ -805,7 +938,7 @@ public class EventManagementView {
 
         TableView<Participation> participantsTable = new TableView<>();
         participantsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        participantsTable.setPrefHeight(350);
+        participantsTable.setPrefHeight(400);
         participantsTable.setStyle("-fx-background-color: transparent; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 8;");
 
         TableColumn<Participation, Integer> idCol = new TableColumn<>("ID");
@@ -819,42 +952,18 @@ public class EventManagementView {
             String nomComplet = user != null ? user.getPrenom() + " " + user.getNom() : "Inconnu";
             return new javafx.beans.property.SimpleStringProperty(nomComplet);
         });
-        nomCol.setPrefWidth(150);
-        nomCol.setCellFactory(col -> new TableCell<Participation, String>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item);
-                    setWrapText(true);
-                }
-            }
-        });
+        nomCol.setPrefWidth(180);
 
         TableColumn<Participation, String> emailCol = new TableColumn<>("Email");
         emailCol.setCellValueFactory(cellData -> {
             User user = userService.getUserById(cellData.getValue().getIdUser());
             return new javafx.beans.property.SimpleStringProperty(user != null ? user.getEmail() : "Inconnu");
         });
-        emailCol.setPrefWidth(180);
-        emailCol.setCellFactory(col -> new TableCell<Participation, String>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item);
-                    setWrapText(true);
-                }
-            }
-        });
+        emailCol.setPrefWidth(200);
 
         TableColumn<Participation, String> contactCol = new TableColumn<>("Contact");
         contactCol.setCellValueFactory(new PropertyValueFactory<>("contact"));
-        contactCol.setPrefWidth(120);
+        contactCol.setPrefWidth(150);
 
         TableColumn<Participation, String> ageCol = new TableColumn<>("Âge");
         ageCol.setCellValueFactory(cellData -> {
@@ -866,6 +975,7 @@ public class EventManagementView {
 
         TableColumn<Participation, String> statutCol = new TableColumn<>("Statut");
         statutCol.setCellValueFactory(new PropertyValueFactory<>("statut"));
+        statutCol.setPrefWidth(100);
         statutCol.setCellFactory(col -> new TableCell<Participation, String>() {
             @Override
             protected void updateItem(String statut, boolean empty) {
@@ -876,7 +986,7 @@ public class EventManagementView {
                     Label badge = new Label(statut.toUpperCase());
                     badge.setFont(Font.font("System", FontWeight.BOLD, 11));
                     badge.setTextFill(Color.WHITE);
-                    badge.setPadding(new Insets(4, 10, 4, 10));
+                    badge.setPadding(new Insets(4, 12, 4, 12));
                     String color = statut.equals("inscrit") ? "#3b82f6" :
                             statut.equals("present") ? "#10b981" : "#ef4444";
                     badge.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 15;");
@@ -885,26 +995,25 @@ public class EventManagementView {
                 }
             }
         });
-        statutCol.setPrefWidth(80);
 
-        TableColumn<Participation, String> dateCol = new TableColumn<>("Date inscription");
+        TableColumn<Participation, String> dateCol = new TableColumn<>("Date d'inscription");
         dateCol.setCellValueFactory(cellData ->
                 new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFormattedDate()));
-        dateCol.setPrefWidth(130);
+        dateCol.setPrefWidth(150);
         dateCol.setStyle("-fx-alignment: CENTER;");
 
         TableColumn<Participation, Void> actionsCol = new TableColumn<>("Actions");
-        actionsCol.setPrefWidth(100);
+        actionsCol.setPrefWidth(120);
         actionsCol.setCellFactory(col -> new TableCell<Participation, Void>() {
             private final Button editBtn = new Button("✏️");
             private final Button deleteBtn = new Button("🗑️");
             private final HBox buttons = new HBox(5, editBtn, deleteBtn);
 
             {
-                editBtn.setStyle("-fx-background-color: " + adminDashboard.getWarningColor() + "; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                editBtn.setStyle("-fx-background-color: " + adminDashboard.getWarningColor() + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
                 editBtn.setTooltip(new Tooltip("Modifier statut"));
 
-                deleteBtn.setStyle("-fx-background-color: " + adminDashboard.getDangerColor() + "; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
+                deleteBtn.setStyle("-fx-background-color: " + adminDashboard.getDangerColor() + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 6 8; -fx-background-radius: 4; -fx-cursor: hand;");
                 deleteBtn.setTooltip(new Tooltip("Supprimer"));
 
                 editBtn.setOnAction(e -> {
@@ -935,7 +1044,7 @@ public class EventManagementView {
         participantsTable.setItems(FXCollections.observableArrayList(participants));
 
         Button closeBtn = new Button("Fermer");
-        closeBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand;");
+        closeBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
         closeBtn.setOnAction(e -> stage.close());
 
         content.getChildren().addAll(header, statsBox, participantsTable, closeBtn);
@@ -949,15 +1058,15 @@ public class EventManagementView {
     private VBox createParticipantStat(String label, String value, String color) {
         VBox box = new VBox(5);
         box.setAlignment(Pos.CENTER);
-        box.setPadding(new Insets(10, 20, 10, 20));
-        box.setStyle("-fx-background-color: white; -fx-background-radius: 8; -fx-border-color: " + color + "; -fx-border-width: 0 0 3 0;");
+        box.setPadding(new Insets(15, 30, 15, 30));
+        box.setStyle("-fx-background-color: white; -fx-background-radius: 10; -fx-border-color: " + color + "; -fx-border-width: 0 0 4 0;");
 
         Label valueLabel = new Label(value);
-        valueLabel.setFont(Font.font("System", FontWeight.BOLD, 18));
+        valueLabel.setFont(Font.font("System", FontWeight.BOLD, 24));
         valueLabel.setTextFill(Color.web(color));
 
         Label labelLabel = new Label(label);
-        labelLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
+        labelLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
         labelLabel.setTextFill(Color.web("#6c757d"));
 
         box.getChildren().addAll(valueLabel, labelLabel);
@@ -972,24 +1081,24 @@ public class EventManagementView {
 
         VBox content = new VBox(20);
         content.setPadding(new Insets(25));
-        content.setPrefWidth(450);
+        content.setPrefWidth(500);
         content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
-        Label title = new Label("Modifier le statut");
-        title.setFont(Font.font("System", FontWeight.BOLD, 18));
+        Label title = new Label("Modifier le statut du participant");
+        title.setFont(Font.font("System", FontWeight.BOLD, 20));
         title.setTextFill(Color.web(adminDashboard.getTextColor()));
 
         User participant = userService.getUserById(participation.getIdUser());
         Label participantName = new Label("Participant: " + (participant != null ? participant.getNomComplet() : "Inconnu"));
-        participantName.setFont(Font.font("System", 13));
-        participantName.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+        participantName.setFont(Font.font("System", 14));
+        participantName.setTextFill(Color.web(adminDashboard.getTextColor()));
 
         ComboBox<String> statutCombo = new ComboBox<>();
         statutCombo.getItems().addAll("inscrit", "present", "absent");
         statutCombo.setValue(participation.getStatut());
         statutCombo.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
                 "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-background-radius: 6; -fx-border-radius: 6; " +
-                "-fx-padding: 8; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+                "-fx-padding: 10; -fx-font-size: 14px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
         statutCombo.setPrefWidth(Double.MAX_VALUE);
 
         HBox buttonBox = new HBox(15);
@@ -998,10 +1107,10 @@ public class EventManagementView {
 
         Button cancelBtn = new Button("Annuler");
         cancelBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColor() +
-                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-padding: 8 20; -fx-cursor: hand;");
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-padding: 10 25; -fx-cursor: hand; -fx-font-size: 14px;");
 
         Button saveBtn = new Button("Enregistrer");
-        saveBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+        saveBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         cancelBtn.setOnAction(e -> dialog.close());
 
@@ -1038,9 +1147,22 @@ public class EventManagementView {
         String participantName = participant != null ? participant.getNomComplet() : "l'utilisateur";
 
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Confirmation");
+        alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer la participation ?");
-        alert.setContentText("Voulez-vous vraiment supprimer la participation de " + participantName + " ?");
+        alert.setContentText("Voulez-vous vraiment supprimer la participation de " + participantName + " ?\nCette action est irréversible.");
+        alert.initOwner(adminDashboard.getPrimaryStage());
+
+        DialogPane dialogPane = alert.getDialogPane();
+        dialogPane.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+
+        Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
+        okButton.setText("Supprimer");
+        okButton.setStyle("-fx-background-color: " + adminDashboard.getDangerColor() +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
+
+        Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
+        cancelButton.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
@@ -1057,287 +1179,64 @@ public class EventManagementView {
         }
     }
 
-    private void showEventDetails(Event event) {
-        Stage dialog = new Stage();
-        dialog.setTitle("Détails de l'événement");
-        dialog.initOwner(adminDashboard.getPrimaryStage());
+    private void confirmPublish(Event event) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirmation de publication");
+        alert.setHeaderText("Publier l'événement");
+        alert.setContentText("Voulez-vous publier \"" + event.getTitre() + "\" ?\nL'événement sera visible par tous les participants.");
+        alert.initOwner(adminDashboard.getPrimaryStage());
 
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(25));
-        content.setPrefWidth(800);
-        content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+        DialogPane dialogPane = alert.getDialogPane();
+        dialogPane.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
-        HBox header = new HBox(15);
-        header.setAlignment(Pos.CENTER_LEFT);
+        Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
+        okButton.setText("Publier");
+        okButton.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
-        Label iconLabel = new Label("📅");
-        iconLabel.setFont(Font.font("System", 32));
+        Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
+        cancelButton.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
-        VBox headerText = new VBox(5);
-        Label titleLabel = new Label(event.getTitre());
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
-        titleLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
-
-        Label idLabel = new Label("ID: " + event.getId_evenement());
-        idLabel.setFont(Font.font("System", 12));
-        idLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
-
-        headerText.getChildren().addAll(titleLabel, idLabel);
-        header.getChildren().addAll(iconLabel, headerText);
-
-        StackPane imageContainer = new StackPane();
-        imageContainer.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#F3F4F6") +
-                "; -fx-background-radius: 10;");
-        imageContainer.setPrefHeight(200);
-
-        ImageView imageView = new ImageView();
-        imageView.setFitWidth(750);
-        imageView.setFitHeight(180);
-        imageView.setPreserveRatio(true);
-
-        try {
-            if (event.getImage_evenement() != null && !event.getImage_evenement().isEmpty()) {
-                String fileName = event.getImage_evenement().substring(event.getImage_evenement().lastIndexOf('/') + 1);
-                File imgFile = new File(FULL_IMAGE_PATH + fileName);
-                if (imgFile.exists()) {
-                    imageView.setImage(new Image(imgFile.toURI().toString()));
-                }
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            if (eventService.publierEvenement(event.getId_evenement())) {
+                adminDashboard.showAlert("Succès", "✅ Événement publié avec succès !");
+                refreshData();
+            } else {
+                adminDashboard.showError("Erreur", "❌ Impossible de publier l'événement");
             }
-        } catch (Exception e) {
-            // Ignorer
         }
-        imageContainer.getChildren().add(imageView);
-
-        GridPane infoGrid = new GridPane();
-        infoGrid.setHgap(20);
-        infoGrid.setVgap(15);
-        infoGrid.setPadding(new Insets(10, 0, 10, 0));
-
-        infoGrid.add(new Label("Description:"), 0, 0);
-        TextArea descArea = new TextArea(event.getDescription());
-        descArea.setWrapText(true);
-        descArea.setEditable(false);
-        descArea.setPrefRowCount(3);
-        descArea.setPrefWidth(600);
-        infoGrid.add(descArea, 1, 0);
-
-        infoGrid.add(new Label("Date:"), 0, 1);
-        Label dateValue = new Label(event.getFormattedDate());
-        dateValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        infoGrid.add(dateValue, 1, 1);
-
-        infoGrid.add(new Label("Lieu:"), 0, 2);
-        Label lieuValue = new Label(event.getLieu());
-        lieuValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        infoGrid.add(lieuValue, 1, 2);
-
-        infoGrid.add(new Label("Organisateur:"), 0, 3);
-        User org = userService.getUserById(event.getId_organisateur());
-        Label orgValue = new Label(org != null ? org.getNomComplet() : "Inconnu");
-        orgValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        infoGrid.add(orgValue, 1, 3);
-
-        infoGrid.add(new Label("Email:"), 0, 4);
-        Label emailValue = new Label(org != null ? org.getEmail() : "Inconnu");
-        emailValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        infoGrid.add(emailValue, 1, 4);
-
-        infoGrid.add(new Label("Capacité:"), 0, 5);
-        String capacite = event.getCapacite_max() != null ? event.getCapacite_max() + " places" : "Illimitée";
-        Label capaciteValue = new Label(capacite + " (" + event.getParticipantsCount() + " inscrits)");
-        capaciteValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        infoGrid.add(capaciteValue, 1, 5);
-
-        infoGrid.add(new Label("Statut validation:"), 0, 6);
-        Label statutValue = new Label(event.getStatutValidationFr());
-        statutValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        statutValue.setStyle("-fx-background-color: " + event.getStatutValidationColor() +
-                "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
-        infoGrid.add(statutValue, 1, 6);
-
-        infoGrid.add(new Label("Publication:"), 0, 7);
-        Label pubValue = new Label(event.getStatutPublicationFr());
-        pubValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        pubValue.setStyle("-fx-background-color: " +
-                (event.isEstPublie() ? "#2ecc71" : "#95a5a6") + "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
-        infoGrid.add(pubValue, 1, 7);
-
-        if (event.getCommentaireValidation() != null && !event.getCommentaireValidation().isEmpty()) {
-            infoGrid.add(new Label("Commentaire:"), 0, 8);
-            Label commentaireValue = new Label(event.getCommentaireValidation());
-            commentaireValue.setWrapText(true);
-            infoGrid.add(commentaireValue, 1, 8);
-        }
-
-        ColumnConstraints col1 = new ColumnConstraints();
-        col1.setPrefWidth(120);
-        ColumnConstraints col2 = new ColumnConstraints();
-        col2.setPrefWidth(600);
-        infoGrid.getColumnConstraints().addAll(col1, col2);
-
-        Label histoTitre = new Label("📋 Historique des actions");
-        histoTitre.setFont(Font.font("System", FontWeight.BOLD, 14));
-        histoTitre.setTextFill(Color.web(adminDashboard.getTextColor()));
-
-        VBox histoBox = new VBox(5);
-        if (event.getDateSoumission() != null) {
-            histoBox.getChildren().add(new Label("• Créé le: " + event.getDateSoumission().toLocalDateTime()
-                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))));
-        }
-        if (event.getDateValidation() != null) {
-            String action = "approuve".equals(event.getStatutValidation()) ? "Approuvé" : "Refusé";
-            histoBox.getChildren().add(new Label("• " + action + " le: " + event.getDateValidation().toLocalDateTime()
-                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))));
-        }
-        if (event.getDatePublication() != null) {
-            histoBox.getChildren().add(new Label("• Publié le: " + event.getDatePublication().toLocalDateTime()
-                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))));
-        }
-
-        content.getChildren().addAll(header, imageContainer, infoGrid);
-
-        if (!histoBox.getChildren().isEmpty()) {
-            content.getChildren().addAll(histoTitre, histoBox);
-        }
-
-        DialogPane dialogPane = new DialogPane();
-        dialogPane.setContent(content);
-        dialogPane.getButtonTypes().add(ButtonType.CLOSE);
-
-        Button closeButton = (Button) dialogPane.lookupButton(ButtonType.CLOSE);
-        closeButton.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
-
-        Scene scene = new Scene(dialogPane, 850, 700);
-        dialog.setScene(scene);
-        dialog.showAndWait();
     }
 
-    private void showEditEventDialog(Event event) {
-        Stage dialog = new Stage();
-        dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle("✏️ Modifier l'événement");
-        dialog.initOwner(adminDashboard.getPrimaryStage());
+    private void confirmUnpublish(Event event) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirmation de dépublication");
+        alert.setHeaderText("Dépublier l'événement");
+        alert.setContentText("Voulez-vous dépublier \"" + event.getTitre() + "\" ?\nL'événement ne sera plus visible par les participants.");
+        alert.initOwner(adminDashboard.getPrimaryStage());
 
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(25));
-        content.setPrefWidth(600);
-        content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+        DialogPane dialogPane = alert.getDialogPane();
+        dialogPane.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
-        Label title = new Label("Modifier l'événement");
-        title.setFont(Font.font("System", FontWeight.BOLD, 20));
-        title.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
+        okButton.setText("Dépublier");
+        okButton.setStyle("-fx-background-color: " + adminDashboard.getWarningColor() +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
-        GridPane grid = new GridPane();
-        grid.setHgap(15);
-        grid.setVgap(15);
-        grid.setPadding(new Insets(10, 0, 10, 0));
+        Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
+        cancelButton.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
-        grid.add(new Label("Titre:"), 0, 0);
-        TextField titreField = new TextField(event.getTitre());
-        titreField.setPrefWidth(400);
-        grid.add(titreField, 1, 0);
-
-        grid.add(new Label("Description:"), 0, 1);
-        TextArea descArea = new TextArea(event.getDescription());
-        descArea.setPrefRowCount(3);
-        descArea.setPrefWidth(400);
-        descArea.setWrapText(true);
-        grid.add(descArea, 1, 1);
-
-        grid.add(new Label("Date:"), 0, 2);
-        DatePicker datePicker = new DatePicker(event.getDate_evenement().toLocalDate());
-        datePicker.setPrefWidth(150);
-        grid.add(datePicker, 1, 2);
-
-        grid.add(new Label("Heure:"), 0, 3);
-        HBox timeBox = new HBox(10);
-        Spinner<Integer> hourSpinner = new Spinner<>(0, 23, event.getDate_evenement().getHour());
-        hourSpinner.setPrefWidth(80);
-        Spinner<Integer> minuteSpinner = new Spinner<>(0, 59, event.getDate_evenement().getMinute());
-        minuteSpinner.setPrefWidth(80);
-        timeBox.getChildren().addAll(hourSpinner, new Label("h"), minuteSpinner);
-        grid.add(timeBox, 1, 3);
-
-        grid.add(new Label("Lieu:"), 0, 4);
-        TextField lieuField = new TextField(event.getLieu());
-        lieuField.setPrefWidth(400);
-        grid.add(lieuField, 1, 4);
-
-        grid.add(new Label("Capacité max:"), 0, 5);
-        HBox capaciteBox = new HBox(10);
-        Spinner<Integer> capaciteSpinner = new Spinner<>(1, 1000,
-                event.getCapacite_max() != null ? event.getCapacite_max() : 50);
-        capaciteSpinner.setEditable(true);
-        capaciteSpinner.setPrefWidth(100);
-
-        CheckBox capaciteIllimitee = new CheckBox("Illimitée");
-        if (event.getCapacite_max() == null) {
-            capaciteIllimitee.setSelected(true);
-            capaciteSpinner.setDisable(true);
-        }
-
-        capaciteIllimitee.setOnAction(e -> {
-            if (capaciteIllimitee.isSelected()) {
-                capaciteSpinner.setDisable(true);
-                capaciteSpinner.getValueFactory().setValue(null);
-            } else {
-                capaciteSpinner.setDisable(false);
-                capaciteSpinner.getValueFactory().setValue(50);
-            }
-        });
-
-        capaciteBox.getChildren().addAll(capaciteSpinner, capaciteIllimitee);
-        grid.add(capaciteBox, 1, 5);
-
-        ColumnConstraints col1 = new ColumnConstraints();
-        col1.setPrefWidth(100);
-        ColumnConstraints col2 = new ColumnConstraints();
-        col2.setPrefWidth(450);
-        grid.getColumnConstraints().addAll(col1, col2);
-
-        HBox buttonBox = new HBox(15);
-        buttonBox.setAlignment(Pos.CENTER_RIGHT);
-        buttonBox.setPadding(new Insets(10, 0, 0, 0));
-
-        Button cancelBtn = new Button("Annuler");
-        cancelBtn.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
-                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
-
-        Button saveBtn = new Button("Enregistrer");
-        saveBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
-
-        saveBtn.setOnAction(e -> {
-            event.setTitre(titreField.getText());
-            event.setDescription(descArea.getText());
-            event.setDate_evenement(LocalDateTime.of(datePicker.getValue(),
-                    LocalDateTime.of(0, 1, 1, hourSpinner.getValue(), minuteSpinner.getValue()).toLocalTime()));
-            event.setLieu(lieuField.getText());
-
-            if (!capaciteIllimitee.isSelected()) {
-                event.setCapacite_max(capaciteSpinner.getValue());
-            } else {
-                event.setCapacite_max(null);
-            }
-
-            if (eventService.updateEvent(event)) {
-                adminDashboard.showAlert("Succès", "✅ Événement modifié avec succès !");
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            if (eventService.depublierEvenement(event.getId_evenement())) {
+                adminDashboard.showAlert("Succès", "✅ Événement dépublié avec succès !");
                 refreshData();
-                dialog.close();
             } else {
-                adminDashboard.showError("Erreur", "❌ Impossible de modifier l'événement");
+                adminDashboard.showError("Erreur", "❌ Impossible de dépublier l'événement");
             }
-        });
-
-        cancelBtn.setOnAction(e -> dialog.close());
-
-        VBox mainContent = new VBox(10, grid, buttonBox);
-        content.getChildren().addAll(title, mainContent);
-
-        Scene scene = new Scene(content);
-        dialog.setScene(scene);
-        dialog.showAndWait();
+        }
     }
 
     private void showApproveDialog(Event event) {
@@ -1347,16 +1246,23 @@ public class EventManagementView {
         dialog.initOwner(adminDashboard.getPrimaryStage());
 
         VBox content = new VBox(15);
-        content.setPadding(new Insets(20));
-        content.setPrefWidth(450);
+        content.setPadding(new Insets(25));
+        content.setPrefWidth(500);
+        content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
         Label infoLabel = new Label("Vous êtes sur le point d'approuver cet événement. " +
                 "Il pourra ensuite être publié par l'organisateur pour être visible par les participants.");
         infoLabel.setWrapText(true);
+        infoLabel.setFont(Font.font("System", 13));
+        infoLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
         TextArea commentaireArea = new TextArea();
         commentaireArea.setPromptText("Commentaire pour l'organisateur (optionnel)");
-        commentaireArea.setPrefRowCount(3);
+        commentaireArea.setPrefRowCount(4);
+        commentaireArea.setWrapText(true);
+        commentaireArea.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-prompt-text-fill: " + adminDashboard.getTextColorMuted() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6;");
 
         content.getChildren().addAll(infoLabel, new Label("Commentaire:"), commentaireArea);
 
@@ -1367,11 +1273,11 @@ public class EventManagementView {
         Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
         okButton.setText("Approuver");
         okButton.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
         cancelButton.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
-                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         dialog.setResultConverter(button -> {
             if (button == ButtonType.OK) {
@@ -1398,16 +1304,23 @@ public class EventManagementView {
         dialog.initOwner(adminDashboard.getPrimaryStage());
 
         VBox content = new VBox(15);
-        content.setPadding(new Insets(20));
-        content.setPrefWidth(450);
+        content.setPadding(new Insets(25));
+        content.setPrefWidth(500);
+        content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
         Label infoLabel = new Label("Veuillez indiquer le motif du refus. " +
                 "Ce message sera envoyé à l'organisateur.");
         infoLabel.setWrapText(true);
+        infoLabel.setFont(Font.font("System", 13));
+        infoLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
         TextArea motifArea = new TextArea();
         motifArea.setPromptText("Motif du refus (obligatoire)");
-        motifArea.setPrefRowCount(4);
+        motifArea.setPrefRowCount(5);
+        motifArea.setWrapText(true);
+        motifArea.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-prompt-text-fill: " + adminDashboard.getTextColorMuted() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6;");
 
         content.getChildren().addAll(infoLabel, new Label("Motif du refus *"), motifArea);
 
@@ -1418,11 +1331,11 @@ public class EventManagementView {
         Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
         okButton.setText("Refuser");
         okButton.setStyle("-fx-background-color: " + adminDashboard.getDangerColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
         cancelButton.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
-                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         final Button ok = okButton;
         ok.addEventFilter(javafx.event.ActionEvent.ACTION, actionEvent -> {
@@ -1431,6 +1344,7 @@ public class EventManagementView {
                 alert.setTitle("Validation");
                 alert.setHeaderText(null);
                 alert.setContentText("Le motif du refus est obligatoire !");
+                alert.initOwner(adminDashboard.getPrimaryStage());
                 alert.showAndWait();
                 actionEvent.consume();
             }
@@ -1454,11 +1368,636 @@ public class EventManagementView {
         });
     }
 
+    /**
+     * Affiche la boîte de dialogue de modification d'événement
+     * Format compact avec tous les détails et boutons Enregistrer/Annuler
+     */
+    private void showEditEventDialog(Event event) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("✏️ Modifier l'événement");
+        dialog.initOwner(adminDashboard.getPrimaryStage());
+        dialog.setResizable(false);
+
+        BorderPane root = new BorderPane();
+        root.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+
+        // Header avec dégradé
+        HBox header = new HBox(15);
+        header.setPadding(new Insets(20, 25, 20, 25));
+        header.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
+                "; -fx-background-radius: 12 12 0 0;");
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label headerIcon = new Label("✏️");
+        headerIcon.setFont(Font.font("System", 32));
+        headerIcon.setTextFill(Color.WHITE);
+
+        VBox headerText = new VBox(3);
+        Label headerTitle = new Label("Modifier l'événement");
+        headerTitle.setFont(Font.font("System", FontWeight.BOLD, 20));
+        headerTitle.setTextFill(Color.WHITE);
+
+        Label headerSubtitle = new Label("ID: " + event.getId_evenement() + " • " + event.getStatutValidationFr());
+        headerSubtitle.setFont(Font.font("System", 12));
+        headerSubtitle.setTextFill(Color.web("#e0e0e0"));
+
+        headerText.getChildren().addAll(headerTitle, headerSubtitle);
+        header.getChildren().addAll(headerIcon, headerText);
+
+        // Formulaire
+        VBox form = new VBox(20);
+        form.setPadding(new Insets(25));
+        form.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+
+        // Titre
+        VBox titleBox = new VBox(3);
+        Label titleLabel = new Label("📝 Titre *");
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        titleLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        TextField titreField = new TextField(event.getTitre());
+        titreField.setPromptText("Ex: Nettoyage de la plage");
+        titreField.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-padding: 10 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+        titreField.setPrefWidth(500);
+
+        Label titreError = new Label();
+        titreError.setFont(Font.font("System", 11));
+        titreError.setTextFill(Color.web(adminDashboard.getDangerColor()));
+        titreError.setVisible(false);
+        titreError.setWrapText(true);
+
+        titleBox.getChildren().addAll(titleLabel, titreField, titreError);
+
+        // Description
+        VBox descBox = new VBox(3);
+        Label descLabel = new Label("📄 Description *");
+        descLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        descLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        TextArea descArea = new TextArea(event.getDescription());
+        descArea.setPromptText("Décrivez votre événement...");
+        descArea.setPrefRowCount(4);
+        descArea.setWrapText(true);
+        descArea.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-padding: 10 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+
+        Label descError = new Label();
+        descError.setFont(Font.font("System", 11));
+        descError.setTextFill(Color.web(adminDashboard.getDangerColor()));
+        descError.setVisible(false);
+        descError.setWrapText(true);
+
+        descBox.getChildren().addAll(descLabel, descArea, descError);
+
+        // Date et Heure
+        VBox dateBox = new VBox(3);
+        Label dateLabel = new Label("📅 Date & Heure *");
+        dateLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        dateLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        HBox dateTimeBox = new HBox(10);
+        dateTimeBox.setAlignment(Pos.CENTER_LEFT);
+
+        DatePicker datePicker = new DatePicker(event.getDate_evenement().toLocalDate());
+        datePicker.setPrefWidth(150);
+        datePicker.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-padding: 8 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+
+        Spinner<Integer> hourSpinner = new Spinner<>(0, 23, event.getDate_evenement().getHour());
+        hourSpinner.setPrefWidth(80);
+        hourSpinner.setEditable(true);
+        hourSpinner.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-text-fill: " + adminDashboard.getTextColor() + ";");
+
+        Spinner<Integer> minuteSpinner = new Spinner<>(0, 59, event.getDate_evenement().getMinute());
+        minuteSpinner.setPrefWidth(80);
+        minuteSpinner.setEditable(true);
+        minuteSpinner.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-text-fill: " + adminDashboard.getTextColor() + ";");
+
+        Label separatorLabel = new Label("h");
+        separatorLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        separatorLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        dateTimeBox.getChildren().addAll(datePicker, hourSpinner, separatorLabel, minuteSpinner);
+
+        Label dateError = new Label();
+        dateError.setFont(Font.font("System", 11));
+        dateError.setTextFill(Color.web(adminDashboard.getDangerColor()));
+        dateError.setVisible(false);
+        dateError.setWrapText(true);
+
+        dateBox.getChildren().addAll(dateLabel, dateTimeBox, dateError);
+
+        // Lieu
+        VBox lieuBox = new VBox(3);
+        Label lieuLabel = new Label("📍 Lieu *");
+        lieuLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        lieuLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        TextField lieuField = new TextField(event.getLieu());
+        lieuField.setPromptText("Ex: Plage de Sousse");
+        lieuField.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-padding: 10 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
+        lieuField.setPrefWidth(500);
+
+        Label lieuError = new Label();
+        lieuError.setFont(Font.font("System", 11));
+        lieuError.setTextFill(Color.web(adminDashboard.getDangerColor()));
+        lieuError.setVisible(false);
+        lieuError.setWrapText(true);
+
+        lieuBox.getChildren().addAll(lieuLabel, lieuField, lieuError);
+
+        // Capacité
+        VBox capaciteBox = new VBox(3);
+        Label capaciteLabel = new Label("👥 Capacité max");
+        capaciteLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        capaciteLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        HBox capaciteControl = new HBox(10);
+        capaciteControl.setAlignment(Pos.CENTER_LEFT);
+
+        Spinner<Integer> capaciteSpinner = new Spinner<>(1, 1000,
+                event.getCapacite_max() != null ? event.getCapacite_max() : 50);
+        capaciteSpinner.setEditable(true);
+        capaciteSpinner.setPrefWidth(100);
+        capaciteSpinner.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
+                "-fx-text-fill: " + adminDashboard.getTextColor() + ";");
+
+        CheckBox capaciteIllimitee = new CheckBox("Illimitée");
+        capaciteIllimitee.setTextFill(Color.web(adminDashboard.getTextColor()));
+        if (event.getCapacite_max() == null) {
+            capaciteIllimitee.setSelected(true);
+            capaciteSpinner.setDisable(true);
+        }
+
+        capaciteIllimitee.setOnAction(e -> {
+            if (capaciteIllimitee.isSelected()) {
+                capaciteSpinner.setDisable(true);
+                capaciteSpinner.getValueFactory().setValue(null);
+            } else {
+                capaciteSpinner.setDisable(false);
+                capaciteSpinner.getValueFactory().setValue(50);
+            }
+        });
+
+        capaciteControl.getChildren().addAll(capaciteSpinner, capaciteIllimitee);
+        capaciteBox.getChildren().addAll(capaciteLabel, capaciteControl);
+
+        // Assemblage du formulaire
+        form.getChildren().addAll(titleBox, descBox, dateBox, lieuBox, capaciteBox);
+
+        // ScrollPane pour le formulaire
+        ScrollPane scrollPane = new ScrollPane(form);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setPrefViewportHeight(450);
+
+        // Boutons
+        HBox buttonBox = new HBox(15);
+        buttonBox.setPadding(new Insets(15, 25, 25, 25));
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.setStyle("-fx-background-color: " + adminDashboard.getCardBg() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-width: 1 0 0 0;");
+
+        Button cancelBtn = new Button("Annuler");
+        cancelBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColor() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-padding: 10 25; -fx-cursor: hand; -fx-font-weight: bold; -fx-font-size: 14px;");
+        cancelBtn.setOnAction(e -> dialog.close());
+
+        Button saveBtn = new Button("💾 Enregistrer");
+        saveBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
+
+        saveBtn.setOnAction(e -> {
+            // Réinitialiser les messages d'erreur
+            titreError.setVisible(false);
+            descError.setVisible(false);
+            dateError.setVisible(false);
+            lieuError.setVisible(false);
+
+            boolean isValid = true;
+
+            // Validation du titre
+            String titre = titreField.getText().trim();
+            if (titre.isEmpty()) {
+                titreError.setText("🔴 Le titre est obligatoire");
+                titreError.setVisible(true);
+                isValid = false;
+            } else if (titre.length() < 3) {
+                titreError.setText("🔴 Minimum 3 caractères");
+                titreError.setVisible(true);
+                isValid = false;
+            }
+
+            // Validation de la description
+            String description = descArea.getText().trim();
+            if (description.isEmpty()) {
+                descError.setText("🔴 La description est obligatoire");
+                descError.setVisible(true);
+                isValid = false;
+            } else if (description.length() < 10) {
+                descError.setText("🔴 Minimum 10 caractères");
+                descError.setVisible(true);
+                isValid = false;
+            }
+
+            // Validation de la date
+            LocalDate date = datePicker.getValue();
+            if (date == null) {
+                dateError.setText("🔴 La date est obligatoire");
+                dateError.setVisible(true);
+                isValid = false;
+            } else {
+                LocalDateTime eventDateTime = LocalDateTime.of(date,
+                        LocalTime.of(hourSpinner.getValue(), minuteSpinner.getValue()));
+                if (eventDateTime.isBefore(LocalDateTime.now())) {
+                    dateError.setText("🔴 Date future requise");
+                    dateError.setVisible(true);
+                    isValid = false;
+                }
+            }
+
+            // Validation du lieu
+            String lieu = lieuField.getText().trim();
+            if (lieu.isEmpty()) {
+                lieuError.setText("🔴 Le lieu est obligatoire");
+                lieuError.setVisible(true);
+                isValid = false;
+            } else if (lieu.length() < 3) {
+                lieuError.setText("🔴 Minimum 3 caractères");
+                lieuError.setVisible(true);
+                isValid = false;
+            }
+
+            if (!isValid) return;
+
+            // Mise à jour de l'événement
+            event.setTitre(titre);
+            event.setDescription(description);
+            event.setDate_evenement(LocalDateTime.of(datePicker.getValue(),
+                    LocalTime.of(hourSpinner.getValue(), minuteSpinner.getValue())));
+            event.setLieu(lieu);
+
+            if (!capaciteIllimitee.isSelected()) {
+                event.setCapacite_max(capaciteSpinner.getValue());
+            } else {
+                event.setCapacite_max(null);
+            }
+
+            if (eventService.updateEvent(event)) {
+                adminDashboard.showAlert("Succès", "✅ Événement modifié avec succès !");
+                refreshData();
+                dialog.close();
+            } else {
+                adminDashboard.showError("Erreur", "❌ Impossible de modifier l'événement");
+            }
+        });
+
+        buttonBox.getChildren().addAll(cancelBtn, saveBtn);
+
+        // Assemblage final
+        root.setTop(header);
+        root.setCenter(scrollPane);
+        root.setBottom(buttonBox);
+
+        Scene scene = new Scene(root, 650, 700);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
+    /**
+     * Affiche la boîte de dialogue des détails de l'événement
+     * Format compact avec tous les détails bien organisés
+     */
+    private void showEventDetails(Event event) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Détails de l'événement");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.initOwner(adminDashboard.getPrimaryStage());
+        dialog.setResizable(false);
+
+        BorderPane root = new BorderPane();
+        root.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+
+        // Header avec dégradé
+        HBox header = new HBox(15);
+        header.setPadding(new Insets(20, 25, 20, 25));
+        header.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
+                "; -fx-background-radius: 12 12 0 0;");
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label headerIcon = new Label("📅");
+        headerIcon.setFont(Font.font("System", 32));
+        headerIcon.setTextFill(Color.WHITE);
+
+        VBox headerText = new VBox(3);
+        Label headerTitle = new Label(event.getTitre());
+        headerTitle.setFont(Font.font("System", FontWeight.BOLD, 20));
+        headerTitle.setTextFill(Color.WHITE);
+
+        Label headerSubtitle = new Label("ID: " + event.getId_evenement() + " • " + event.getStatutValidationFr());
+        headerSubtitle.setFont(Font.font("System", 12));
+        headerSubtitle.setTextFill(Color.web("#e0e0e0"));
+
+        headerText.getChildren().addAll(headerTitle, headerSubtitle);
+        header.getChildren().addAll(headerIcon, headerText);
+
+        // Contenu principal
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(25));
+        content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
+
+        // Image
+        StackPane imageContainer = new StackPane();
+        imageContainer.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#F3F4F6") +
+                "; -fx-background-radius: 10;");
+        imageContainer.setPrefHeight(180);
+        imageContainer.setMinHeight(180);
+
+        ImageView imageView = new ImageView();
+        imageView.setFitWidth(550);
+        imageView.setFitHeight(160);
+        imageView.setPreserveRatio(true);
+
+        try {
+            if (event.getImage_evenement() != null && !event.getImage_evenement().isEmpty()) {
+                String fileName = event.getImage_evenement().substring(event.getImage_evenement().lastIndexOf('/') + 1);
+                File imgFile = new File(FULL_IMAGE_PATH + fileName);
+                if (imgFile.exists()) {
+                    imageView.setImage(new Image(imgFile.toURI().toString()));
+                } else {
+                    imageView.setImage(new Image("https://via.placeholder.com/550x160/3182ce/ffffff?text=" + event.getTitre()));
+                }
+            } else {
+                imageView.setImage(new Image("https://via.placeholder.com/550x160/3182ce/ffffff?text=" + event.getTitre()));
+            }
+        } catch (Exception e) {
+            imageView.setImage(new Image("https://via.placeholder.com/550x160/3182ce/ffffff?text=" + event.getTitre()));
+        }
+
+        Rectangle clip = new Rectangle(550, 160);
+        clip.setArcWidth(15);
+        clip.setArcHeight(15);
+        imageView.setClip(clip);
+        imageContainer.getChildren().add(imageView);
+
+        // Description
+        VBox descBox = new VBox(8);
+        Label descLabel = new Label("📝 Description");
+        descLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        descLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        TextArea descArea = new TextArea(event.getDescription());
+        descArea.setWrapText(true);
+        descArea.setEditable(false);
+        descArea.setPrefRowCount(3);
+        descArea.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#F3F4F6") +
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-border-color: " + adminDashboard.getBorderColor() +
+                "; -fx-border-radius: 6; -fx-padding: 10;");
+
+        descBox.getChildren().addAll(descLabel, descArea);
+
+        // Grille d'informations
+        GridPane infoGrid = new GridPane();
+        infoGrid.setHgap(20);
+        infoGrid.setVgap(15);
+        infoGrid.setPadding(new Insets(10, 0, 10, 0));
+
+        // Ligne 1: Date
+        Label dateIcon = new Label("📅");
+        dateIcon.setFont(Font.font("System", 16));
+        Label dateLabel = new Label("Date :");
+        dateLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        dateLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label dateValue = new Label(event.getFormattedDate());
+        dateValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        dateValue.setTextFill(Color.web(adminDashboard.getAccentColor()));
+
+        HBox dateRow = new HBox(10);
+        dateRow.setAlignment(Pos.CENTER_LEFT);
+        dateRow.getChildren().addAll(dateIcon, dateLabel, dateValue);
+
+        // Ligne 2: Lieu
+        Label lieuIcon = new Label("📍");
+        lieuIcon.setFont(Font.font("System", 16));
+        Label lieuLabelTitle = new Label("Lieu :");
+        lieuLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        lieuLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label lieuValue = new Label(event.getLieu());
+        lieuValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        lieuValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+        lieuValue.setWrapText(true);
+
+        HBox lieuRow = new HBox(10);
+        lieuRow.setAlignment(Pos.CENTER_LEFT);
+        lieuRow.getChildren().addAll(lieuIcon, lieuLabelTitle, lieuValue);
+
+        // Ligne 3: Organisateur
+        User org = userService.getUserById(event.getId_organisateur());
+        Label orgIcon = new Label("👤");
+        orgIcon.setFont(Font.font("System", 16));
+        Label orgLabelTitle = new Label("Organisateur :");
+        orgLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        orgLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label orgValue = new Label(org != null ? org.getNomComplet() : "Inconnu");
+        orgValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        orgValue.setTextFill(Color.web(adminDashboard.getSuccessColor()));
+
+        HBox orgRow = new HBox(10);
+        orgRow.setAlignment(Pos.CENTER_LEFT);
+        orgRow.getChildren().addAll(orgIcon, orgLabelTitle, orgValue);
+
+        // Ligne 4: Email
+        Label emailIcon = new Label("📧");
+        emailIcon.setFont(Font.font("System", 16));
+        Label emailLabelTitle = new Label("Email :");
+        emailLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        emailLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label emailValue = new Label(org != null ? org.getEmail() : "Inconnu");
+        emailValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        emailValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        HBox emailRow = new HBox(10);
+        emailRow.setAlignment(Pos.CENTER_LEFT);
+        emailRow.getChildren().addAll(emailIcon, emailLabelTitle, emailValue);
+
+        // Ligne 5: Capacité
+        Label capIcon = new Label("👥");
+        capIcon.setFont(Font.font("System", 16));
+        Label capLabelTitle = new Label("Capacité :");
+        capLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        capLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+        String capacite = event.getCapacite_max() != null ? event.getCapacite_max() + " places" : "Illimitée";
+        Label capValue = new Label(capacite + " (" + event.getParticipantsCount() + " inscrits)");
+        capValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        capValue.setTextFill(Color.web(adminDashboard.getWarningColor()));
+
+        HBox capRow = new HBox(10);
+        capRow.setAlignment(Pos.CENTER_LEFT);
+        capRow.getChildren().addAll(capIcon, capLabelTitle, capValue);
+
+        // Ligne 6: Statut validation
+        Label statutIcon = new Label("✅");
+        statutIcon.setFont(Font.font("System", 16));
+        Label statutLabelTitle = new Label("Validation :");
+        statutLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        statutLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label statutValue = new Label(event.getStatutValidationFr());
+        statutValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        statutValue.setStyle("-fx-background-color: " + event.getStatutValidationColor() +
+                "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
+
+        HBox statutRow = new HBox(10);
+        statutRow.setAlignment(Pos.CENTER_LEFT);
+        statutRow.getChildren().addAll(statutIcon, statutLabelTitle, statutValue);
+
+        // Ligne 7: Publication
+        Label pubIcon = new Label("📢");
+        pubIcon.setFont(Font.font("System", 16));
+        Label pubLabelTitle = new Label("Publication :");
+        pubLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        pubLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label pubValue = new Label(event.getStatutPublicationFr());
+        pubValue.setFont(Font.font("System", FontWeight.BOLD, 13));
+        pubValue.setStyle("-fx-background-color: " +
+                (event.isEstPublie() ? "#2ecc71" : "#95a5a6") + "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
+
+        HBox pubRow = new HBox(10);
+        pubRow.setAlignment(Pos.CENTER_LEFT);
+        pubRow.getChildren().addAll(pubIcon, pubLabelTitle, pubValue);
+
+        // Ajouter toutes les lignes à la grille
+        VBox infoBox = new VBox(15);
+        infoBox.getChildren().addAll(dateRow, lieuRow, orgRow, emailRow, capRow, statutRow, pubRow);
+
+        // Commentaire de validation (si existe)
+        if (event.getCommentaireValidation() != null && !event.getCommentaireValidation().isEmpty()) {
+            Separator sep = new Separator();
+            sep.setPadding(new Insets(10, 0, 10, 0));
+
+            Label commentIcon = new Label("💬");
+            commentIcon.setFont(Font.font("System", 16));
+            Label commentLabelTitle = new Label("Commentaire :");
+            commentLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+            commentLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+            Label commentValue = new Label(event.getCommentaireValidation());
+            commentValue.setWrapText(true);
+            commentValue.setFont(Font.font("System", 13));
+            commentValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+            HBox commentRow = new HBox(10);
+            commentRow.setAlignment(Pos.TOP_LEFT);
+            commentRow.getChildren().addAll(commentIcon, commentLabelTitle, commentValue);
+            VBox.setMargin(commentRow, new Insets(5, 0, 0, 0));
+
+            infoBox.getChildren().addAll(sep, commentRow);
+        }
+
+        // Historique
+        Separator histoSep = new Separator();
+        histoSep.setPadding(new Insets(15, 0, 10, 0));
+
+        Label histoIcon = new Label("📋");
+        histoIcon.setFont(Font.font("System", 16));
+        Label histoLabel = new Label("Historique");
+        histoLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        histoLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        HBox histoTitle = new HBox(10);
+        histoTitle.setAlignment(Pos.CENTER_LEFT);
+        histoTitle.getChildren().addAll(histoIcon, histoLabel);
+
+        VBox histoBox = new VBox(8);
+        histoBox.setPadding(new Insets(10, 0, 0, 25));
+
+        if (event.getDateSoumission() != null) {
+            Label soumissionLabel = new Label("• Créé le: " + event.getDateSoumission().toLocalDateTime()
+                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+            soumissionLabel.setFont(Font.font("System", 12));
+            soumissionLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+            histoBox.getChildren().add(soumissionLabel);
+        }
+        if (event.getDateValidation() != null) {
+            String action = "approuve".equals(event.getStatutValidation()) ? "Approuvé" : "Refusé";
+            Label validationLabel = new Label("• " + action + " le: " + event.getDateValidation().toLocalDateTime()
+                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+            validationLabel.setFont(Font.font("System", 12));
+            validationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+            histoBox.getChildren().add(validationLabel);
+        }
+        if (event.getDatePublication() != null) {
+            Label publicationLabel = new Label("• Publié le: " + event.getDatePublication().toLocalDateTime()
+                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+            publicationLabel.setFont(Font.font("System", 12));
+            publicationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+            histoBox.getChildren().add(publicationLabel);
+        }
+
+        // Assemblage du contenu
+        VBox mainContent = new VBox(15);
+        mainContent.getChildren().addAll(imageContainer, descBox, infoBox);
+
+        if (event.getCommentaireValidation() != null && !event.getCommentaireValidation().isEmpty()) {
+            // Déjà ajouté dans infoBox
+        }
+
+        if (!histoBox.getChildren().isEmpty()) {
+            mainContent.getChildren().addAll(histoSep, histoTitle, histoBox);
+        }
+
+        content.getChildren().add(mainContent);
+
+        // ScrollPane pour le contenu
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setPrefViewportHeight(500);
+
+        // Bouton Fermer
+        HBox buttonBox = new HBox();
+        buttonBox.setPadding(new Insets(15, 25, 25, 25));
+        buttonBox.setAlignment(Pos.CENTER);
+        buttonBox.setStyle("-fx-background-color: " + adminDashboard.getCardBg() +
+                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-width: 1 0 0 0;");
+
+        Button closeBtn = new Button("Fermer");
+        closeBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 40; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
+        closeBtn.setOnAction(e -> dialog.close());
+
+        buttonBox.getChildren().add(closeBtn);
+
+        // Assemblage final
+        root.setTop(header);
+        root.setCenter(scrollPane);
+        root.setBottom(buttonBox);
+
+        Scene scene = new Scene(root, 650, 750);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
     private void confirmDelete(Event event) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Confirmation");
+        alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer l'événement ?");
-        alert.setContentText("Êtes-vous sûr de vouloir supprimer définitivement \"" + event.getTitre() + "\" ?\nCette action est irréversible.");
+        alert.setContentText("Êtes-vous sûr de vouloir supprimer définitivement \"" + event.getTitre() + "\" ?\nCette action est irréversible et supprimera toutes les participations associées.");
+        alert.initOwner(adminDashboard.getPrimaryStage());
 
         DialogPane dialogPane = alert.getDialogPane();
         dialogPane.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
@@ -1466,11 +2005,11 @@ public class EventManagementView {
         Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
         okButton.setText("Supprimer");
         okButton.setStyle("-fx-background-color: " + adminDashboard.getDangerColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
         cancelButton.setStyle("-fx-background-color: " + adminDashboard.getBorderColor() +
-                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+                "; -fx-text-fill: " + adminDashboard.getTextColor() + "; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {

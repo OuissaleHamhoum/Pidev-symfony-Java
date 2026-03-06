@@ -15,61 +15,28 @@ public class NotificationService implements INotificationService {
 
     public NotificationService() {
         this.connection = MyConnection.getInstance().getConnection();
-        createNotificationsTable();
-    }
-
-    private void createNotificationsTable() {
-        String sql = "CREATE TABLE IF NOT EXISTS notifications (" +
-                "id INT AUTO_INCREMENT PRIMARY KEY," +
-                "id_user INT NOT NULL," +
-                "type VARCHAR(50) NOT NULL," +
-                "titre VARCHAR(200) NOT NULL," +
-                "message TEXT NOT NULL," +
-                "is_read BOOLEAN DEFAULT FALSE," +
-                "id_evenement INT," +
-                "id_participation INT," +
-                "nom_organisateur VARCHAR(200)," +
-                "email_organisateur VARCHAR(200)," +
-                "nom_participant VARCHAR(200)," +
-                "email_participant VARCHAR(200)," +
-                "nom_admin VARCHAR(200)," +
-                "email_admin VARCHAR(200)," +
-                "commentaire TEXT," +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
-                "FOREIGN KEY (id_user) REFERENCES users(id) ON DELETE CASCADE," +
-                "FOREIGN KEY (id_evenement) REFERENCES evenement(id_evenement) ON DELETE CASCADE," +
-                "INDEX idx_user_read (id_user, is_read)," +
-                "INDEX idx_created (created_at)" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
-
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute(sql);
-            System.out.println("✅ Table 'notifications' vérifiée/créée");
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur création table notifications: " + e.getMessage());
-        }
     }
 
     @Override
     public void creerNotificationParticipation(int idUser, int idEvenement, String eventTitre) {
         String titre = "✅ Nouvelle participation";
-        String message = eventTitre;
+        String message = "Vous êtes inscrit à l'événement : " + eventTitre;
 
         Notification notif = new Notification(idUser, "PARTICIPATION", titre, message);
         notif.setIdEvenement(idEvenement);
         notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
     @Override
     public void creerNotificationAnnulation(int idUser, int idEvenement, String eventTitre) {
         String titre = "❌ Participation annulée";
-        String message = eventTitre;
+        String message = "Votre participation à l'événement a été annulée : " + eventTitre;
 
         Notification notif = new Notification(idUser, "ANNULATION", titre, message);
         notif.setIdEvenement(idEvenement);
         notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
     @Override
@@ -77,102 +44,100 @@ public class NotificationService implements INotificationService {
         String titre = "📅 Événement modifié";
         String message = eventTitre + " - " + modification;
 
-        Notification notif = new Notification(idUser, "MODIFICATION", titre, message);
+        Notification notif = new Notification(idUser, "EVENEMENT_MODIFIE", titre, message);
         notif.setIdEvenement(idEvenement);
         notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
     @Override
     public void creerNotificationRappel(int idUser, int idEvenement, String eventTitre) {
         String titre = "⏰ Rappel d'événement";
-        String message = "Rappel: " + eventTitre + " a lieu demain";
+        String message = "Rappel : " + eventTitre + " a lieu demain";
 
         Notification notif = new Notification(idUser, "RAPPEL", titre, message);
         notif.setIdEvenement(idEvenement);
         notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
     @Override
-    public void creerNotificationNouveauParticipant(int idOrganisateur, int idEvenement, String eventTitre, String participantNom, String participantEmail) {
+    public void creerNotificationNouveauParticipant(int idOrganisateur, int idEvenement, String eventTitre,
+                                                    String participantNom, String participantEmail) {
         String titre = "👥 Nouveau participant";
-        String message = eventTitre + " - " + participantNom;
+        String message = participantNom + " s'est inscrit à votre événement : " + eventTitre;
 
         Notification notif = new Notification(idOrganisateur, "NOUVEAU_PARTICIPANT", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
         notif.setNomParticipant(participantNom);
         notif.setEmailParticipant(participantEmail);
-        notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
     @Override
-    public void creerNotificationParticipantAnnule(int idOrganisateur, int idEvenement, String eventTitre, String participantNom, String participantEmail) {
+    public void creerNotificationParticipantAnnule(int idOrganisateur, int idEvenement, String eventTitre,
+                                                   String participantNom, String participantEmail) {
         String titre = "🚫 Participant annulé";
-        String message = eventTitre + " - " + participantNom;
+        String message = participantNom + " a annulé sa participation à : " + eventTitre;
 
         Notification notif = new Notification(idOrganisateur, "PARTICIPANT_ANNULE", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
         notif.setNomParticipant(participantNom);
         notif.setEmailParticipant(participantEmail);
-        notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
-    public void creerNotificationAdminNouvelEvenement(int idAdmin, int idEvenement, String eventTitre, String organisateurNom, String organisateurEmail) {
+    public void creerNotificationAdminNouvelEvenement(int idAdmin, int idEvenement, String eventTitre,
+                                                      String organisateurNom, String organisateurEmail) {
         String titre = "📅 Nouvel événement en attente";
-        String message = organisateurNom + " - " + eventTitre;
+        String message = organisateurNom + " a créé un nouvel événement : " + eventTitre;
 
         Notification notif = new Notification(idAdmin, "NOUVEL_EVENEMENT_ADMIN", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
         notif.setNomOrganisateur(organisateurNom);
         notif.setEmailOrganisateur(organisateurEmail);
-        notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
-    public void creerNotificationEvenementApprouve(int idOrganisateur, int idEvenement, String eventTitre, String commentaire, String adminNom, String adminEmail) {
+    public void creerNotificationEvenementApprouve(int idOrganisateur, int idEvenement, String eventTitre,
+                                                   String commentaire, String adminNom, String adminEmail) {
         String titre = "✅ Événement approuvé";
-        String message = eventTitre;
+        String message = "Votre événement \"" + eventTitre + "\" a été approuvé par l'administrateur";
 
         Notification notif = new Notification(idOrganisateur, "EVENEMENT_APPROUVE", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
         notif.setNomAdmin(adminNom);
         notif.setEmailAdmin(adminEmail);
         notif.setCommentaire(commentaire);
-        notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
-    public void creerNotificationEvenementRefuse(int idOrganisateur, int idEvenement, String eventTitre, String commentaire, String adminNom, String adminEmail) {
+    public void creerNotificationEvenementRefuse(int idOrganisateur, int idEvenement, String eventTitre,
+                                                 String commentaire, String adminNom, String adminEmail) {
         String titre = "❌ Événement refusé";
-        String message = eventTitre;
+        String message = "Votre événement \"" + eventTitre + "\" a été refusé";
 
         Notification notif = new Notification(idOrganisateur, "EVENEMENT_REFUSE", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
         notif.setNomAdmin(adminNom);
         notif.setEmailAdmin(adminEmail);
         notif.setCommentaire(commentaire);
-        notif.setEventTitre(eventTitre);
-        ajouterNotification(notif, idEvenement, null);
+        ajouterNotification(notif);
     }
 
-    public void creerNotificationEvenementPublie(int idEvenement, String eventTitre) {
-        EventService eventService = new EventService();
-        Event event = eventService.getEventById(idEvenement);
+    public void creerNotificationEvenementPublie(int idOrganisateur, int idEvenement, String eventTitre) {
+        String titre = "📢 Événement publié";
+        String message = "Votre événement \"" + eventTitre + "\" est maintenant visible par les participants";
 
-        if (event != null) {
-            String titreOrg = "📢 Événement publié";
-            String messageOrg = eventTitre;
-
-            Notification notifOrg = new Notification(event.getId_organisateur(), "EVENEMENT_PUBLIE", titreOrg, messageOrg);
-            notifOrg.setIdEvenement(idEvenement);
-            notifOrg.setEventTitre(eventTitre);
-            notifOrg.setNomAdmin(event.getOrganisateurNom());
-            notifOrg.setEmailAdmin(event.getOrganisateurEmail());
-            ajouterNotification(notifOrg, idEvenement, null);
-        }
+        Notification notif = new Notification(idOrganisateur, "EVENEMENT_PUBLIE", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif);
     }
 
     public void creerNotificationEvenementModifie(int idEvenement, String eventTitre, String modification) {
@@ -180,15 +145,27 @@ public class NotificationService implements INotificationService {
         Event event = eventService.getEventById(idEvenement);
 
         if (event != null) {
+            // Notifier l'organisateur
+            String titreOrg = "📅 Événement modifié";
+            String messageOrg = "Votre événement \"" + eventTitre + "\" a été modifié par l'administrateur";
+
+            Notification notifOrg = new Notification(event.getId_organisateur(), "EVENEMENT_MODIFIE", titreOrg, messageOrg);
+            notifOrg.setIdEvenement(idEvenement);
+            notifOrg.setEventTitre(eventTitre);
+            notifOrg.setCommentaire(modification);
+            ajouterNotification(notifOrg);
+
+            // Notifier tous les participants
             List<Integer> participantIds = getParticipantIdsForEvent(idEvenement);
             for (int participantId : participantIds) {
-                String titre = "📅 Événement modifié";
-                String message = eventTitre + " - " + modification;
+                String titrePart = "📅 Événement modifié";
+                String messagePart = "L'événement \"" + eventTitre + "\" auquel vous participez a été modifié";
 
-                Notification notif = new Notification(participantId, "EVENEMENT_MODIFIE", titre, message);
-                notif.setIdEvenement(idEvenement);
-                notif.setEventTitre(eventTitre);
-                ajouterNotification(notif, idEvenement, null);
+                Notification notifPart = new Notification(participantId, "EVENEMENT_MODIFIE", titrePart, messagePart);
+                notifPart.setIdEvenement(idEvenement);
+                notifPart.setEventTitre(eventTitre);
+                notifPart.setCommentaire(modification);
+                ajouterNotification(notifPart);
             }
         }
     }
@@ -201,12 +178,12 @@ public class NotificationService implements INotificationService {
             List<Integer> participantIds = getParticipantIdsForEvent(idEvenement);
             for (int participantId : participantIds) {
                 String titre = "❌ Événement annulé";
-                String message = eventTitre;
+                String message = "L'événement \"" + eventTitre + "\" auquel vous participiez a été annulé";
 
                 Notification notif = new Notification(participantId, "EVENEMENT_ANNULE", titre, message);
                 notif.setIdEvenement(idEvenement);
                 notif.setEventTitre(eventTitre);
-                ajouterNotification(notif, idEvenement, null);
+                ajouterNotification(notif);
             }
         }
     }
@@ -231,29 +208,7 @@ public class NotificationService implements INotificationService {
     @Override
     public List<Notification> getNotificationsByUser(int idUser) {
         List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
-                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
-                "WHERE n.id_user = ? ORDER BY n.created_at DESC LIMIT 100";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, idUser);
-            ResultSet rs = pst.executeQuery();
-
-            while (rs.next()) {
-                notifications.add(mapResultSetToNotification(rs));
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur chargement notifications: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return notifications;
-    }
-
-    public List<Notification> getAllNotificationsByUser(int idUser) {
-        List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
-                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
-                "WHERE n.id_user = ? ORDER BY n.created_at DESC LIMIT 200";
+        String query = "SELECT * FROM notifications WHERE id_user = ? ORDER BY created_at DESC LIMIT 100";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idUser);
@@ -272,9 +227,7 @@ public class NotificationService implements INotificationService {
     @Override
     public List<Notification> getNotificationsNonLues(int idUser) {
         List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
-                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
-                "WHERE n.id_user = ? AND n.is_read = FALSE ORDER BY n.created_at DESC";
+        String query = "SELECT * FROM notifications WHERE id_user = ? AND is_read = FALSE ORDER BY created_at DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idUser);
@@ -293,11 +246,10 @@ public class NotificationService implements INotificationService {
     @Override
     public List<Notification> getNotificationsForOrganisateur(int idOrganisateur) {
         List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
-                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
-                "WHERE n.id_user = ? AND n.type IN ('NOUVEAU_PARTICIPANT', 'PARTICIPANT_ANNULE', " +
-                "'EVENEMENT_APPROUVE', 'EVENEMENT_REFUSE', 'EVENEMENT_PUBLIE', 'EVENEMENT_MODIFIE') " +
-                "ORDER BY n.created_at DESC LIMIT 100";
+        String query = "SELECT * FROM notifications WHERE id_user = ? AND type IN " +
+                "('NOUVEAU_PARTICIPANT', 'PARTICIPANT_ANNULE', 'EVENEMENT_APPROUVE', " +
+                "'EVENEMENT_REFUSE', 'EVENEMENT_PUBLIE', 'EVENEMENT_MODIFIE') " +
+                "ORDER BY created_at DESC LIMIT 100";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idOrganisateur);
@@ -315,11 +267,10 @@ public class NotificationService implements INotificationService {
 
     public List<Notification> getNotificationsForAdmin(int idAdmin) {
         List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
-                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
-                "WHERE n.id_user = ? AND n.type IN ('NOUVEL_EVENEMENT_ADMIN', 'PARTICIPATION', 'ANNULATION', " +
+        String query = "SELECT * FROM notifications WHERE id_user = ? AND type IN " +
+                "('NOUVEL_EVENEMENT_ADMIN', 'PARTICIPATION', 'ANNULATION', " +
                 "'EVENEMENT_PUBLIE', 'EVENEMENT_APPROUVE', 'EVENEMENT_REFUSE') " +
-                "ORDER BY n.created_at DESC LIMIT 200";
+                "ORDER BY created_at DESC LIMIT 200";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idAdmin);
@@ -342,7 +293,6 @@ public class NotificationService implements INotificationService {
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idNotification);
             pst.executeUpdate();
-            System.out.println("✅ Notification " + idNotification + " marquée comme lue");
         } catch (SQLException e) {
             System.err.println("❌ Erreur marquage notification: " + e.getMessage());
         }
@@ -377,11 +327,11 @@ public class NotificationService implements INotificationService {
         return 0;
     }
 
-    private void ajouterNotification(Notification notification, int idEvenement, Integer idParticipation) {
+    private void ajouterNotification(Notification notification) {
         String query = "INSERT INTO notifications (id_user, type, titre, message, id_evenement, " +
                 "id_participation, nom_organisateur, email_organisateur, nom_participant, email_participant, " +
-                "nom_admin, email_admin, commentaire, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+                "nom_admin, email_admin, commentaire, event_titre, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, notification.getIdUser());
@@ -389,14 +339,14 @@ public class NotificationService implements INotificationService {
             pst.setString(3, notification.getTitre());
             pst.setString(4, notification.getMessage());
 
-            if (idEvenement > 0) {
-                pst.setInt(5, idEvenement);
+            if (notification.getIdEvenement() > 0) {
+                pst.setInt(5, notification.getIdEvenement());
             } else {
                 pst.setNull(5, Types.INTEGER);
             }
 
-            if (idParticipation != null) {
-                pst.setInt(6, idParticipation);
+            if (notification.getIdParticipation() > 0) {
+                pst.setInt(6, notification.getIdParticipation());
             } else {
                 pst.setNull(6, Types.INTEGER);
             }
@@ -408,6 +358,7 @@ public class NotificationService implements INotificationService {
             pst.setString(11, notification.getNomAdmin());
             pst.setString(12, notification.getEmailAdmin());
             pst.setString(13, notification.getCommentaire());
+            pst.setString(14, notification.getEventTitre());
 
             pst.executeUpdate();
             System.out.println("✅ Notification créée pour l'utilisateur " + notification.getIdUser() +
@@ -428,28 +379,20 @@ public class NotificationService implements INotificationService {
         n.setMessage(rs.getString("message"));
         n.setRead(rs.getBoolean("is_read"));
         n.setCreatedAt(rs.getTimestamp("created_at"));
-        n.setIdEvenement(rs.getInt("id_evenement"));
-        if (rs.wasNull()) {
-            n.setIdEvenement(0);
+
+        int idEvent = rs.getInt("id_evenement");
+        if (!rs.wasNull()) {
+            n.setIdEvenement(idEvent);
         }
 
-        try {
-            n.setEventTitre(rs.getString("event_titre"));
-        } catch (SQLException e) {
-            // Ignorer
-        }
-
-        try {
-            n.setNomOrganisateur(rs.getString("nom_organisateur"));
-            n.setEmailOrganisateur(rs.getString("email_organisateur"));
-            n.setNomParticipant(rs.getString("nom_participant"));
-            n.setEmailParticipant(rs.getString("email_participant"));
-            n.setNomAdmin(rs.getString("nom_admin"));
-            n.setEmailAdmin(rs.getString("email_admin"));
-            n.setCommentaire(rs.getString("commentaire"));
-        } catch (SQLException e) {
-            // Ignorer
-        }
+        n.setEventTitre(rs.getString("event_titre"));
+        n.setNomOrganisateur(rs.getString("nom_organisateur"));
+        n.setEmailOrganisateur(rs.getString("email_organisateur"));
+        n.setNomParticipant(rs.getString("nom_participant"));
+        n.setEmailParticipant(rs.getString("email_participant"));
+        n.setNomAdmin(rs.getString("nom_admin"));
+        n.setEmailAdmin(rs.getString("email_admin"));
+        n.setCommentaire(rs.getString("commentaire"));
 
         return n;
     }

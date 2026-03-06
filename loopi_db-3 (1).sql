@@ -277,8 +277,35 @@ INSERT INTO `genre` (`id_genre`, `sexe`) VALUES
 
 --
 -- Structure de la table `notifications`
---
 
+---modification
+
+CREATE TABLE notifications (
+                               id INT AUTO_INCREMENT PRIMARY KEY,
+                               id_user INT NOT NULL,
+                               type VARCHAR(50) NOT NULL,
+                               titre VARCHAR(200) NOT NULL,
+                               message TEXT NOT NULL,
+                               is_read BOOLEAN DEFAULT FALSE,
+                               id_evenement INT,
+                               id_participation INT,
+                               nom_organisateur VARCHAR(200),
+                               email_organisateur VARCHAR(200),
+                               nom_participant VARCHAR(200),
+                               email_participant VARCHAR(200),
+                               nom_admin VARCHAR(200),
+                               email_admin VARCHAR(200),
+                               commentaire TEXT,
+                               event_titre VARCHAR(200),
+                               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               INDEX idx_user_read (id_user, is_read),
+                               INDEX idx_created (created_at),
+                               INDEX idx_type (type),
+                               FOREIGN KEY (id_user) REFERENCES users(id) ON DELETE CASCADE,
+                               FOREIGN KEY (id_evenement) REFERENCES evenement(id_evenement) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+--
+/*
 CREATE TABLE IF NOT EXISTS `notifications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `id_user` int(11) NOT NULL,
@@ -294,7 +321,7 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   KEY `idx_user_read` (`id_user`,`is_read`),
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1 ;
-
+*/
 -- --------------------------------------------------------
 
 --

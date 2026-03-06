@@ -22,7 +22,9 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.web.WebEngine;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import netscape.javascript.JSObject;
 
@@ -328,7 +330,7 @@ public class AdminDashboard {
     private void showNotifications() {
         Stage notifStage = new Stage();
         notifStage.setTitle("Notifications");
-        notifStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        notifStage.initModality(Modality.APPLICATION_MODAL);
         notifStage.initOwner(primaryStage);
 
         VBox content = new VBox(20);
@@ -376,12 +378,7 @@ public class AdminDashboard {
                     HBox titleRow = new HBox(10);
                     titleRow.setAlignment(Pos.CENTER_LEFT);
 
-                    String typeIcon = n.getType().contains("APPROUVE") ? "✅" :
-                            n.getType().contains("REFUSE") ? "❌" :
-                                    n.getType().contains("PUBLIE") ? "📢" :
-                                            n.getType().contains("NOUVEAU") ? "👤" :
-                                                    n.getType().contains("ANNULE") ? "🚫" : "📝";
-
+                    String typeIcon = n.getIcon();
                     Label typeIconLabel = new Label(typeIcon);
                     typeIconLabel.setFont(Font.font("System", 16));
 
@@ -404,6 +401,7 @@ public class AdminDashboard {
                     messageLabel.setTextFill(Color.web(getTextColorMuted()));
 
                     VBox detailsBox = new VBox(5);
+
                     if (n.getNomOrganisateur() != null && !n.getNomOrganisateur().isEmpty()) {
                         HBox orgRow = new HBox(10);
                         orgRow.setAlignment(Pos.CENTER_LEFT);
@@ -428,6 +426,18 @@ public class AdminDashboard {
                         detailsBox.getChildren().add(partRow);
                     }
 
+                    if (n.getNomAdmin() != null && !n.getNomAdmin().isEmpty()) {
+                        HBox adminRow = new HBox(10);
+                        adminRow.setAlignment(Pos.CENTER_LEFT);
+                        Label adminIcon = new Label("👑");
+                        adminIcon.setFont(Font.font("System", 12));
+                        Label adminText = new Label("Admin: " + n.getNomAdmin());
+                        adminText.setFont(Font.font("System", 11));
+                        adminText.setTextFill(Color.web("#8b5cf6"));
+                        adminRow.getChildren().addAll(adminIcon, adminText);
+                        detailsBox.getChildren().add(adminRow);
+                    }
+
                     if (n.getCommentaire() != null && !n.getCommentaire().isEmpty()) {
                         HBox commentRow = new HBox(10);
                         commentRow.setAlignment(Pos.CENTER_LEFT);
@@ -439,6 +449,18 @@ public class AdminDashboard {
                         commentText.setTextFill(Color.web("#f59e0b"));
                         commentRow.getChildren().addAll(commentIcon, commentText);
                         detailsBox.getChildren().add(commentRow);
+                    }
+
+                    if (n.getEventTitre() != null && !n.getEventTitre().isEmpty()) {
+                        HBox eventRow = new HBox(10);
+                        eventRow.setAlignment(Pos.CENTER_LEFT);
+                        Label eventIcon = new Label("📅");
+                        eventIcon.setFont(Font.font("System", 12));
+                        Label eventText = new Label("Événement: " + n.getEventTitre());
+                        eventText.setFont(Font.font("System", 11));
+                        eventText.setTextFill(Color.web("#3b82f6"));
+                        eventRow.getChildren().addAll(eventIcon, eventText);
+                        detailsBox.getChildren().add(eventRow);
                     }
 
                     Label dateLabel = new Label(n.getFormattedDate());
@@ -466,6 +488,10 @@ public class AdminDashboard {
                     showNotificationDetails(selected);
                     notificationService.marquerCommeLue(selected.getId());
                     updateNotificationBadge();
+                    // Recharger la liste
+                    notifList.setItems(FXCollections.observableArrayList(
+                            notificationService.getNotificationsForAdmin(currentUser.getId())
+                    ));
                 }
             }
         });
@@ -475,7 +501,9 @@ public class AdminDashboard {
         markAllReadBtn.setOnAction(e -> {
             notificationService.marquerToutesCommeLues(currentUser.getId());
             updateNotificationBadge();
-            showNotifications();
+            notifList.setItems(FXCollections.observableArrayList(
+                    notificationService.getNotificationsForAdmin(currentUser.getId())
+            ));
         });
 
         Button closeBtn = new Button("Fermer");
@@ -497,7 +525,7 @@ public class AdminDashboard {
     private void showNotificationDetails(Notification notification) {
         Stage dialog = new Stage();
         dialog.setTitle("Détails de la notification");
-        dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initOwner(primaryStage);
 
         VBox content = new VBox(20);
@@ -510,11 +538,8 @@ public class AdminDashboard {
         header.setPadding(new Insets(0, 0, 15, 0));
         header.setStyle("-fx-border-color: " + getBorderColor() + "; -fx-border-width: 0 0 1 0;");
 
-        String icon = notification.getType().contains("APPROUVE") ? "✅" :
-                notification.getType().contains("REFUSE") ? "❌" :
-                        notification.getType().contains("PUBLIE") ? "📢" :
-                                notification.getType().contains("NOUVEAU") ? "👤" :
-                                        notification.getType().contains("ANNULE") ? "🚫" : "📝";
+        String icon = notification.getIcon();
+        String color = notification.getColor();
 
         Label iconLabel = new Label(icon);
         iconLabel.setFont(Font.font("System", 32));
@@ -570,7 +595,7 @@ public class AdminDashboard {
         infoGrid.add(new Label("Source:"), 0, row);
         Label sourceValue = new Label(source);
         sourceValue.setFont(Font.font("System", FontWeight.BOLD, 13));
-        sourceValue.setTextFill(Color.web(getAccentColor()));
+        sourceValue.setTextFill(Color.web(color));
         infoGrid.add(sourceValue, 1, row);
         row++;
 

@@ -4,6 +4,7 @@ import edu.Loopi.entities.Event;
 import edu.Loopi.entities.User;
 import edu.Loopi.services.EventService;
 import edu.Loopi.services.GeocodingService;
+import edu.Loopi.services.AddressSuggestionService;
 import edu.Loopi.services.UserService;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -33,13 +34,11 @@ import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 public class EventMapView {
     private User currentUser;
@@ -47,6 +46,7 @@ public class EventMapView {
     private EventService eventService;
     private AdminDashboard adminDashboard;
     private GeocodingService geocodingService;
+    private AddressSuggestionService addressSuggestionService;
 
     // Composants UI
     private WebView webView;
@@ -88,6 +88,7 @@ public class EventMapView {
         this.adminDashboard = adminDashboard;
         this.eventService = new EventService();
         this.geocodingService = new GeocodingService();
+        this.addressSuggestionService = new AddressSuggestionService();
     }
 
     public void showEventMapView(StackPane mainContentArea, boolean isDarkMode) {
@@ -386,7 +387,6 @@ public class EventMapView {
         storyImageView.setFitHeight(180);
         storyImageView.setPreserveRatio(true);
 
-        // Appliquer un cercle de clipping pour l'image
         Circle imageClip = new Circle(90, 90, 90);
         storyImageView.setClip(imageClip);
 
@@ -484,7 +484,6 @@ public class EventMapView {
     }
 
     private void loadEvents() {
-        // Utiliser refreshEvents pour forcer le rechargement depuis la base
         List<Event> allEvents = eventService.refreshEvents();
         allEventsWithCoords.clear();
         eventCache.clear();
@@ -493,14 +492,12 @@ public class EventMapView {
 
         for (Event event : allEvents) {
             if ("approuve".equals(event.getStatutValidation())) {
-                // Si l'événement n'a pas de coordonnées, essayer de les géocoder
                 if (!event.hasCoordinates()) {
                     System.out.println("📍 Géocodage de: " + event.getLieu() + " pour " + event.getTitre());
                     double[] coords = geocodingService.geocodeAddress(event.getLieu());
                     if (coords != null) {
                         event.setLatitude(coords[0]);
                         event.setLongitude(coords[1]);
-                        // Sauvegarder en base de données
                         eventService.updateEvent(event);
                         geocoded++;
                         System.out.println("✅ Coordonnées trouvées: " + coords[0] + ", " + coords[1]);
@@ -520,7 +517,6 @@ public class EventMapView {
             System.out.println("🆕 " + geocoded + " nouveaux événements géocodés");
         }
 
-        // Nettoyer les anciens marqueurs avant d'ajouter les nouveaux
         if (mapReady) {
             try {
                 webEngine.executeScript(
@@ -532,7 +528,6 @@ public class EventMapView {
             }
         }
 
-        // Ajouter les événements à la carte
         for (Event event : allEventsWithCoords) {
             addEventMarker(event);
         }
@@ -544,7 +539,6 @@ public class EventMapView {
 
     private String sanitizeForJS(String text) {
         if (text == null) return "";
-        // Remplacer les caractères problématiques
         return text.replace("\\", "\\\\")
                 .replace("'", "\\'")
                 .replace("\"", "\\\"")
@@ -589,7 +583,6 @@ public class EventMapView {
         String imageUrl = getEventImageUrl(event);
         String statut = event.getStatut() != null ? event.getStatut() : "Inconnu";
 
-        // Nettoyer le statut pour éviter les caractères spéciaux
         if (statut.equals("À venir")) statut = "A venir";
 
         String description = event.getDescription() != null ? event.getDescription() : "";
@@ -626,7 +619,6 @@ public class EventMapView {
     }
 
     private String getEventImageUrl(Event event) {
-        // Vérifier si l'image existe localement
         if (event.getImage_evenement() != null && !event.getImage_evenement().isEmpty()) {
             String fileName = event.getImage_evenement().substring(event.getImage_evenement().lastIndexOf('/') + 1);
             File imgFile = new File(FULL_IMAGE_PATH + fileName);
@@ -635,7 +627,6 @@ public class EventMapView {
             }
         }
 
-        // Image par défaut avec le titre de l'événement encodé proprement
         String title = event.getTitre() != null ? event.getTitre() : "Event";
         String encodedTitle = encodeForUrl(title);
         return "https://via.placeholder.com/300x150/3182ce/ffffff?text=" + encodedTitle;
@@ -987,7 +978,6 @@ public class EventMapView {
         content.setPrefWidth(500);
         content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + "; -fx-background-radius: 12;");
 
-        // Image avec cercle
         StackPane imageContainer = new StackPane();
         imageContainer.setPrefSize(200, 200);
         imageContainer.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "20; -fx-background-radius: 100;");
@@ -998,7 +988,6 @@ public class EventMapView {
         imgView.setFitHeight(180);
         imgView.setPreserveRatio(true);
 
-        // Cercle de clipping pour l'image
         Circle clipCircle = new Circle(90, 90, 90);
         imgView.setClip(clipCircle);
 
@@ -1008,7 +997,6 @@ public class EventMapView {
                 Image img = new Image(imgUrl, true);
                 imgView.setImage(img);
             } catch (Exception e) {
-                // Image par défaut si erreur
                 imgView.setImage(new Image("https://via.placeholder.com/180x180/3182ce/ffffff?text=" +
                         encodeForUrl(event.getTitre())));
             }
@@ -1019,13 +1007,11 @@ public class EventMapView {
 
         imageContainer.getChildren().add(imgView);
 
-        // Grille d'informations
         GridPane grid = new GridPane();
         grid.setHgap(15);
         grid.setVgap(12);
         grid.setPadding(new Insets(10, 0, 10, 0));
 
-        // Ligne 0: Titre
         Label titleLabel = new Label(event.getTitre());
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 22));
         titleLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
@@ -1034,7 +1020,6 @@ public class EventMapView {
         grid.add(titleLabel, 0, 0, 2, 1);
         GridPane.setHalignment(titleLabel, javafx.geometry.HPos.CENTER);
 
-        // Ligne 1: Date
         Label dateIcon = new Label("📅");
         dateIcon.setFont(Font.font("System", 16));
         Label dateValue = new Label(event.getFormattedDate() != null ? event.getFormattedDate() : "Non définie");
@@ -1043,7 +1028,6 @@ public class EventMapView {
         grid.add(dateIcon, 0, 1);
         grid.add(dateValue, 1, 1);
 
-        // Ligne 2: Lieu
         Label lieuIcon = new Label("📍");
         lieuIcon.setFont(Font.font("System", 16));
         Label lieuValue = new Label(event.getLieu() != null ? event.getLieu() : "Non défini");
@@ -1052,7 +1036,6 @@ public class EventMapView {
         grid.add(lieuIcon, 0, 2);
         grid.add(lieuValue, 1, 2);
 
-        // Ligne 3: Coordonnées
         if (event.hasCoordinates()) {
             Label coordIcon = new Label("🌍");
             coordIcon.setFont(Font.font("System", 16));
@@ -1062,7 +1045,6 @@ public class EventMapView {
             grid.add(coordValue, 1, 3);
         }
 
-        // Ligne 4: Participants
         Label partIcon = new Label("👥");
         partIcon.setFont(Font.font("System", 16));
         Label partValue = new Label(event.getParticipantsCount() + " inscrits");
@@ -1070,7 +1052,6 @@ public class EventMapView {
         grid.add(partIcon, 0, 4);
         grid.add(partValue, 1, 4);
 
-        // Ligne 5: Capacité
         if (event.getCapacite_max() != null) {
             Label capIcon = new Label("📊");
             capIcon.setFont(Font.font("System", 16));
@@ -1080,7 +1061,6 @@ public class EventMapView {
             grid.add(capValue, 1, 5);
         }
 
-        // Ligne 6: Organisateur
         Label orgIcon = new Label("👤");
         orgIcon.setFont(Font.font("System", 16));
         User org = userService.getUserById(event.getId_organisateur());
@@ -1090,7 +1070,6 @@ public class EventMapView {
         grid.add(orgIcon, 0, 6);
         grid.add(orgValue, 1, 6);
 
-        // Ligne 7: Statut
         Label statutIcon = new Label("📌");
         statutIcon.setFont(Font.font("System", 16));
         String statut = event.getStatut() != null ? event.getStatut() : "Inconnu";
@@ -1102,7 +1081,6 @@ public class EventMapView {
         grid.add(statutIcon, 0, 7);
         grid.add(statutLabel, 1, 7);
 
-        // Ligne 8: Description
         if (event.getDescription() != null && !event.getDescription().isEmpty()) {
             Label descIcon = new Label("📝");
             descIcon.setFont(Font.font("System", 16));
@@ -1122,7 +1100,6 @@ public class EventMapView {
         col2.setHgrow(Priority.ALWAYS);
         grid.getColumnConstraints().addAll(col1, col2);
 
-        // Bouton Fermer
         Button closeBtn = new Button("Fermer");
         closeBtn.setMaxWidth(200);
         closeBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +

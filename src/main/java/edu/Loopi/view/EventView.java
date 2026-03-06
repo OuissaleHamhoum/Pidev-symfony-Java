@@ -6,6 +6,8 @@ import edu.Loopi.entities.User;
 import edu.Loopi.services.AIImageGenerationService;
 import edu.Loopi.services.EventService;
 import edu.Loopi.services.NotificationService;
+import edu.Loopi.services.AddressSuggestionService;
+import javafx.animation.PauseTransition;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -1023,6 +1025,79 @@ public class EventView {
         notifStage.show();
     }
 
+    /**
+     * Crée un TextField avec autocomplétion d'adresses
+     */
+    private TextField createAddressTextField(String initialValue, Stage dialog) {
+        TextField textField = new TextField(initialValue);
+        textField.setPromptText("Saisissez une adresse...");
+        textField.setStyle("-fx-background-radius: 8; -fx-padding: 10; " +
+                "-fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 8;");
+
+        AddressSuggestionService addressService = new AddressSuggestionService();
+
+        // Créer un ContextMenu pour les suggestions
+        ContextMenu suggestionsMenu = new ContextMenu();
+
+        // Timer pour le debounce (éviter trop de requêtes)
+        PauseTransition debounceTimer = new PauseTransition(Duration.millis(500));
+
+        textField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null || newVal.trim().length() < 3) {
+                suggestionsMenu.hide();
+                return;
+            }
+
+            // Réinitialiser le timer
+            debounceTimer.setOnFinished(event -> {
+                String query = newVal.trim();
+
+                // Exécuter la recherche dans un thread séparé
+                new Thread(() -> {
+                    List<String> suggestions = addressService.getAddressSuggestions(query);
+
+                    // Mettre à jour l'interface JavaFX
+                    javafx.application.Platform.runLater(() -> {
+                        suggestionsMenu.getItems().clear();
+
+                        if (suggestions.isEmpty()) {
+                            MenuItem noResultItem = new MenuItem("Aucune suggestion");
+                            noResultItem.setDisable(true);
+                            suggestionsMenu.getItems().add(noResultItem);
+                        } else {
+                            for (String suggestion : suggestions) {
+                                MenuItem item = new MenuItem(suggestion);
+                                item.setOnAction(e -> {
+                                    textField.setText(suggestion);
+                                    suggestionsMenu.hide();
+                                });
+                                suggestionsMenu.getItems().add(item);
+                            }
+                        }
+
+                        // Afficher le menu sous le TextField
+                        if (!suggestionsMenu.getItems().isEmpty()) {
+                            suggestionsMenu.show(textField, javafx.geometry.Side.BOTTOM, 0, 0);
+                        } else {
+                            suggestionsMenu.hide();
+                        }
+                    });
+                }).start();
+            });
+
+            debounceTimer.playFromStart();
+        });
+
+        // Cacher le menu quand le champ perd le focus
+        textField.focusedProperty().addListener((obs, oldVal, newVal) -> {
+            if (!newVal) {
+                suggestionsMenu.hide();
+            }
+        });
+
+        return textField;
+    }
+
     @SuppressWarnings("unchecked")
     private void openEventDialog(Event existingEvent) {
         Stage dialog = new Stage();
@@ -1141,15 +1216,16 @@ public class EventView {
 
         dateBox.getChildren().addAll(dateLabel, dateTimeBox, dateError);
 
-        // LIEU
+        // LIEU AVEC AUTOCOMPLÉTION
         VBox lieuBox = new VBox(3);
         Label lieuLabel = new Label("📍 Lieu *");
         lieuLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
 
-        TextField lieuField = new TextField(existingEvent != null ? existingEvent.getLieu() : "");
+        TextField lieuField = createAddressTextField(
+                existingEvent != null ? existingEvent.getLieu() : "",
+                dialog
+        );
         lieuField.setPromptText("Ex: Plage de Sousse");
-        lieuField.setStyle("-fx-background-radius: 8; -fx-padding: 10; " +
-                "-fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 8;");
 
         Label lieuError = new Label();
         lieuError.setFont(Font.font("System", FontWeight.NORMAL, 11));
