@@ -157,7 +157,7 @@ public class QRLoginService {
         Thread cleanupThread = new Thread(() -> {
             while (true) {
                 try {
-                    Thread.sleep(30000);
+                    Thread.sleep(30000); // Nettoyage toutes les 30 secondes
                     long currentTime = System.currentTimeMillis();
                     activeSessions.entrySet().removeIf(entry ->
                             currentTime - entry.getValue().getTimestamp() > QR_EXPIRY_TIME);

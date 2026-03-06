@@ -100,7 +100,7 @@ public class FavorisView {
         header.setStyle("-fx-background-color: white; -fx-border-color: #e9ecef; -fx-border-width: 0 0 1 0;");
 
         // Titre seulement (sans compteur)
-        Label title = new Label("❤️ Mes Favoris");
+        Label title = new Label("❤ Mes Favoris");
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: " + ACCENT_COLOR + ";");
 
         // Barre de recherche et filtres

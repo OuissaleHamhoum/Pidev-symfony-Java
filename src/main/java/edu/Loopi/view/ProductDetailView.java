@@ -8,6 +8,7 @@ import edu.Loopi.services.ProduitService;
 import edu.Loopi.services.FavorisService;
 import edu.Loopi.tools.SessionManager;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -17,6 +18,14 @@ import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.animation.ScaleTransition;
 import javafx.util.Duration;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.google.zxing.common.BitMatrix;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
 
 import java.io.File;
 import java.net.URLEncoder;
@@ -63,7 +72,7 @@ public class ProductDetailView {
         // === SECTION PRODUIT ===
         VBox productSection = createProductSection();
 
-        // === SECTION RESEAUX SOCIAUX ===
+        // === SECTION RESEAUX SOCIAUX ET QR CODE ===
         HBox socialShareSection = createSocialShareSection();
 
         // === SECTION FEEDBACK ===
@@ -154,7 +163,7 @@ public class ProductDetailView {
     }
 
     /**
-     * Crée la section de partage sur les réseaux sociaux
+     * Crée la section de partage sur les réseaux sociaux et QR code
      */
     private HBox createSocialShareSection() {
         HBox socialSection = new HBox(20);
@@ -177,9 +186,12 @@ public class ProductDetailView {
         Button whatsappBtn = createSocialButton("WhatsApp", "#25d366", "📱");
         whatsappBtn.setOnAction(e -> shareOnWhatsApp());
 
-        // Bouton LinkedIn
-        Button linkedinBtn = createSocialButton("LinkedIn", "#0077b5", "in");
-        linkedinBtn.setOnAction(e -> shareOnLinkedIn());
+        // Séparateur vertical
+        Separator sep1 = new Separator(Orientation.VERTICAL);
+        sep1.setStyle("-fx-background-color: #e0e0e0;");
+
+        // BOUTON QR CODE (NOIR)
+        Button qrButton = createQRCodeButton();
 
         // Bouton Copier le lien
         Button copyBtn = createSocialButton("Copier le lien", "#6c757d", "📋");
@@ -188,8 +200,170 @@ public class ProductDetailView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        socialSection.getChildren().addAll(shareLabel, facebookBtn, twitterBtn, whatsappBtn, linkedinBtn, spacer, copyBtn);
+        socialSection.getChildren().addAll(shareLabel, facebookBtn, twitterBtn, whatsappBtn, sep1, qrButton, spacer, copyBtn);
         return socialSection;
+    }
+
+    /**
+     * Crée un bouton noir avec QR code intégré
+     */
+    private Button createQRCodeButton() {
+        Button btn = new Button();
+        btn.setStyle("-fx-background-color: #1a1a1a; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 5 15; " +
+                "-fx-background-radius: 20; -fx-cursor: hand;");
+
+        // Contenu du bouton avec QR code et texte
+        HBox content = new HBox(8);
+        content.setAlignment(Pos.CENTER);
+
+        // Petit QR code
+        ImageView qrIcon = generateQRCode(getProductUrl(), 25, 25);
+        qrIcon.setFitWidth(20);
+        qrIcon.setFitHeight(20);
+
+        Label text = new Label("QR Code");
+        text.setTextFill(javafx.scene.paint.Color.WHITE);
+        text.setStyle("-fx-font-weight: bold;");
+
+        content.getChildren().addAll(qrIcon, text);
+        btn.setGraphic(content);
+
+        // Tooltip
+        Tooltip.install(btn, new Tooltip("Afficher le QR code"));
+
+        // Animation au survol
+        ScaleTransition st = new ScaleTransition(Duration.millis(200), btn);
+        st.setToX(1.05);
+        st.setToY(1.05);
+
+        btn.setOnMouseEntered(e -> {
+            st.setRate(1);
+            st.play();
+            btn.setStyle("-fx-background-color: #333333; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 5 15; " +
+                    "-fx-background-radius: 20; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, #00000080, 10, 0, 0, 2);");
+        });
+
+        btn.setOnMouseExited(e -> {
+            st.setRate(-1);
+            st.play();
+            btn.setStyle("-fx-background-color: #1a1a1a; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 5 15; " +
+                    "-fx-background-radius: 20; -fx-cursor: hand;");
+        });
+
+        // Action : afficher le grand QR code
+        btn.setOnAction(e -> showLargeQRCode());
+
+        return btn;
+    }
+
+    /**
+     * Génère un QR code à partir d'un texte
+     */
+    private ImageView generateQRCode(String text, int width, int height) {
+        try {
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(text, BarcodeFormat.QR_CODE, width, height);
+
+            WritableImage image = new WritableImage(width, height);
+            PixelWriter pixelWriter = image.getPixelWriter();
+
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    pixelWriter.setColor(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                }
+            }
+
+            ImageView imageView = new ImageView(image);
+            imageView.setPreserveRatio(true);
+            return imageView;
+        } catch (WriterException e) {
+            e.printStackTrace();
+            // En cas d'erreur, retourner une image vide
+            ImageView fallback = new ImageView();
+            fallback.setFitWidth(width);
+            fallback.setFitHeight(height);
+            return fallback;
+        }
+    }
+
+    /**
+     * Affiche une version agrandie du QR code
+     */
+    private void showLargeQRCode() {
+        Stage qrStage = new Stage();
+        qrStage.setTitle("QR Code - " + produit.getNom());
+
+        VBox qrContainer = new VBox(20);
+        qrContainer.setAlignment(Pos.CENTER);
+        qrContainer.setPadding(new Insets(30));
+        qrContainer.setStyle("-fx-background-color: white;");
+
+        Label title = new Label(produit.getNom());
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        ImageView largeQR = generateQRCode(getProductUrl(), 300, 300);
+
+        Label urlLabel = new Label(getProductUrl());
+        urlLabel.setWrapText(true);
+        urlLabel.setMaxWidth(400);
+        urlLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px; -fx-text-alignment: center;");
+
+        Button closeBtn = new Button("Fermer");
+        closeBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 5; -fx-cursor: hand;");
+        closeBtn.setOnAction(e -> qrStage.close());
+
+        // Bouton pour télécharger le QR code
+        Button downloadBtn = new Button("📥 Télécharger");
+        downloadBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 5; -fx-cursor: hand;");
+        downloadBtn.setOnAction(e -> downloadQRCode());
+
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER);
+        buttonBox.getChildren().addAll(downloadBtn, closeBtn);
+
+        qrContainer.getChildren().addAll(title, largeQR, urlLabel, buttonBox);
+
+        Scene scene = new Scene(qrContainer, 500, 550);
+        qrStage.setScene(scene);
+        qrStage.show();
+    }
+
+    /**
+     * Télécharge le QR code en tant que fichier image
+     */
+    private void downloadQRCode() {
+        try {
+            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+            fileChooser.setTitle("Enregistrer le QR Code");
+            fileChooser.getExtensionFilters().add(
+                    new javafx.stage.FileChooser.ExtensionFilter("Fichier PNG", "*.png")
+            );
+            fileChooser.setInitialFileName("qrcode_" + produit.getNom().replace(" ", "_") + ".png");
+
+            File file = fileChooser.showSaveDialog(stage);
+            if (file != null) {
+                // Générer le QR code en mémoire
+                QRCodeWriter qrCodeWriter = new QRCodeWriter();
+                BitMatrix bitMatrix = qrCodeWriter.encode(getProductUrl(), BarcodeFormat.QR_CODE, 300, 300);
+
+                // Convertir en BufferedImage pour sauvegarde
+                java.awt.image.BufferedImage bufferedImage = new java.awt.image.BufferedImage(300, 300, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                for (int x = 0; x < 300; x++) {
+                    for (int y = 0; y < 300; y++) {
+                        bufferedImage.setRGB(x, y, bitMatrix.get(x, y) ? 0xFF000000 : 0xFFFFFFFF);
+                    }
+                }
+
+                // Sauvegarder
+                javax.imageio.ImageIO.write(bufferedImage, "PNG", file);
+                showAlert("Succès", "QR Code téléchargé avec succès !");
+            }
+        } catch (Exception e) {
+            showAlert("Erreur", "Impossible de télécharger le QR code: " + e.getMessage());
+        }
     }
 
     /**
@@ -271,20 +445,6 @@ public class ProductDetailView {
     }
 
     /**
-     * Partage sur LinkedIn
-     */
-    private void shareOnLinkedIn() {
-        try {
-            String url = "https://www.linkedin.com/sharing/share-offsite/?url=" +
-                    URLEncoder.encode(getProductUrl(), StandardCharsets.UTF_8);
-            openBrowser(url);
-            showAlert("Partage LinkedIn", "Redirection vers LinkedIn pour partager ce produit !");
-        } catch (Exception e) {
-            showAlert("Erreur", "Impossible d'ouvrir LinkedIn: " + e.getMessage());
-        }
-    }
-
-    /**
      * Copie le lien du produit dans le presse-papiers
      */
     private void copyLinkToClipboard() {
@@ -300,10 +460,9 @@ public class ProductDetailView {
     }
 
     /**
-     * Génère une URL pour le produit (simulée)
+     * Génère une URL pour le produit
      */
     private String getProductUrl() {
-        // Dans une application réelle, ce serait l'URL réelle du produit
         return "https://www.loopi.tn/produit/" + produit.getId() + "/" +
                 produit.getNom().toLowerCase().replace(" ", "-");
     }
@@ -362,11 +521,11 @@ public class ProductDetailView {
 
     private void updateFavorisButton(Button btn) {
         if (estFavoris) {
-            btn.setText("❤️"); // Cœur rouge plein
+            btn.setText("❤");
             btn.setStyle("-fx-background-color: transparent; -fx-font-size: 28px; -fx-text-fill: #e74c3c; -fx-cursor: hand;");
         } else {
-            btn.setText("❤️"); // On garde le même symbole mais en gris
-            btn.setStyle("-fx-background-color: transparent; -fx-font-size: 28px; -fx-text-fill: #95a5a6; -fx-cursor: hand;"); // Gris
+            btn.setText("❤");
+            btn.setStyle("-fx-background-color: transparent; -fx-font-size: 28px; -fx-text-fill: #95a5a6; -fx-cursor: hand;");
         }
     }
 
@@ -385,7 +544,7 @@ public class ProductDetailView {
         formBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-background-radius: 5;");
 
         Label rateLabel = new Label("Donnez votre avis :");
-        rateLabel.setStyle("-fx-font-weight: bold;");
+        rateLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
 
         // Étoiles
         HBox starBox = new HBox(5);
@@ -419,7 +578,7 @@ public class ProductDetailView {
 
         if (feedbacks.isEmpty()) {
             Label noComments = new Label("Aucun avis pour le moment. Soyez le premier à commenter !");
-            noComments.setStyle("-fx-font-style: italic; -fx-text-fill: #999;");
+            noComments.setStyle("-fx-font-style: italic; -fx-text-fill: #999; ");
             commentsList.getChildren().add(noComments);
         } else {
             for (Feedback f : feedbacks) {

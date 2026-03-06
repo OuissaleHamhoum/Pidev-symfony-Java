@@ -23,9 +23,20 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.util.StringConverter;
 import javafx.stage.FileChooser;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.layout.borders.Border;
+
 import java.io.File;
-import java.io.FileWriter;
-import java.io.PrintWriter;
+import java.io.FileOutputStream;
+
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -38,6 +49,11 @@ public class ProductManagementView {
     private ProduitService produitService = new ProduitService();
     private FeedbackService feedbackService = new FeedbackService();
 
+
+    // Détecteur de mots inappropriés
+    private BadWordDetector badWordDetector = new BadWordDetector();
+
+
     // Composants UI
     private TableView<Produit> productTable;
     private TableView<Feedback> feedbackTable;
@@ -47,6 +63,9 @@ public class ProductManagementView {
     private Label totalProductsValue;
     private Label totalFeedbacksValue;
     private Label avgRatingValue;
+
+    private Label flaggedFeedbacksValue;
+
     private VBox statsBox;
     private TabPane tabPane;
 
@@ -180,10 +199,29 @@ public class ProductManagementView {
 
         avgRatingBox.getChildren().addAll(avgRatingTitle, avgRatingValue);
 
+        // Séparateur vertical
+        Separator sep3 = new Separator(Orientation.VERTICAL);
+        sep3.setStyle("-fx-background-color: " + dashboard.getBorderColor() + ";");
+
+        // Avis signalés (bad words)
+        VBox flaggedFeedbacksBox = new VBox(2);
+        flaggedFeedbacksBox.setAlignment(Pos.CENTER_LEFT);
+
+        Label flaggedFeedbacksTitle = new Label("⚠️ AVIS SIGNALÉS");
+        flaggedFeedbacksTitle.setFont(Font.font("System", FontWeight.BOLD, 10));
+        flaggedFeedbacksTitle.setTextFill(Color.web(dashboard.getTextColorMuted()));
+
+        flaggedFeedbacksValue = new Label("0");
+        flaggedFeedbacksValue.setFont(Font.font("System", FontWeight.BOLD, 18));
+        flaggedFeedbacksValue.setTextFill(Color.web(dashboard.getWarningColor()));
+
+        flaggedFeedbacksBox.getChildren().addAll(flaggedFeedbacksTitle, flaggedFeedbacksValue);
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        statsRow.getChildren().addAll(totalProductsBox, sep1, totalFeedbacksBox, sep2, avgRatingBox, spacer);
+        statsRow.getChildren().addAll(totalProductsBox, sep1, totalFeedbacksBox, sep2, avgRatingBox, sep3, flaggedFeedbacksBox, spacer);
+
         return statsRow;
     }
 
@@ -212,13 +250,6 @@ public class ProductManagementView {
 
         // Filtre organisateur
 
-        //organisateurFilter = new ComboBox<>();
-        //organisateurFilter.setPromptText("Organisateur");
-        //organisateurFilter.setPrefWidth(140);
-        //organisateurFilter.setStyle("-fx-background-radius: 20; -fx-font-size: 12px;");
-        //organisateurFilter.setOnAction(e -> loadProducts());
-        //
-
         VBox orgFilterBox = new VBox(5);
         Label orgLabel = new Label("Organisateur");
         orgLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
@@ -230,13 +261,6 @@ public class ProductManagementView {
         organisateurFilter.setOnAction(e -> loadProducts());
 
         // Filtre catégorie
-        //categoryFilter = new ComboBox<>();
-        //categoryFilter.getItems().addAll("Toutes", "Objets décoratifs", "Art mural",
-        //        "Mobilier artistique", "Installations artistiques");
-        //categoryFilter.setValue("Toutes");
-        //categoryFilter.setPrefWidth(140);
-        //categoryFilter.setStyle("-fx-background-radius: 20; -fx-font-size: 12px;");
-        //categoryFilter.setOnAction(e -> loadProducts());
 
         VBox catFilterBox = new VBox(5);
         Label catLabel = new Label("Catégorie");
@@ -253,25 +277,35 @@ public class ProductManagementView {
 
         catFilterBox.getChildren().addAll(catLabel, categoryFilter);
 
-        // Bouton Exporter CSV
-        MenuButton exportMenu = new MenuButton("📥 Export");
-        exportMenu.setStyle("-fx-background-color: " + dashboard.getAccentColor() + ";" +
-                "-fx-text-fill: white;" +
+        // Bouton pour afficher uniquement les avis signalés
+        ToggleButton showFlaggedOnlyBtn = new ToggleButton("🚩 Avis signalés");
+        showFlaggedOnlyBtn.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#F3F4F6") + ";" +
+                "-fx-text-fill: " + dashboard.getTextColor() + ";" +
                 "-fx-font-size: 12px;" +
-                "-fx-padding: 5 15;" +
+                "-fx-padding: 5 12;" +
                 "-fx-background-radius: 20;" +
                 "-fx-cursor: hand;");
+        showFlaggedOnlyBtn.setSelected(false);
+        showFlaggedOnlyBtn.setOnAction(e -> {
+            if (showFlaggedOnlyBtn.isSelected()) {
+                showFlaggedOnlyBtn.setStyle("-fx-background-color: " + dashboard.getWarningColor() + ";" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-size: 12px;" +
+                        "-fx-padding: 5 12;" +
+                        "-fx-background-radius: 20;" +
+                        "-fx-cursor: hand;");
+                loadFlaggedFeedbacks();
+            } else {
+                showFlaggedOnlyBtn.setStyle("-fx-background-color: " + (isDarkMode ? "#2D3748" : "#F3F4F6") + ";" +
+                        "-fx-text-fill: " + dashboard.getTextColor() + ";" +
+                        "-fx-font-size: 12px;" +
+                        "-fx-padding: 5 12;" +
+                        "-fx-background-radius: 20;" +
+                        "-fx-cursor: hand;");
+                loadFeedbacks();
+            }
+        });
 
-        MenuItem exportProductsItem = new MenuItem("Exporter les produits");
-        exportProductsItem.setOnAction(e -> exportProductsToCSV());
-
-        MenuItem exportFeedbacksItem = new MenuItem("Exporter les avis");
-        exportFeedbacksItem.setOnAction(e -> exportFeedbacksToCSV());
-
-        MenuItem exportAllItem = new MenuItem("Exporter les deux");
-        exportAllItem.setOnAction(e -> exportAllToCSV());
-
-        exportMenu.getItems().addAll(exportProductsItem, exportFeedbacksItem, new SeparatorMenuItem(), exportAllItem);
 
         // Bouton Rafraîchir compact
         Button refreshBtn = new Button("🔄");
@@ -291,63 +325,18 @@ public class ProductManagementView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        filtersRow.getChildren().addAll(searchBox, organisateurFilter, categoryFilter, spacer, exportMenu, refreshBtn);
+
+        filtersRow.getChildren().addAll(searchBox, organisateurFilter, categoryFilter, showFlaggedOnlyBtn, spacer, refreshBtn);
         return filtersRow;
     }
 
-    private VBox createStatsBox(boolean isDarkMode) {
-        // Cette méthode n'est plus utilisée mais conservée pour compatibilité
-        VBox box = new VBox(10);
-        box.setPadding(new Insets(15));
-        box.setStyle("-fx-background-color: " + dashboard.getCardBg() + ";" +
-                "-fx-background-radius: 10;" +
-                "-fx-border-color: " + dashboard.getBorderColor() + ";" +
-                "-fx-border-radius: 10;");
-        return box;
-    }
+    // ==================== MÉTHODE createProductsTab ====================
 
-    private VBox createStatCard(String title, String value, boolean isDarkMode) {
-        // Cette méthode n'est plus utilisée mais conservée pour compatibilité
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(15, 25, 15, 25));
-        card.setStyle("-fx-background-color: " + dashboard.getCardBg() + ";" +
-                "-fx-background-radius: 8;" +
-                "-fx-border-color: " + dashboard.getBorderColor() + ";" +
-                "-fx-border-radius: 8;" +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 5, 0, 0, 2);");
-        card.setPrefWidth(180);
-        return card;
-    }
-
-    private VBox createFiltersBox(boolean isDarkMode) {
-        // Cette méthode n'est plus utilisée mais conservée pour compatibilité
-        VBox filtersBox = new VBox(10);
-        filtersBox.setPadding(new Insets(15));
-        filtersBox.setStyle("-fx-background-color: " + dashboard.getCardBg() + ";" +
-                "-fx-background-radius: 10;" +
-                "-fx-border-color: " + dashboard.getBorderColor() + ";" +
-                "-fx-border-radius: 10;");
-        return filtersBox;
-    }
 
     private VBox createProductsTab(boolean isDarkMode) {
         VBox content = new VBox(15);
         content.setPadding(new Insets(15, 0, 0, 0));
 
-        // Barre d'actions pour l'onglet Produits
-        HBox tabActions = new HBox(10);
-        tabActions.setAlignment(Pos.CENTER_RIGHT);
-
-        Button exportProductsBtn = new Button("📥 Exporter les produits");
-        exportProductsBtn.setStyle("-fx-background-color: " + dashboard.getAccentColor() + ";" +
-                "-fx-text-fill: white;" +
-                "-fx-font-size: 11px;" +
-                "-fx-padding: 5 12;" +
-                "-fx-background-radius: 15;" +
-                "-fx-cursor: hand;");
-        exportProductsBtn.setOnAction(e -> exportProductsToCSV());
-
-        tabActions.getChildren().add(exportProductsBtn);
 
         // Tableau des produits (agrandi)
         productTable = new TableView<>();
@@ -465,7 +454,9 @@ public class ProductManagementView {
                 organisateurCol, feedbacksCol, actionsCol);
 
         VBox.setVgrow(productTable, Priority.ALWAYS);
-        content.getChildren().addAll(tabActions, productTable);
+
+        content.getChildren().add(productTable);
+
 
         return content;
     }
@@ -474,20 +465,6 @@ public class ProductManagementView {
         VBox content = new VBox(15);
         content.setPadding(new Insets(15, 0, 0, 0));
 
-        // Barre d'actions pour l'onglet Avis
-        HBox tabActions = new HBox(10);
-        tabActions.setAlignment(Pos.CENTER_RIGHT);
-
-        Button exportFeedbacksBtn = new Button("📥 Exporter les avis");
-        exportFeedbacksBtn.setStyle("-fx-background-color: " + dashboard.getAccentColor() + ";" +
-                "-fx-text-fill: white;" +
-                "-fx-font-size: 11px;" +
-                "-fx-padding: 5 12;" +
-                "-fx-background-radius: 15;" +
-                "-fx-cursor: hand;");
-        exportFeedbacksBtn.setOnAction(e -> exportFeedbacksToCSV());
-
-        tabActions.getChildren().add(exportFeedbacksBtn);
 
         // Tableau des feedbacks (agrandi)
         feedbackTable = new TableView<>();
@@ -527,6 +504,29 @@ public class ProductManagementView {
         TableColumn<Feedback, String> commentCol = new TableColumn<>("Commentaire");
         commentCol.setCellValueFactory(cellData ->
                 new SimpleStringProperty(cellData.getValue().getCommentaire()));
+
+        commentCol.setCellFactory(col -> new TableCell<Feedback, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+
+                    // Détection des mots inappropriés
+                    Feedback feedback = getTableView().getItems().get(getIndex());
+                    if (badWordDetector.containsBadWords(item)) {
+                        setStyle("-fx-background-color: " + dashboard.getWarningColor() + "20; -fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                        setTooltip(new Tooltip("⚠️ Ce commentaire contient des mots inappropriés"));
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        });
+
         commentCol.setPrefWidth(300);
 
         TableColumn<Feedback, String> dateCol = new TableColumn<>("Date");
@@ -534,9 +534,38 @@ public class ProductManagementView {
                 new SimpleStringProperty(formatDate(cellData.getValue().getDateCommentaire())));
         dateCol.setPrefWidth(120);
 
+
+        TableColumn<Feedback, String> flaggedCol = new TableColumn<>("Signalé");
+        flaggedCol.setCellValueFactory(cellData -> {
+            boolean hasBadWords = badWordDetector.containsBadWords(cellData.getValue().getCommentaire());
+            return new SimpleStringProperty(hasBadWords ? "⚠️ Oui" : "✓ Non");
+        });
+        flaggedCol.setCellFactory(col -> new TableCell<Feedback, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                    if (item.contains("⚠️")) {
+                        setStyle("-fx-text-fill: " + dashboard.getWarningColor() + "; -fx-font-weight: bold;");
+                    } else {
+                        setStyle("-fx-text-fill: " + dashboard.getSuccessColor() + ";");
+                    }
+                }
+            }
+        });
+        flaggedCol.setPrefWidth(80);
+
         TableColumn<Feedback, Void> actionsCol = new TableColumn<>("Actions");
         actionsCol.setCellFactory(col -> new TableCell<Feedback, Void>() {
             private final Button deleteBtn = new Button("🗑️ Supprimer");
+            private final Button reviewBtn = new Button("🔍 Examiner");
+            private final Button reportBtn = new Button("📄 Rapport PDF");
+            private final HBox pane = new HBox(5, reviewBtn, reportBtn, deleteBtn);
+
+
             {
                 deleteBtn.setStyle("-fx-background-color: " + dashboard.getDangerColor() + ";" +
                         "-fx-text-fill: white;" +
@@ -545,27 +574,289 @@ public class ProductManagementView {
                         "-fx-background-radius: 3;" +
                         "-fx-cursor: hand;");
 
+
+                reviewBtn.setStyle("-fx-background-color: " + dashboard.getWarningColor() + ";" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-size: 11px;" +
+                        "-fx-padding: 5 10;" +
+                        "-fx-background-radius: 3;" +
+                        "-fx-cursor: hand;");
+
+                reportBtn.setStyle("-fx-background-color: " + dashboard.getAccentColor() + ";" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-size: 11px;" +
+                        "-fx-padding: 5 10;" +
+                        "-fx-background-radius: 3;" +
+                        "-fx-cursor: hand;");
+
+
                 deleteBtn.setOnAction(e -> {
                     Feedback f = getTableView().getItems().get(getIndex());
                     confirmDeleteFeedback(f);
                 });
+
+
+                reviewBtn.setOnAction(e -> {
+                    Feedback f = getTableView().getItems().get(getIndex());
+                    showFeedbackReviewDialog(f);
+                });
+
+                reportBtn.setOnAction(e -> {
+                    Feedback f = getTableView().getItems().get(getIndex());
+                    generateFeedbackReport(f);
+                });
+
             }
 
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                setGraphic(empty ? null : deleteBtn);
+
+                setGraphic(empty ? null : pane);
             }
         });
-        actionsCol.setPrefWidth(80);
+        actionsCol.setPrefWidth(200);
 
-        feedbackTable.getColumns().addAll(userCol, productCol, ratingCol, commentCol, dateCol, actionsCol);
+        feedbackTable.getColumns().addAll(userCol, productCol, ratingCol, commentCol, dateCol, flaggedCol, actionsCol);
 
         VBox.setVgrow(feedbackTable, Priority.ALWAYS);
-        content.getChildren().addAll(tabActions, feedbackTable);
+        content.getChildren().add(feedbackTable);
+
 
         return content;
     }
+
+    // ==================== MÉTHODE DE GÉNÉRATION DE RAPPORT PDF ====================
+
+    /**
+     * Génère un rapport PDF avec toutes les informations du feedback et du produit
+     */
+    private void generateFeedbackReport(Feedback feedback) {
+        try {
+            // Récupérer toutes les informations nécessaires
+            Produit produit = produitService.getAll().stream()
+                    .filter(p -> p.getId() == feedback.getIdProduit())
+                    .findFirst().orElse(null);
+
+            if (produit == null) {
+                dashboard.showError("Erreur", "Produit non trouvé");
+                return;
+            }
+
+            User participant = userService.getUserById(feedback.getIdUser());
+            User organisateur = userService.getUserById(produit.getIdUser());
+
+            // Boîte de dialogue pour ajouter un avertissement
+            TextInputDialog dialog = new TextInputDialog();
+            dialog.setTitle("Ajouter un avertissement");
+            dialog.setHeaderText("Ajouter un avertissement au participant");
+            dialog.setContentText("Avertissement (optionnel):");
+
+            Optional<String> warningResult = dialog.showAndWait();
+            String warning = warningResult.orElse("");
+
+            // Ouvrir une boîte de dialogue de confirmation avec résumé
+            Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmAlert.setTitle("Générer rapport PDF");
+            confirmAlert.setHeaderText("Confirmer la génération du rapport");
+
+            String content = "Les informations suivantes seront incluses dans le rapport PDF :\n\n" +
+                    "📋 INFORMATIONS PARTICIPANT :\n" +
+                    "• Nom : " + (participant != null ? participant.getNomComplet() : "Inconnu") + "\n" +
+                    "• Email : " + (participant != null ? participant.getEmail() : "Inconnu") + "\n\n" +
+                    "💬 INFORMATIONS COMMENTAIRE :\n" +
+                    "• Date : " + formatDate(feedback.getDateCommentaire()) + "\n" +
+                    "• Note : " + feedback.getNote() + " étoiles\n" +
+                    "• Commentaire : " + feedback.getCommentaire() + "\n" +
+                    "• Mots inappropriés détectés : " + String.join(", ", badWordDetector.findBadWords(feedback.getCommentaire())) + "\n\n" +
+                    "📦 INFORMATIONS PRODUIT :\n" +
+                    "• Nom : " + produit.getNom() + "\n" +
+                    "• Catégorie : " + categoryNames.getOrDefault(produit.getIdCategorie(), "Inconnue") + "\n" +
+                    "• Description : " + produit.getDescription() + "\n" +
+                    "• Organisateur : " + (organisateur != null ? organisateur.getNomComplet() : "Inconnu") + "\n\n" +
+                    "⚠️ AVERTISSEMENT AJOUTÉ :\n" + (warning.isEmpty() ? "Aucun avertissement" : warning);
+
+            confirmAlert.setContentText(content);
+
+            Optional<ButtonType> result = confirmAlert.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                // Générer le PDF
+                generatePDF(produit, feedback, participant, organisateur, warning);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            dashboard.showError("Erreur", "Erreur lors de la génération du rapport : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Génère le fichier PDF avec toutes les informations (sans image)
+     */
+    private void generatePDF(Produit produit, Feedback feedback, User participant, User organisateur, String warning) {
+        try {
+            // Créer un FileChooser pour choisir l'emplacement de sauvegarde
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Enregistrer le rapport PDF");
+            fileChooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter("Fichier PDF", "*.pdf")
+            );
+
+            String fileName = "rapport_commentaire_" +
+                    (participant != null ? participant.getNomComplet().replace(" ", "_") : "inconnu") +
+                    "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
+                    ".pdf";
+            fileChooser.setInitialFileName(fileName);
+
+            File file = fileChooser.showSaveDialog(dashboard.getPrimaryStage());
+            if (file == null) return;
+
+            // Initialiser le document PDF
+            PdfWriter writer = new PdfWriter(new FileOutputStream(file));
+            PdfDocument pdfDoc = new PdfDocument(writer);
+            Document document = new Document(pdfDoc);
+
+            // Titre du document
+            Paragraph title = new Paragraph("RAPPORT D'AVIS SIGNALÉ")
+                    .setFontSize(20)
+                    .setBold()
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginBottom(20);
+            document.add(title);
+
+            // Informations du rapport
+            Paragraph rapportInfo = new Paragraph(
+                    "Rapport généré le : " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) + "\n" +
+                            "Généré par : " + currentUser.getNomComplet() + " (" + currentUser.getEmail() + ")")
+                    .setFontSize(10)
+                    .setMarginBottom(20);
+            document.add(rapportInfo);
+
+            // Section Participant
+            Paragraph participantTitle = new Paragraph("1. INFORMATIONS DU PARTICIPANT")
+                    .setFontSize(14)
+                    .setBold()
+                    .setFontColor(ColorConstants.BLUE)
+                    .setMarginTop(15);
+            document.add(participantTitle);
+
+            Table participantTable = new Table(UnitValue.createPercentArray(new float[]{30, 70}))
+                    .setWidth(UnitValue.createPercentValue(100))
+                    .setMarginBottom(15);
+
+            addPdfTableRow(participantTable, "Nom complet:", participant != null ? participant.getNomComplet() : "Inconnu");
+            addPdfTableRow(participantTable, "Email:", participant != null ? participant.getEmail() : "Inconnu");
+            addPdfTableRow(participantTable, "Rôle:", participant != null ? participant.getRole() : "Inconnu");
+            addPdfTableRow(participantTable, "ID Utilisateur:", participant != null ? String.valueOf(participant.getId()) : "Inconnu");
+
+            document.add(participantTable);
+
+            // Section Commentaire
+            Paragraph commentTitle = new Paragraph("2. INFORMATIONS DU COMMENTAIRE")
+                    .setFontSize(14)
+                    .setBold()
+                    .setFontColor(ColorConstants.BLUE)
+                    .setMarginTop(15);
+            document.add(commentTitle);
+
+            Table commentTable = new Table(UnitValue.createPercentArray(new float[]{30, 70}))
+                    .setWidth(UnitValue.createPercentValue(100))
+                    .setMarginBottom(15);
+
+            addPdfTableRow(commentTable, "Date du commentaire:", formatDate(feedback.getDateCommentaire()));
+            addPdfTableRow(commentTable, "Note attribuée:", feedback.getNote() + " / 5");
+            addPdfTableRow(commentTable, "Commentaire:", feedback.getCommentaire());
+
+            List<String> badWords = badWordDetector.findBadWords(feedback.getCommentaire());
+            addPdfTableRow(commentTable, "Mots inappropriés détectés:",
+                    badWords.isEmpty() ? "Aucun" : String.join(", ", badWords));
+
+            document.add(commentTable);
+
+            // Section Produit
+            Paragraph productTitle = new Paragraph("3. INFORMATIONS DU PRODUIT")
+                    .setFontSize(14)
+                    .setBold()
+                    .setFontColor(ColorConstants.BLUE)
+                    .setMarginTop(15);
+            document.add(productTitle);
+
+            Table productTable = new Table(UnitValue.createPercentArray(new float[]{30, 70}))
+                    .setWidth(UnitValue.createPercentValue(100))
+                    .setMarginBottom(15);
+
+            addPdfTableRow(productTable, "Nom du produit:", produit.getNom());
+            addPdfTableRow(productTable, "Catégorie:", categoryNames.getOrDefault(produit.getIdCategorie(), "Inconnue"));
+            addPdfTableRow(productTable, "Description:", produit.getDescription());
+            addPdfTableRow(productTable, "ID Produit:", String.valueOf(produit.getId()));
+
+            document.add(productTable);
+
+            // Section Organisateur
+            Paragraph organisateurTitle = new Paragraph("4. INFORMATIONS DE L'ORGANISATEUR")
+                    .setFontSize(14)
+                    .setBold()
+                    .setFontColor(ColorConstants.BLUE)
+                    .setMarginTop(15);
+            document.add(organisateurTitle);
+
+            Table organisateurTable = new Table(UnitValue.createPercentArray(new float[]{30, 70}))
+                    .setWidth(UnitValue.createPercentValue(100))
+                    .setMarginBottom(15);
+
+            addPdfTableRow(organisateurTable, "Nom:", organisateur != null ? organisateur.getNomComplet() : "Inconnu");
+            addPdfTableRow(organisateurTable, "Email:", organisateur != null ? organisateur.getEmail() : "Inconnu");
+
+            document.add(organisateurTable);
+
+            // Section Avertissement
+            Paragraph warningTitle = new Paragraph("5. AVERTISSEMENT")
+                    .setFontSize(14)
+                    .setBold()
+                    .setFontColor(ColorConstants.RED)
+                    .setMarginTop(15);
+            document.add(warningTitle);
+
+            Paragraph warningText = new Paragraph(warning.isEmpty() ? "Aucun avertissement ajouté" : warning)
+                    .setFontSize(12)
+                    .setBackgroundColor(ColorConstants.YELLOW)
+                    .setPadding(10)
+                    .setMarginBottom(20);
+            document.add(warningText);
+
+            // Pied de page
+            Paragraph footer = new Paragraph(
+                    "Ce rapport a été généré automatiquement dans le cadre de la modération des commentaires.\n" +
+                            "Document confidentiel - À usage interne uniquement.")
+                    .setFontSize(8)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginTop(30);
+            document.add(footer);
+
+            // Fermer le document
+            document.close();
+
+            dashboard.showAlert("Succès", "Rapport PDF généré avec succès : " + file.getName());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            dashboard.showError("Erreur", "Erreur lors de la création du PDF : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Helper pour ajouter une ligne au tableau PDF
+     */
+    private void addPdfTableRow(Table table, String label, String value) {
+        Cell labelCell = new Cell().add(new Paragraph(label).setBold());
+        labelCell.setBorder(Border.NO_BORDER);
+        table.addCell(labelCell);
+
+        Cell valueCell = new Cell().add(new Paragraph(value != null ? value : ""));
+        valueCell.setBorder(Border.NO_BORDER);
+        table.addCell(valueCell);
+    }
+
 
     private void loadOrganisateurs() {
         List<User> organisateurs = userService.getUsersByRole("organisateur");
@@ -639,6 +930,22 @@ public class ProductManagementView {
         feedbackTable.setItems(FXCollections.observableArrayList(allFeedbacks));
     }
 
+    private void loadFlaggedFeedbacks() {
+        List<Feedback> allFeedbacks = new ArrayList<>();
+        List<Produit> allProducts = produitService.getAll();
+
+        for (Produit p : allProducts) {
+            allFeedbacks.addAll(feedbackService.getFeedbacksByProduct(p.getId()));
+        }
+
+        List<Feedback> flaggedFeedbacks = allFeedbacks.stream()
+                .filter(f -> badWordDetector.containsBadWords(f.getCommentaire()))
+                .collect(Collectors.toList());
+
+        feedbackTable.setItems(FXCollections.observableArrayList(flaggedFeedbacks));
+    }
+
+
     private void updateStats() {
         List<Produit> allProducts = produitService.getAll();
         List<Feedback> allFeedbacks = new ArrayList<>();
@@ -646,6 +953,11 @@ public class ProductManagementView {
         for (Produit p : allProducts) {
             allFeedbacks.addAll(feedbackService.getFeedbacksByProduct(p.getId()));
         }
+
+        long flaggedCount = allFeedbacks.stream()
+                .filter(f -> badWordDetector.containsBadWords(f.getCommentaire()))
+                .count();
+
 
         if (totalProductsValue != null) {
             totalProductsValue.setText(String.valueOf(allProducts.size()));
@@ -663,6 +975,11 @@ public class ProductManagementView {
         if (avgRatingValue != null) {
             avgRatingValue.setText(String.format("%.1f", avgRating));
         }
+
+        if (flaggedFeedbacksValue != null) {
+            flaggedFeedbacksValue.setText(String.valueOf(flaggedCount));
+        }
+
     }
 
     private void confirmDeleteProduct(Produit p) {
@@ -695,6 +1012,107 @@ public class ProductManagementView {
             dashboard.showAlert("Succès", "Avis supprimé avec succès !");
         }
     }
+
+    private void showFeedbackReviewDialog(Feedback f) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Examen de l'avis");
+        dialog.setHeaderText("Avis signalé - " + f.getUserName());
+
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(500);
+
+        // Informations
+        GridPane infoGrid = new GridPane();
+        infoGrid.setHgap(10);
+        infoGrid.setVgap(10);
+
+        Label userLabel = new Label("Utilisateur:");
+        userLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        Label userValue = new Label(f.getUserName());
+
+        Label productLabel = new Label("Produit:");
+        productLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        Produit p = produitService.getAll().stream()
+                .filter(prod -> prod.getId() == f.getIdProduit())
+                .findFirst().orElse(null);
+        Label productValue = new Label(p != null ? p.getNom() : "Produit supprimé");
+
+        Label ratingLabel = new Label("Note:");
+        ratingLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        Label ratingValue = new Label("⭐".repeat(f.getNote()));
+
+        Label dateLabel = new Label("Date:");
+        dateLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        Label dateValue = new Label(formatDate(f.getDateCommentaire()));
+
+        infoGrid.add(userLabel, 0, 0);
+        infoGrid.add(userValue, 1, 0);
+        infoGrid.add(productLabel, 0, 1);
+        infoGrid.add(productValue, 1, 1);
+        infoGrid.add(ratingLabel, 0, 2);
+        infoGrid.add(ratingValue, 1, 2);
+        infoGrid.add(dateLabel, 0, 3);
+        infoGrid.add(dateValue, 1, 3);
+
+        // Commentaire original
+        Label commentLabel = new Label("Commentaire original:");
+        commentLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+
+        TextArea originalComment = new TextArea(f.getCommentaire());
+        originalComment.setWrapText(true);
+        originalComment.setEditable(false);
+        originalComment.setPrefRowCount(4);
+        originalComment.setStyle("-fx-control-inner-background: #fef9e7; -fx-text-fill: #2c3e50;");
+
+        // Mots détectés
+        List<String> badWordsFound = badWordDetector.findBadWords(f.getCommentaire());
+        Label detectionLabel = new Label("Mots inappropriés détectés: " + String.join(", ", badWordsFound));
+        detectionLabel.setStyle("-fx-text-fill: " + dashboard.getWarningColor() + "; -fx-font-weight: bold;");
+
+        // Actions
+        HBox actionButtons = new HBox(10);
+        actionButtons.setAlignment(Pos.CENTER);
+
+        Button generateReportBtn = new Button("📄 Générer Rapport");
+        generateReportBtn.setStyle("-fx-background-color: " + dashboard.getAccentColor() + ";" +
+                "-fx-text-fill: white;" +
+                "-fx-font-weight: bold;" +
+                "-fx-padding: 8 15;" +
+                "-fx-background-radius: 5;" +
+                "-fx-cursor: hand;");
+        generateReportBtn.setOnAction(e -> {
+            generateFeedbackReport(f);
+            dialog.close();
+        });
+
+        Button deleteBtn = new Button("🗑️ Supprimer l'avis");
+        deleteBtn.setStyle("-fx-background-color: " + dashboard.getDangerColor() + ";" +
+                "-fx-text-fill: white;" +
+                "-fx-font-weight: bold;" +
+                "-fx-padding: 8 15;" +
+                "-fx-background-radius: 5;" +
+                "-fx-cursor: hand;");
+        deleteBtn.setOnAction(e -> {
+            feedbackService.deleteFeedback(f.getIdFeedback());
+            loadFeedbacks();
+            updateStats();
+            dialog.setResult(ButtonType.CANCEL);
+            dialog.close();
+            dashboard.showAlert("Succès", "Avis supprimé avec succès !");
+        });
+
+        actionButtons.getChildren().addAll(generateReportBtn, deleteBtn);
+
+        content.getChildren().addAll(infoGrid, commentLabel, originalComment, detectionLabel, actionButtons);
+
+        DialogPane dialogPane = dialog.getDialogPane();
+        dialogPane.setContent(content);
+        dialogPane.getButtonTypes().add(ButtonType.CLOSE);
+
+        dialog.showAndWait();
+    }
+
 
     private void showProductDetails(Produit p) {
         Dialog<Void> dialog = new Dialog<>();
@@ -779,97 +1197,111 @@ public class ProductManagementView {
         return date.format(formatter);
     }
 
-    // ==================== FONCTIONS D'EXPORT CSV ====================
+    // ==================== CLASSE INTERNE DÉTECTEUR DE BAD WORDS ====================
 
-    private void exportProductsToCSV() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Exporter les produits");
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Fichier CSV", "*.csv")
-        );
-        fileChooser.setInitialFileName("produits_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv");
+    /**
+     * Détecteur de mots inappropriés dans les commentaires
+     */
+    private class BadWordDetector {
+        // Liste de mots inappropriés (à personnaliser selon vos besoins)
+        private final Set<String> badWords = new HashSet<>(Arrays.asList(
+                // Insultes en français
+                "merde", "putain", "connard", "connasse", "salope", "enculé", "enculée",
+                "bâtard", "bâtarde", "fils de pute", "fdp", "ntm", "pd", "pédé",
+                "salaud", "salopard", "ordure", "charogne", "raciste", "nazi",
+                // Mots grossiers en anglais
+                "shit", "fuck", "asshole", "bitch", "bastard", "damn", "hell",
+                "cunt", "dick", "pussy", "motherfucker", "mf", "wtf", "stfu",
+                // Termes racistes/discriminatoires
+                "nègre", "bougnoule", "sale arabe", "sale juif", "sale noir",
+                "sale blanc", "sale chinois", "sale rom", "sale gitan",
+                // Termes violents/menaces
+                "tuer", "crever", "massacre", "assassiner", "violer", "brûler",
+                "pendre", "décapiter", "exploser", "bombe", "attentat",
+                // Insultes courantes en français
+                "abruti", "abrutie", "imbécile", "crétin", "crétine", "débile",
+                "idiot", "idiote", "stupide", "con", "conne", "couillon",
+                "gros con", "grosse conne", "pauvre type", "trou du cul", "trouduc"
+        ));
 
-        File file = fileChooser.showSaveDialog(dashboard.getPrimaryStage());
-        if (file != null) {
-            try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
-                // En-tête CSV
-                writer.println("ID;Nom;Description;Catégorie;Organisateur;Email Organisateur;Nombre d'avis");
+        // Mots autorisés qui pourraient être mal interprétés
+        private final Set<String> allowedWords = new HashSet<>(Arrays.asList(
+                "confiture", "confit", "conference", "connaissance", "connu",
+                "connue", "connus", "connues", "connection", "connexion"
+        ));
 
-                // Données
-                for (Produit p : productTable.getItems()) {
-                    User org = userService.getUserById(p.getIdUser());
-                    String orgName = org != null ? org.getNomComplet() : "Inconnu";
-                    String orgEmail = org != null ? org.getEmail() : "";
-                    int feedbackCount = feedbackService.getFeedbacksByProduct(p.getId()).size();
+        /**
+         * Vérifie si un texte contient des mots inappropriés
+         */
+        public boolean containsBadWords(String text) {
+            if (text == null || text.isEmpty()) return false;
 
-                    writer.println(String.format("%d;%s;%s;%s;%s;%s;%d",
-                            p.getId(),
-                            escapeCSV(p.getNom()),
-                            escapeCSV(p.getDescription()),
-                            categoryNames.getOrDefault(p.getIdCategorie(), "Inconnue"),
-                            escapeCSV(orgName),
-                            escapeCSV(orgEmail),
-                            feedbackCount
-                    ));
+            String lowerText = text.toLowerCase();
+
+            // Vérifier chaque mot inapproprié
+            for (String badWord : badWords) {
+                // Vérifier si le mot est présent en tant que mot entier ou partie de mot
+                if (lowerText.contains(badWord)) {
+                    // Vérifier que ce n'est pas un mot autorisé
+                    boolean isAllowed = false;
+                    for (String allowed : allowedWords) {
+                        if (lowerText.contains(allowed) && allowed.contains(badWord)) {
+                            isAllowed = true;
+                            break;
+                        }
+                    }
+                    if (!isAllowed) {
+                        return true;
+                    }
                 }
+            }
+            return false;
+        }
 
-                dashboard.showAlert("Succès", "Export réussi : " + file.getName());
-            } catch (Exception e) {
-                dashboard.showError("Erreur", "Erreur lors de l'export : " + e.getMessage());
+        /**
+         * Retourne la liste des mots inappropriés trouvés dans le texte
+         */
+        public List<String> findBadWords(String text) {
+            List<String> found = new ArrayList<>();
+            if (text == null || text.isEmpty()) return found;
+
+            String lowerText = text.toLowerCase();
+
+            for (String badWord : badWords) {
+                if (lowerText.contains(badWord)) {
+                    // Vérifier que ce n'est pas un mot autorisé
+                    boolean isAllowed = false;
+                    for (String allowed : allowedWords) {
+                        if (lowerText.contains(allowed) && allowed.contains(badWord)) {
+                            isAllowed = true;
+                            break;
+                        }
+                    }
+                    if (!isAllowed) {
+                        found.add(badWord);
+                    }
+                }
+            }
+            return found;
+        }
+
+        /**
+         * Ajoute un mot à la liste des mots inappropriés
+         */
+        public void addBadWord(String word) {
+            if (word != null && !word.isEmpty()) {
+                badWords.add(word.toLowerCase());
+            }
+        }
+
+        /**
+         * Ajoute un mot à la liste des mots autorisés
+         */
+        public void addAllowedWord(String word) {
+            if (word != null && !word.isEmpty()) {
+                allowedWords.add(word.toLowerCase());
             }
         }
     }
 
-    private void exportFeedbacksToCSV() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Exporter les avis");
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Fichier CSV", "*.csv")
-        );
-        fileChooser.setInitialFileName("avis_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv");
-
-        File file = fileChooser.showSaveDialog(dashboard.getPrimaryStage());
-        if (file != null) {
-            try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
-                // En-tête CSV
-                writer.println("ID;Utilisateur;Email;Produit;Note;Commentaire;Date");
-
-                // Données
-                for (Feedback f : feedbackTable.getItems()) {
-                    Produit p = produitService.getAll().stream()
-                            .filter(prod -> prod.getId() == f.getIdProduit())
-                            .findFirst().orElse(null);
-                    String productName = p != null ? p.getNom() : "Produit supprimé";
-
-                    writer.println(String.format("%d;%s;%s;%s;%d;%s;%s",
-                            f.getIdFeedback(),
-                            escapeCSV(f.getUserName()),
-                            "", // Email (à ajouter si disponible)
-                            escapeCSV(productName),
-                            f.getNote(),
-                            escapeCSV(f.getCommentaire()),
-                            formatDate(f.getDateCommentaire())
-                    ));
-                }
-
-                dashboard.showAlert("Succès", "Export réussi : " + file.getName());
-            } catch (Exception e) {
-                dashboard.showError("Erreur", "Erreur lors de l'export : " + e.getMessage());
-            }
-        }
-    }
-
-    private void exportAllToCSV() {
-        exportProductsToCSV();
-        exportFeedbacksToCSV();
-    }
-
-    private String escapeCSV(String value) {
-        if (value == null) return "";
-        // Échapper les guillemets et entourer de guillemets si nécessaire
-        if (value.contains(";") || value.contains("\"") || value.contains("\n")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return value;
-    }
 }

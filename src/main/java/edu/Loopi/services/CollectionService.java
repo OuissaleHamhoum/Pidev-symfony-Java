@@ -13,6 +13,40 @@ public class CollectionService {
         conn = MyConnection.getInstance().getConnection();
     }
 
+    // --- ADDED: Method to fetch a single collection by ID ---
+    public Collection getCollectionById(int id) {
+        String query = "SELECT c.*, u.nom, u.prenom FROM collection c " +
+                "JOIN users u ON c.id_user = u.id WHERE c.id_collection = ?";
+        try (PreparedStatement pst = conn.prepareStatement(query)) {
+            pst.setInt(1, id);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                Collection c = new Collection(
+                        rs.getInt("id_collection"), rs.getString("title"),
+                        rs.getString("material_type"), rs.getDouble("goal_amount"),
+                        rs.getDouble("current_amount"), rs.getString("unit"),
+                        rs.getString("status"), rs.getString("image_collection"),
+                        rs.getInt("id_user"), rs.getTimestamp("created_at")
+                );
+                c.setUserName(rs.getString("prenom") + " " + rs.getString("nom"));
+                return c;
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
+    }
+
+    // --- ADDED: Method to update current amount based on donations ---
+    public void updateCurrentAmount(int collectionId) {
+        String query = "UPDATE collection SET current_amount = " +
+                "(SELECT IFNULL(SUM(amount), 0) FROM donation WHERE id_collection = ? AND status = 'confirmé') " +
+                "WHERE id_collection = ?";
+        try (PreparedStatement pst = conn.prepareStatement(query)) {
+            pst.setInt(1, collectionId);
+            pst.setInt(2, collectionId);
+            pst.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
     /**
      * Fetches all campaigns and joins with the users table
      * to get the organizer's full name.

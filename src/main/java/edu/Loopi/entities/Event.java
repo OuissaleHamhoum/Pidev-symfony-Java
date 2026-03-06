@@ -19,11 +19,15 @@ public class Event {
     private Double latitude;
     private Double longitude;
 
-    // Nouveaux champs pour validation
+    // Statut de validation (admin)
     private String statutValidation; // "en_attente", "approuve", "refuse"
     private Timestamp dateSoumission;
     private Timestamp dateValidation;
     private String commentaireValidation;
+
+    // Statut de publication (organisateur)
+    private boolean estPublie; // false = brouillon, true = publié (après approbation)
+    private Timestamp datePublication;
 
     // Statistiques de participation
     private int participantsCount = 0;
@@ -33,8 +37,12 @@ public class Event {
 
     // Informations supplémentaires
     private String organisateurNom;
+    private String organisateurEmail;
 
-    public Event() {}
+    public Event() {
+        this.statutValidation = "en_attente";
+        this.estPublie = false;
+    }
 
     public Event(String titre, String description, LocalDateTime date_evenement, String lieu,
                  int id_organisateur, Integer capacite_max, String image_evenement) {
@@ -46,9 +54,122 @@ public class Event {
         this.capacite_max = capacite_max;
         this.image_evenement = image_evenement;
         this.statutValidation = "en_attente";
+        this.estPublie = false;
     }
 
-    // Getters et Setters
+    // Getters et Setters existants...
+
+    public boolean isEstPublie() { return estPublie; }
+    public void setEstPublie(boolean estPublie) { this.estPublie = estPublie; }
+
+    public Timestamp getDatePublication() { return datePublication; }
+    public void setDatePublication(Timestamp datePublication) { this.datePublication = datePublication; }
+
+    public String getOrganisateurEmail() { return organisateurEmail; }
+    public void setOrganisateurEmail(String organisateurEmail) { this.organisateurEmail = organisateurEmail; }
+
+    // Méthodes utilitaires
+    public String getFormattedDate() {
+        if (date_evenement == null) return "Date non définie";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        return date_evenement.format(formatter);
+    }
+
+    public String getStatut() {
+        if (date_evenement == null) return "Date non définie";
+        LocalDateTime now = LocalDateTime.now();
+
+        // Vérifier si la date est passée
+        if (date_evenement.isBefore(now)) {
+            return "Passé";
+        }
+
+        // Vérifier si c'est aujourd'hui
+        if (date_evenement.toLocalDate().isEqual(now.toLocalDate())) {
+            return "En cours";
+        }
+
+        return "À venir";
+    }
+
+    public boolean isDatePassee() {
+        if (date_evenement == null) return true;
+        return date_evenement.isBefore(LocalDateTime.now());
+    }
+
+    public boolean isComplet() {
+        if (capacite_max == null || capacite_max <= 0) return false;
+        return participantsCount >= capacite_max;
+    }
+
+    public boolean estAccessiblePourParticipant() {
+        // Un événement est accessible si :
+        // 1. Il est approuvé par l'admin
+        // 2. Il est publié par l'organisateur
+        // 3. La date n'est pas passée
+        // 4. Il n'est pas complet
+        return "approuve".equals(statutValidation) &&
+                estPublie &&
+                !isDatePassee() &&
+                !isComplet();
+    }
+
+    public String getStatutValidationFr() {
+        if (statutValidation == null) return "Inconnu";
+        switch (statutValidation) {
+            case "en_attente": return "En attente";
+            case "approuve": return "Approuvé";
+            case "refuse": return "Refusé";
+            default: return statutValidation;
+        }
+    }
+
+    public String getStatutValidationColor() {
+        if (statutValidation == null) return "#6c757d";
+        switch (statutValidation) {
+            case "en_attente": return "#f39c12"; // Orange
+            case "approuve": return "#2ecc71";   // Vert
+            case "refuse": return "#e74c3c";     // Rouge
+            default: return "#6c757d";
+        }
+    }
+
+    public String getStatutPublicationFr() {
+        return estPublie ? "Publié" : "Brouillon";
+    }
+
+    public String getStatutPublicationColor() {
+        return estPublie ? "#2ecc71" : "#95a5a6";
+    }
+
+    public int getPlacesRestantes() {
+        if (capacite_max == null) return -1;
+        return Math.max(0, capacite_max - participantsCount);
+    }
+
+    public double getTauxRemplissage() {
+        if (capacite_max == null || capacite_max == 0) return 0;
+        return (double) participantsCount / capacite_max * 100;
+    }
+
+    public boolean hasCoordinates() {
+        return latitude != null && longitude != null;
+    }
+
+    // Getters et Setters pour les statistiques
+    public int getParticipantsCount() { return participantsCount; }
+    public void setParticipantsCount(int participantsCount) { this.participantsCount = participantsCount; }
+
+    public int getParticipantsInscrits() { return participantsInscrits; }
+    public void setParticipantsInscrits(int participantsInscrits) { this.participantsInscrits = participantsInscrits; }
+
+    public int getParticipantsPresents() { return participantsPresents; }
+    public void setParticipantsPresents(int participantsPresents) { this.participantsPresents = participantsPresents; }
+
+    public int getParticipantsAbsents() { return participantsAbsents; }
+    public void setParticipantsAbsents(int participantsAbsents) { this.participantsAbsents = participantsAbsents; }
+
+    // Getters et Setters existants
     public int getId_evenement() { return id_evenement; }
     public void setId_evenement(int id_evenement) { this.id_evenement = id_evenement; }
 
@@ -76,7 +197,6 @@ public class Event {
     public Timestamp getCreated_at() { return created_at; }
     public void setCreated_at(Timestamp created_at) { this.created_at = created_at; }
 
-    // Coordonnées géographiques
     public Double getLatitude() { return latitude; }
     public void setLatitude(Double latitude) { this.latitude = latitude; }
 
@@ -97,65 +217,4 @@ public class Event {
 
     public String getOrganisateurNom() { return organisateurNom; }
     public void setOrganisateurNom(String organisateurNom) { this.organisateurNom = organisateurNom; }
-
-    // Statistiques
-    public int getParticipantsCount() { return participantsCount; }
-    public void setParticipantsCount(int participantsCount) { this.participantsCount = participantsCount; }
-
-    public int getParticipantsInscrits() { return participantsInscrits; }
-    public void setParticipantsInscrits(int participantsInscrits) { this.participantsInscrits = participantsInscrits; }
-
-    public int getParticipantsPresents() { return participantsPresents; }
-    public void setParticipantsPresents(int participantsPresents) { this.participantsPresents = participantsPresents; }
-
-    public int getParticipantsAbsents() { return participantsAbsents; }
-    public void setParticipantsAbsents(int participantsAbsents) { this.participantsAbsents = participantsAbsents; }
-
-    // Méthodes utilitaires
-    public String getFormattedDate() {
-        if (date_evenement == null) return "Date non définie";
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        return date_evenement.format(formatter);
-    }
-
-    public String getStatut() {
-        if (date_evenement == null) return "Date non définie";
-        LocalDateTime now = LocalDateTime.now();
-        if (date_evenement.toLocalDate().isEqual(now.toLocalDate())) {
-            return "En cours";
-        } else if (date_evenement.isAfter(now)) {
-            return "À venir";
-        } else {
-            return "Passé";
-        }
-    }
-
-    public String getStatutValidationFr() {
-        if (statutValidation == null) return "Inconnu";
-        switch (statutValidation) {
-            case "en_attente": return "En attente";
-            case "approuve": return "Approuvé";
-            case "refuse": return "Refusé";
-            default: return statutValidation;
-        }
-    }
-
-    public String getStatutValidationColor() {
-        if (statutValidation == null) return "#6c757d";
-        switch (statutValidation) {
-            case "en_attente": return "#f39c12"; // Orange
-            case "approuve": return "#2ecc71";   // Vert
-            case "refuse": return "#e74c3c";     // Rouge
-            default: return "#6c757d";
-        }
-    }
-
-    public double getTauxRemplissage() {
-        if (capacite_max == null || capacite_max == 0) return 0;
-        return (double) participantsCount / capacite_max * 100;
-    }
-
-    public boolean hasCoordinates() {
-        return latitude != null && longitude != null;
-    }
 }

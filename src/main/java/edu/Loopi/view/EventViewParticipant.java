@@ -5,6 +5,8 @@ import edu.Loopi.entities.User;
 import edu.Loopi.entities.Participation;
 import edu.Loopi.services.EventService;
 import edu.Loopi.services.ParticipationService;
+import edu.Loopi.services.NotificationService;
+import edu.Loopi.services.UserService;
 import javafx.animation.ScaleTransition;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -23,6 +25,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.io.File;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -34,12 +37,15 @@ public class EventViewParticipant {
     private FlowPane cardsContainer;
     private EventService eventService = new EventService();
     private ParticipationService participationService = new ParticipationService();
+    private NotificationService notificationService = new NotificationService();
+    private UserService userService = new UserService();
     private List<Event> allEvents;
 
     // Composants pour les filtres
     private TextField searchField = new TextField();
     private ComboBox<String> statusFilter = new ComboBox<>();
     private ComboBox<String> sortFilter = new ComboBox<>();
+    private CheckBox showPastEventsCheckBox = new CheckBox("Afficher les événements passés");
     private HBox statsBar = new HBox(20);
     private Label messageInfoLabel;
 
@@ -62,7 +68,6 @@ public class EventViewParticipant {
         mainLayout.setPadding(new Insets(30));
         mainLayout.setStyle("-fx-background-color: #f8f9fa;");
 
-        // HEADER SECTION
         VBox heroSection = new VBox(8);
         heroSection.setPadding(new Insets(0, 0, 15, 0));
 
@@ -77,7 +82,6 @@ public class EventViewParticipant {
 
         heroSection.getChildren().addAll(bigTitle, description);
 
-        // Message d'information
         messageInfoLabel = new Label("");
         messageInfoLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 13));
         messageInfoLabel.setTextFill(Color.web("#059669"));
@@ -85,13 +89,11 @@ public class EventViewParticipant {
         messageInfoLabel.setVisible(false);
         heroSection.getChildren().add(messageInfoLabel);
 
-        // STATISTIQUES
         statsBar.setAlignment(Pos.CENTER);
         statsBar.setPadding(new Insets(15));
         statsBar.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 2);");
 
-        // BARRE DE FILTRES
         HBox filterBar = new HBox(15);
         filterBar.setAlignment(Pos.CENTER_LEFT);
         filterBar.setPadding(new Insets(15));
@@ -136,6 +138,11 @@ public class EventViewParticipant {
                 "-fx-background-color: white; -fx-border-color: #cbd5e1;");
         searchField.textProperty().addListener((obs, old, nv) -> applyFilters());
 
+        showPastEventsCheckBox.setFont(Font.font("Arial", 12));
+        showPastEventsCheckBox.setTextFill(Color.web("#1e293b"));
+        showPastEventsCheckBox.setSelected(false);
+        showPastEventsCheckBox.setOnAction(e -> applyFilters());
+
         Button myParticipationsBtn = new Button("👥 Mes participations");
         myParticipationsBtn.setStyle("-fx-background-color: #10b981; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 30; " +
@@ -153,11 +160,12 @@ public class EventViewParticipant {
                 sortLabel, sortFilter,
                 new Separator(javafx.geometry.Orientation.VERTICAL),
                 searchLabel, searchField,
+                new Separator(javafx.geometry.Orientation.VERTICAL),
+                showPastEventsCheckBox,
                 spacer,
                 myParticipationsBtn
         );
 
-        // ZONE DES CARTES
         cardsContainer = new FlowPane();
         cardsContainer.setHgap(20);
         cardsContainer.setVgap(20);
@@ -174,12 +182,11 @@ public class EventViewParticipant {
 
     private void loadData() {
         List<Event> tousEvents = eventService.getAllEvents();
-        // Filtrer pour ne montrer que les événements approuvés
         allEvents = tousEvents.stream()
                 .filter(e -> "approuve".equals(e.getStatutValidation()))
+                .filter(e -> e.isEstPublie())
                 .collect(Collectors.toList());
 
-        // Message si aucun événement approuvé
         if (allEvents.isEmpty()) {
             messageInfoLabel.setText("🔔 Aucun événement disponible pour le moment. Revenez plus tard !");
             messageInfoLabel.setVisible(true);
@@ -198,10 +205,14 @@ public class EventViewParticipant {
     private void updateStats() {
         statsBar.getChildren().clear();
 
+        List<Event> upcomingEvents = allEvents.stream()
+                .filter(e -> !e.isDatePassee())
+                .collect(Collectors.toList());
+
         int total = allEvents.size();
-        int aVenir = (int) allEvents.stream().filter(e -> "à venir".equals(e.getStatut())).count();
-        int enCours = (int) allEvents.stream().filter(e -> "en cours".equals(e.getStatut())).count();
-        int passes = (int) allEvents.stream().filter(e -> "passé".equals(e.getStatut())).count();
+        int aVenir = (int) allEvents.stream().filter(e -> "à venir".equals(e.getStatut()) && !e.isDatePassee()).count();
+        int enCours = (int) allEvents.stream().filter(e -> "en cours".equals(e.getStatut()) && !e.isDatePassee()).count();
+        int passes = (int) allEvents.stream().filter(Event::isDatePassee).count();
 
         int mesParticipations = participationService.countParticipationsByUser(currentUser.getId());
 
@@ -240,6 +251,7 @@ public class EventViewParticipant {
         String searchText = searchField.getText().toLowerCase().trim();
         String selectedStatus = statusFilter.getValue();
         String selectedSort = sortFilter.getValue();
+        boolean showPast = showPastEventsCheckBox.isSelected();
 
         List<Event> filtered = allEvents.stream()
                 .filter(event -> {
@@ -248,12 +260,16 @@ public class EventViewParticipant {
                             (event.getLieu() != null && event.getLieu().toLowerCase().contains(searchText));
                 })
                 .filter(event -> {
+                    if (!showPast && event.isDatePassee()) return false;
+                    return true;
+                })
+                .filter(event -> {
                     if (selectedStatus == null || "Tous".equals(selectedStatus)) return true;
                     String eventStatut = event.getStatut().toLowerCase();
                     String filterStatut = selectedStatus.toLowerCase();
-                    if (filterStatut.equals("à venir") && eventStatut.equals("à venir")) return true;
-                    if (filterStatut.equals("en cours") && eventStatut.equals("en cours")) return true;
-                    if (filterStatut.equals("passés") && eventStatut.equals("passé")) return true;
+                    if (filterStatut.equals("à venir") && eventStatut.equals("à venir") && !event.isDatePassee()) return true;
+                    if (filterStatut.equals("en cours") && eventStatut.equals("en cours") && !event.isDatePassee()) return true;
+                    if (filterStatut.equals("passés") && event.isDatePassee()) return true;
                     return false;
                 })
                 .collect(Collectors.toList());
@@ -267,10 +283,8 @@ public class EventViewParticipant {
                 break;
             case "Places disponibles":
                 filtered.sort((e1, e2) -> {
-                    int places1 = e1.getCapacite_max() != null ?
-                            e1.getCapacite_max() - e1.getParticipantsCount() : 999;
-                    int places2 = e2.getCapacite_max() != null ?
-                            e2.getCapacite_max() - e2.getParticipantsCount() : 999;
+                    int places1 = e1.getPlacesRestantes();
+                    int places2 = e2.getPlacesRestantes();
                     return Integer.compare(places2, places1);
                 });
                 break;
@@ -319,22 +333,28 @@ public class EventViewParticipant {
 
     private VBox createEventCard(Event event) {
         VBox card = new VBox(0);
-        card.setPrefSize(320, 450);
-        card.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 5);");
+        card.setPrefSize(320, 520);
+        boolean isPastEvent = event.isDatePassee();
 
-        card.setOnMouseEntered(e -> {
-            card.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 20, 0, 0, 8);");
-            scaleNode(card, 1.02);
-        });
-        card.setOnMouseExited(e -> {
-            card.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 5);");
-            scaleNode(card, 1.0);
-        });
+        String cardStyle = isPastEvent ?
+                "-fx-background-color: #f1f5f9; -fx-background-radius: 16; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 5);" :
+                "-fx-background-color: white; -fx-background-radius: 16; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 5);";
 
-        // IMAGE
+        card.setStyle(cardStyle);
+
+        if (!isPastEvent) {
+            card.setOnMouseEntered(e -> {
+                card.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
+                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 20, 0, 0, 8);");
+                scaleNode(card, 1.02);
+            });
+            card.setOnMouseExited(e -> {
+                card.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
+                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 5);");
+                scaleNode(card, 1.0);
+            });
+        }
+
         StackPane imgContainer = new StackPane();
         ImageView imgView = new ImageView();
         imgView.setFitWidth(320);
@@ -363,7 +383,6 @@ public class EventViewParticipant {
         imgView.setClip(clip);
         imgContainer.getChildren().add(imgView);
 
-        // BADGE STATUT
         String statut = event.getStatut();
         Label statusBadge = new Label(statut.substring(0, 1).toUpperCase() + statut.substring(1));
         statusBadge.setFont(Font.font("Arial", FontWeight.BOLD, 11));
@@ -382,7 +401,6 @@ public class EventViewParticipant {
         StackPane.setMargin(statusBadge, new Insets(10, 10, 0, 0));
         imgContainer.getChildren().add(statusBadge);
 
-        // Badge "Approuvé"
         Label approvedBadge = new Label("✓ Approuvé");
         approvedBadge.setFont(Font.font("Arial", FontWeight.BOLD, 10));
         approvedBadge.setTextFill(Color.WHITE);
@@ -392,7 +410,6 @@ public class EventViewParticipant {
         StackPane.setMargin(approvedBadge, new Insets(10, 0, 0, 10));
         imgContainer.getChildren().add(approvedBadge);
 
-        // CONTENU
         VBox content = new VBox(10);
         content.setPadding(new Insets(15));
 
@@ -412,7 +429,7 @@ public class EventViewParticipant {
 
         Label titreLabel = new Label(event.getTitre());
         titreLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
-        titreLabel.setTextFill(Color.web("#0f172a"));
+        titreLabel.setTextFill(isPastEvent ? Color.web("#64748b") : Color.web("#0f172a"));
         titreLabel.setWrapText(true);
         titreLabel.setMaxHeight(44);
 
@@ -427,7 +444,6 @@ public class EventViewParticipant {
         descLabel.setTextFill(Color.web("#475569"));
         descLabel.setMaxHeight(40);
 
-        // Informations organisateur
         Label organisateurLabel = new Label("👤 Organisé par: " +
                 (event.getOrganisateurNom() != null ? event.getOrganisateurNom() : "Inconnu"));
         organisateurLabel.setFont(Font.font(10));
@@ -442,13 +458,14 @@ public class EventViewParticipant {
 
         Label participantsCount = new Label(String.valueOf(event.getParticipantsCount()));
         participantsCount.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        participantsCount.setTextFill(Color.web("#10b981"));
+        participantsCount.setTextFill(isPastEvent ? Color.web("#94a3b8") : Color.web("#10b981"));
 
         Label participantsLabel = new Label("participants");
         participantsLabel.setFont(Font.font(10));
         participantsLabel.setTextFill(Color.web("#64748b"));
 
         participantsBox.getChildren().addAll(participantsCount, participantsLabel);
+        progressInfo.getChildren().add(participantsBox);
 
         if (event.getCapacite_max() != null) {
             VBox capaciteBox = new VBox(2);
@@ -456,7 +473,7 @@ public class EventViewParticipant {
 
             Label capaciteCount = new Label(String.valueOf(event.getCapacite_max()));
             capaciteCount.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-            capaciteCount.setTextFill(Color.web("#3b82f6"));
+            capaciteCount.setTextFill(isPastEvent ? Color.web("#94a3b8") : Color.web("#3b82f6"));
 
             Label capaciteLabel = new Label("places max");
             capaciteLabel.setFont(Font.font(10));
@@ -464,16 +481,15 @@ public class EventViewParticipant {
 
             capaciteBox.getChildren().addAll(capaciteCount, capaciteLabel);
             progressInfo.getChildren().add(capaciteBox);
-        }
 
-        if (event.getCapacite_max() != null) {
+            int placesRestantes = event.getPlacesRestantes();
             VBox restantesBox = new VBox(2);
             restantesBox.setAlignment(Pos.CENTER);
 
-            int placesRestantes = event.getCapacite_max() - event.getParticipantsCount();
             Label restantesCount = new Label(String.valueOf(placesRestantes));
             restantesCount.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-            restantesCount.setTextFill(placesRestantes > 0 ? Color.web("#f59e0b") : Color.web("#ef4444"));
+            restantesCount.setTextFill(isPastEvent ? Color.web("#94a3b8") :
+                    (placesRestantes > 0 ? Color.web("#f59e0b") : Color.web("#ef4444")));
 
             Label restantesLabel = new Label("places restantes");
             restantesLabel.setFont(Font.font(10));
@@ -483,8 +499,6 @@ public class EventViewParticipant {
             progressInfo.getChildren().add(restantesBox);
         }
 
-        progressInfo.getChildren().add(participantsBox);
-
         boolean isParticipant = participationService.isParticipant(event.getId_evenement(), currentUser.getId());
         Button actionBtn = new Button();
         actionBtn.setMaxWidth(Double.MAX_VALUE);
@@ -492,22 +506,21 @@ public class EventViewParticipant {
         actionBtn.setFont(Font.font("Arial", FontWeight.BOLD, 13));
         actionBtn.setCursor(javafx.scene.Cursor.HAND);
 
-        if (isParticipant) {
+        if (isPastEvent) {
+            actionBtn.setText("👁️ Voir détails");
+            actionBtn.setStyle("-fx-background-color: #94a3b8; -fx-text-fill: white; " +
+                    "-fx-background-radius: 8; -fx-opacity: 0.8;");
+            actionBtn.setOnAction(e -> showEventDetails(event));
+        } else if (event.isComplet()) {
+            actionBtn.setText("⚠️ Complet");
+            actionBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
+                    "-fx-background-radius: 8;");
+            actionBtn.setDisable(true);
+        } else if (isParticipant) {
             actionBtn.setText("✅ Gérer ma participation");
             actionBtn.setStyle("-fx-background-color: #10b981; -fx-text-fill: white; " +
                     "-fx-background-radius: 8; -fx-font-weight: bold;");
             actionBtn.setOnAction(e -> showParticipationManagement(event));
-        } else if ("passé".equals(event.getStatut())) {
-            actionBtn.setText("❌ Événement terminé");
-            actionBtn.setStyle("-fx-background-color: #cbd5e1; -fx-text-fill: #475569; " +
-                    "-fx-background-radius: 8; -fx-font-weight: bold;");
-            actionBtn.setDisable(true);
-        } else if (event.getCapacite_max() != null &&
-                event.getParticipantsCount() >= event.getCapacite_max()) {
-            actionBtn.setText("⚠️ Complet");
-            actionBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
-                    "-fx-background-radius: 8; -fx-font-weight: bold;");
-            actionBtn.setDisable(true);
         } else {
             actionBtn.setText("🎟️ Participer");
             actionBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
@@ -515,28 +528,170 @@ public class EventViewParticipant {
             actionBtn.setOnAction(e -> openParticipationDialog(event));
         }
 
-        actionBtn.setOnMouseEntered(e -> {
-            if (!actionBtn.isDisabled() && !isParticipant) {
-                actionBtn.setStyle("-fx-background-color: #2563eb; -fx-text-fill: white; " +
-                        "-fx-background-radius: 8; -fx-font-weight: bold;");
-            }
-        });
-        actionBtn.setOnMouseExited(e -> {
-            if (!actionBtn.isDisabled()) {
-                if (isParticipant) {
-                    actionBtn.setStyle("-fx-background-color: #10b981; -fx-text-fill: white; " +
-                            "-fx-background-radius: 8; -fx-font-weight: bold;");
-                } else {
-                    actionBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
-                            "-fx-background-radius: 8; -fx-font-weight: bold;");
-                }
-            }
-        });
-
         content.getChildren().addAll(dateLieu, titreLabel, descLabel, organisateurLabel, progressInfo, actionBtn);
         card.getChildren().addAll(imgContainer, content);
 
         return card;
+    }
+
+    private void showEventDetails(Event event) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("Détails de l'événement");
+        dialog.setResizable(false);
+
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(25));
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        content.setPrefWidth(600);
+
+        HBox header = new HBox(15);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 0, 15, 0));
+        header.setStyle("-fx-border-color: #e2e8f0; -fx-border-width: 0 0 1 0;");
+
+        Label iconLabel = new Label("📅");
+        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 40));
+
+        VBox headerText = new VBox(5);
+        Label titleLabel = new Label(event.getTitre());
+        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 24));
+        titleLabel.setTextFill(Color.web("#0f172a"));
+        titleLabel.setWrapText(true);
+
+        Label dateLabel = new Label(event.getFormattedDate());
+        dateLabel.setFont(Font.font("Segoe UI", 14));
+        dateLabel.setTextFill(Color.web("#475569"));
+
+        headerText.getChildren().addAll(titleLabel, dateLabel);
+        header.getChildren().addAll(iconLabel, headerText);
+
+        GridPane infoGrid = new GridPane();
+        infoGrid.setHgap(20);
+        infoGrid.setVgap(15);
+        infoGrid.setPadding(new Insets(15, 0, 15, 0));
+
+        // Ligne 1: Lieu
+        Label lieuIcon = new Label("📍");
+        lieuIcon.setFont(Font.font("Arial", 16));
+        infoGrid.add(lieuIcon, 0, 0);
+
+        VBox lieuBox = new VBox(2);
+        Label lieuLabel = new Label("Lieu");
+        lieuLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        lieuLabel.setTextFill(Color.web("#64748b"));
+        Label lieuValue = new Label(event.getLieu() != null ? event.getLieu() : "Non spécifié");
+        lieuValue.setFont(Font.font("Arial", 14));
+        lieuValue.setTextFill(Color.web("#0f172a"));
+        lieuValue.setWrapText(true);
+        lieuBox.getChildren().addAll(lieuLabel, lieuValue);
+        infoGrid.add(lieuBox, 1, 0);
+
+        // Ligne 2: Organisateur
+        Label orgIcon = new Label("👤");
+        orgIcon.setFont(Font.font("Arial", 16));
+        infoGrid.add(orgIcon, 0, 1);
+
+        VBox orgBox = new VBox(2);
+        Label orgLabel = new Label("Organisateur");
+        orgLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        orgLabel.setTextFill(Color.web("#64748b"));
+        Label orgValue = new Label(event.getOrganisateurNom() != null ? event.getOrganisateurNom() : "Inconnu");
+        orgValue.setFont(Font.font("Arial", 14));
+        orgValue.setTextFill(Color.web("#0f172a"));
+        orgValue.setWrapText(true);
+        orgBox.getChildren().addAll(orgLabel, orgValue);
+        infoGrid.add(orgBox, 1, 1);
+
+        // Ligne 3: Participants
+        Label partIcon = new Label("👥");
+        partIcon.setFont(Font.font("Arial", 16));
+        infoGrid.add(partIcon, 0, 2);
+
+        VBox partBox = new VBox(2);
+        Label partLabel = new Label("Participants");
+        partLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        partLabel.setTextFill(Color.web("#64748b"));
+        Label partValue = new Label(event.getParticipantsCount() + " participant(s)");
+        partValue.setFont(Font.font("Arial", 14));
+        partValue.setTextFill(Color.web("#0f172a"));
+        partBox.getChildren().addAll(partLabel, partValue);
+        infoGrid.add(partBox, 1, 2);
+
+        // Ligne 4: Capacité (si disponible)
+        if (event.getCapacite_max() != null) {
+            Label capIcon = new Label("📊");
+            capIcon.setFont(Font.font("Arial", 16));
+            infoGrid.add(capIcon, 0, 3);
+
+            VBox capBox = new VBox(2);
+            Label capLabel = new Label("Capacité");
+            capLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+            capLabel.setTextFill(Color.web("#64748b"));
+            Label capValue = new Label(event.getCapacite_max() + " places (" + event.getPlacesRestantes() + " restantes)");
+            capValue.setFont(Font.font("Arial", 14));
+            capValue.setTextFill(Color.web("#0f172a"));
+            capBox.getChildren().addAll(capLabel, capValue);
+            infoGrid.add(capBox, 1, 3);
+        }
+
+        // Ligne 5: Statut
+        Label statutIcon = new Label("📌");
+        statutIcon.setFont(Font.font("Arial", 16));
+        infoGrid.add(statutIcon, 0, 4);
+
+        VBox statutBox = new VBox(2);
+        Label statutLabelTitle = new Label("Statut");
+        statutLabelTitle.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        statutLabelTitle.setTextFill(Color.web("#64748b"));
+
+        String statut = event.getStatut();
+        Label statutValue = new Label(statut.substring(0, 1).toUpperCase() + statut.substring(1));
+        statutValue.setFont(Font.font("Arial", 14));
+        statutValue.setTextFill(Color.web(statut.equals("passé") ? "#64748b" :
+                (statut.equals("à venir") ? "#3b82f6" : "#f59e0b")));
+        statutBox.getChildren().addAll(statutLabelTitle, statutValue);
+        infoGrid.add(statutBox, 1, 4);
+
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setPrefWidth(40);
+        ColumnConstraints col2 = new ColumnConstraints();
+        col2.setPrefWidth(490);
+        infoGrid.getColumnConstraints().addAll(col1, col2);
+
+        Separator separator = new Separator();
+        separator.setPadding(new Insets(10, 0, 10, 0));
+
+        Label descriptionTitle = new Label("📝 Description");
+        descriptionTitle.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        descriptionTitle.setTextFill(Color.web("#0f172a"));
+
+        TextArea descArea = new TextArea(event.getDescription());
+        descArea.setWrapText(true);
+        descArea.setEditable(false);
+        descArea.setPrefRowCount(5);
+        descArea.setStyle("-fx-background-color: #f8fafc; -fx-background-radius: 8; -fx-font-size: 13px;");
+
+        Button closeBtn = new Button("Fermer");
+        closeBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-size: 14px;");
+        closeBtn.setOnAction(e -> dialog.close());
+
+        VBox buttonBox = new VBox(closeBtn);
+        buttonBox.setAlignment(Pos.CENTER);
+        buttonBox.setPadding(new Insets(10, 0, 0, 0));
+
+        content.getChildren().addAll(header, infoGrid, separator, descriptionTitle, descArea, buttonBox);
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+
+        Scene scene = new Scene(scrollPane, 650, 750);
+        dialog.setScene(scene);
+        dialog.showAndWait();
     }
 
     private void openParticipationDialog(Event event) {
@@ -546,19 +701,21 @@ public class EventViewParticipant {
         dialog.setResizable(false);
 
         VBox content = new VBox(20);
-        content.setPadding(new Insets(30));
-        content.setStyle("-fx-background-color: white;");
-        content.setPrefWidth(450);
+        content.setPadding(new Insets(25));
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        content.setPrefWidth(500);
 
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 0, 15, 0));
+        header.setStyle("-fx-border-color: #e2e8f0; -fx-border-width: 0 0 1 0;");
 
         Label iconLabel = new Label("🎟️");
-        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
+        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 40));
 
         VBox headerText = new VBox(5);
         Label titleLabel = new Label("Confirmer votre participation");
-        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
+        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
         titleLabel.setTextFill(Color.web("#0f172a"));
 
         Label eventTitle = new Label(event.getTitre());
@@ -573,13 +730,18 @@ public class EventViewParticipant {
         infoBox.setPadding(new Insets(15));
         infoBox.setStyle("-fx-background-color: #f8fafc; -fx-background-radius: 12;");
 
+        int placesRestantes = event.getPlacesRestantes();
+        Label placesLabel = new Label("📊 Places restantes: " + placesRestantes);
+        placesLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        placesLabel.setTextFill(placesRestantes > 0 ? Color.web("#059669") : Color.web("#ef4444"));
+
         HBox dateInfo = new HBox(10);
         dateInfo.setAlignment(Pos.CENTER_LEFT);
         dateInfo.getChildren().addAll(
                 new Label("📅"),
                 new Label("Date: " + event.getFormattedDate())
         );
-        ((Label) dateInfo.getChildren().get(1)).setFont(Font.font("Arial", 12));
+        ((Label) dateInfo.getChildren().get(1)).setFont(Font.font("Arial", 13));
 
         HBox lieuInfo = new HBox(10);
         lieuInfo.setAlignment(Pos.CENTER_LEFT);
@@ -587,51 +749,44 @@ public class EventViewParticipant {
                 new Label("📍"),
                 new Label("Lieu: " + event.getLieu())
         );
-        ((Label) lieuInfo.getChildren().get(1)).setFont(Font.font("Arial", 12));
+        ((Label) lieuInfo.getChildren().get(1)).setFont(Font.font("Arial", 13));
 
-        HBox organisateurInfo = new HBox(10);
-        organisateurInfo.setAlignment(Pos.CENTER_LEFT);
-        organisateurInfo.getChildren().addAll(
-                new Label("👤"),
-                new Label("Organisateur: " + (event.getOrganisateurNom() != null ? event.getOrganisateurNom() : "Inconnu"))
-        );
-        ((Label) organisateurInfo.getChildren().get(1)).setFont(Font.font("Arial", 12));
-
-        infoBox.getChildren().addAll(dateInfo, lieuInfo, organisateurInfo);
+        infoBox.getChildren().addAll(placesLabel, dateInfo, lieuInfo);
 
         VBox formBox = new VBox(15);
         formBox.setPadding(new Insets(10, 0, 10, 0));
 
         Label formLabel = new Label("Vos informations");
-        formLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        formLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         formLabel.setTextFill(Color.web("#0f172a"));
 
         VBox emailBox = new VBox(5);
         Label emailLabel = new Label("Email de contact *");
-        emailLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        emailLabel.setFont(Font.font("Arial", FontWeight.BOLD, 13));
         emailLabel.setTextFill(Color.web("#475569"));
 
         TextField emailField = new TextField(currentUser.getEmail());
         emailField.setPromptText("votre@email.com");
         emailField.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10; " +
-                "-fx-border-color: #cbd5e1; -fx-border-width: 1;");
+                "-fx-border-color: #cbd5e1; -fx-border-width: 1; -fx-font-size: 13px;");
         emailBox.getChildren().addAll(emailLabel, emailField);
 
-        VBox ageBox = new VBox(5);
-        Label ageLabel = new Label("Âge (optionnel)");
-        ageLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        ageLabel.setTextFill(Color.web("#475569"));
+        VBox dateNaissanceBox = new VBox(5);
+        Label dateNaissanceLabel = new Label("Date de naissance (optionnel)");
+        dateNaissanceLabel.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+        dateNaissanceLabel.setTextFill(Color.web("#475569"));
 
-        TextField ageField = new TextField();
-        ageField.setPromptText("ex: 25");
-        ageField.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10; " +
-                "-fx-border-color: #cbd5e1; -fx-border-width: 1;");
-        ageBox.getChildren().addAll(ageLabel, ageField);
+        DatePicker datePicker = new DatePicker();
+        datePicker.setPromptText("jj/mm/aaaa");
+        datePicker.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 8; " +
+                "-fx-border-color: #cbd5e1; -fx-border-width: 1; -fx-font-size: 13px;");
+        datePicker.setPrefWidth(Double.MAX_VALUE);
+        dateNaissanceBox.getChildren().addAll(dateNaissanceLabel, datePicker);
 
-        formBox.getChildren().addAll(formLabel, emailBox, ageBox);
+        formBox.getChildren().addAll(formLabel, emailBox, dateNaissanceBox);
 
         Label confirmationMsg = new Label();
-        confirmationMsg.setFont(Font.font("Arial", 11));
+        confirmationMsg.setFont(Font.font("Arial", 12));
         confirmationMsg.setWrapText(true);
 
         HBox buttonBox = new HBox(15);
@@ -640,12 +795,12 @@ public class EventViewParticipant {
 
         Button cancelBtn = new Button("Annuler");
         cancelBtn.setStyle("-fx-background-color: #e2e8f0; -fx-text-fill: #1e293b; " +
-                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-size: 13px;");
         cancelBtn.setOnAction(e -> dialog.close());
 
         Button confirmBtn = new Button("Confirmer");
         confirmBtn.setStyle("-fx-background-color: #10b981; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-size: 13px;");
         confirmBtn.setOnAction(e -> {
             String email = emailField.getText().trim();
             if (email.isEmpty()) {
@@ -661,19 +816,15 @@ public class EventViewParticipant {
             }
 
             Integer age = null;
-            if (!ageField.getText().trim().isEmpty()) {
-                try {
-                    age = Integer.parseInt(ageField.getText().trim());
-                    if (age < 1 || age > 120) {
-                        confirmationMsg.setText("⚠️ L'âge doit être entre 1 et 120 ans");
-                        confirmationMsg.setTextFill(Color.web("#ef4444"));
-                        return;
-                    }
-                } catch (NumberFormatException ex) {
-                    confirmationMsg.setText("⚠️ Âge invalide");
+            if (datePicker.getValue() != null) {
+                LocalDate birthDate = datePicker.getValue();
+                int calculatedAge = LocalDate.now().getYear() - birthDate.getYear();
+                if (calculatedAge < 1 || calculatedAge > 120) {
+                    confirmationMsg.setText("⚠️ Âge invalide (1-120 ans)");
                     confirmationMsg.setTextFill(Color.web("#ef4444"));
                     return;
                 }
+                age = calculatedAge;
             }
 
             boolean success = participationService.participer(
@@ -686,6 +837,28 @@ public class EventViewParticipant {
             if (success) {
                 refreshData();
                 dialog.close();
+
+                // Notification à l'organisateur
+                User organisateur = userService.getUserById(event.getId_organisateur());
+                if (organisateur != null) {
+                    notificationService.creerNotificationNouveauParticipant(
+                            organisateur.getId(),
+                            event.getId_evenement(),
+                            event.getTitre(),
+                            currentUser.getPrenom() + " " + currentUser.getNom(),
+                            currentUser.getEmail()
+                    );
+                }
+
+                // Notification à l'admin
+                List<User> admins = userService.getUsersByRole("admin");
+                for (User admin : admins) {
+                    notificationService.creerNotificationParticipation(
+                            admin.getId(),
+                            event.getId_evenement(),
+                            event.getTitre() + " - Nouveau participant: " + currentUser.getPrenom() + " " + currentUser.getNom()
+                    );
+                }
 
                 Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
                 successAlert.setTitle("Succès");
@@ -717,72 +890,69 @@ public class EventViewParticipant {
         manageStage.initModality(Modality.APPLICATION_MODAL);
         manageStage.setResizable(false);
 
-        VBox content = new VBox(25);
-        content.setPadding(new Insets(30));
-        content.setStyle("-fx-background-color: white;");
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
         content.setPrefWidth(500);
 
-        // En-tête
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(0, 0, 15, 0));
+        header.setPadding(new Insets(0, 0, 10, 0));
         header.setStyle("-fx-border-color: #e2e8f0; -fx-border-width: 0 0 1 0;");
 
         Label iconLabel = new Label("🎟️");
-        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
+        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
 
         VBox headerText = new VBox(5);
         Label titleLabel = new Label("Ma participation");
-        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
         titleLabel.setTextFill(Color.web("#0f172a"));
 
         Label eventTitle = new Label(event.getTitre());
-        eventTitle.setFont(Font.font("Segoe UI", 14));
+        eventTitle.setFont(Font.font("Segoe UI", 13));
         eventTitle.setTextFill(Color.web("#475569"));
         eventTitle.setWrapText(true);
 
         headerText.getChildren().addAll(titleLabel, eventTitle);
         header.getChildren().addAll(iconLabel, headerText);
 
-        // Informations actuelles
         Participation participation = participationService.getParticipation(event.getId_evenement(), currentUser.getId());
 
-        VBox infoBox = new VBox(15);
-        infoBox.setPadding(new Insets(15));
-        infoBox.setStyle("-fx-background-color: #f8fafc; -fx-background-radius: 12;");
+        VBox infoBox = new VBox(10);
+        infoBox.setPadding(new Insets(12));
+        infoBox.setStyle("-fx-background-color: #f8fafc; -fx-background-radius: 8;");
 
         Label infoTitle = new Label("📋 Informations actuelles");
         infoTitle.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         infoTitle.setTextFill(Color.web("#0f172a"));
 
         GridPane infoGrid = new GridPane();
-        infoGrid.setHgap(20);
-        infoGrid.setVgap(10);
+        infoGrid.setHgap(15);
+        infoGrid.setVgap(8);
 
         infoGrid.add(new Label("Email de contact:"), 0, 0);
-        infoGrid.add(new Label(participation.getContact()), 1, 0);
-        ((Label) infoGrid.getChildren().get(1)).setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a;");
+        Label contactValue = new Label(participation.getContact());
+        contactValue.setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a; -fx-font-size: 13px;");
+        infoGrid.add(contactValue, 1, 0);
 
-        infoGrid.add(new Label("Âge:"), 0, 1);
-        infoGrid.add(new Label(participation.getAge() != null ? participation.getAge() + " ans" : "Non spécifié"), 1, 1);
-        ((Label) infoGrid.getChildren().get(3)).setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a;");
+        if (participation.getAge() != null) {
+            infoGrid.add(new Label("Âge:"), 0, 1);
+            Label ageValue = new Label(participation.getAge() + " ans");
+            ageValue.setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a; -fx-font-size: 13px;");
+            infoGrid.add(ageValue, 1, 1);
+        }
 
         infoGrid.add(new Label("Statut:"), 0, 2);
         Label statutLabel = new Label(participation.getStatut().toUpperCase());
         statutLabel.setStyle(getStatutStyle(participation.getStatut()));
         infoGrid.add(statutLabel, 1, 2);
 
-        infoGrid.add(new Label("Date d'inscription:"), 0, 3);
-        infoGrid.add(new Label(participation.getFormattedDate()), 1, 3);
-        ((Label) infoGrid.getChildren().get(7)).setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a;");
-
         infoBox.getChildren().addAll(infoTitle, infoGrid);
 
-        // Section modification
-        VBox modifyBox = new VBox(15);
-        modifyBox.setPadding(new Insets(15));
-        modifyBox.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 12; " +
-                "-fx-border-color: #e2e8f0; -fx-border-radius: 12;");
+        VBox modifyBox = new VBox(12);
+        modifyBox.setPadding(new Insets(12));
+        modifyBox.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 8; " +
+                "-fx-border-color: #e2e8f0; -fx-border-radius: 8;");
 
         Label modifyTitle = new Label("✏️ Modifier mes informations");
         modifyTitle.setFont(Font.font("Arial", FontWeight.BOLD, 14));
@@ -794,22 +964,27 @@ public class EventViewParticipant {
         emailLabel.setTextFill(Color.web("#475569"));
 
         TextField emailField = new TextField(participation.getContact());
-        emailField.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10; " +
-                "-fx-border-color: #cbd5e1; -fx-border-width: 1;");
+        emailField.setStyle("-fx-background-radius: 6; -fx-border-radius: 6; -fx-padding: 8; " +
+                "-fx-border-color: #cbd5e1; -fx-border-width: 1; -fx-font-size: 13px;");
 
-        VBox ageBox = new VBox(5);
-        Label ageLabel = new Label("Âge (optionnel)");
-        ageLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        ageLabel.setTextFill(Color.web("#475569"));
+        VBox dateNaissanceBox = new VBox(5);
+        Label dateNaissanceLabel = new Label("Date de naissance");
+        dateNaissanceLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        dateNaissanceLabel.setTextFill(Color.web("#475569"));
 
-        TextField ageField = new TextField(participation.getAge() != null ? participation.getAge().toString() : "");
-        ageField.setPromptText("ex: 25");
-        ageField.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10; " +
-                "-fx-border-color: #cbd5e1; -fx-border-width: 1;");
+        DatePicker datePicker = new DatePicker();
+        if (participation.getAge() != null) {
+            int birthYear = LocalDate.now().getYear() - participation.getAge();
+            datePicker.setValue(LocalDate.of(birthYear, 1, 1));
+        }
+        datePicker.setPromptText("jj/mm/aaaa");
+        datePicker.setStyle("-fx-background-radius: 6; -fx-border-radius: 6; -fx-padding: 8; " +
+                "-fx-border-color: #cbd5e1; -fx-border-width: 1; -fx-font-size: 13px;");
+        datePicker.setPrefWidth(Double.MAX_VALUE);
 
         Button updateBtn = new Button("💾 Mettre à jour");
         updateBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 13px;");
         updateBtn.setMaxWidth(Double.MAX_VALUE);
         updateBtn.setOnAction(e -> {
             String email = emailField.getText().trim();
@@ -823,17 +998,13 @@ public class EventViewParticipant {
             }
 
             Integer age = null;
-            if (!ageField.getText().trim().isEmpty()) {
-                try {
-                    age = Integer.parseInt(ageField.getText().trim());
-                    if (age < 1 || age > 120) {
-                        showAlert(manageStage, "Erreur", "Âge invalide (1-120)");
-                        return;
-                    }
-                } catch (NumberFormatException ex) {
-                    showAlert(manageStage, "Erreur", "Âge invalide");
+            if (datePicker.getValue() != null) {
+                int calculatedAge = LocalDate.now().getYear() - datePicker.getValue().getYear();
+                if (calculatedAge < 1 || calculatedAge > 120) {
+                    showAlert(manageStage, "Erreur", "Âge invalide (1-120)");
                     return;
                 }
+                age = calculatedAge;
             }
 
             boolean success = participationService.modifierParticipation(
@@ -850,15 +1021,14 @@ public class EventViewParticipant {
             }
         });
 
-        modifyBox.getChildren().addAll(modifyTitle, emailBox, ageBox, updateBtn);
         emailBox.getChildren().addAll(emailLabel, emailField);
-        ageBox.getChildren().addAll(ageLabel, ageField);
+        dateNaissanceBox.getChildren().addAll(dateNaissanceLabel, datePicker);
+        modifyBox.getChildren().addAll(modifyTitle, emailBox, dateNaissanceBox, updateBtn);
 
-        // Section annulation
-        VBox cancelBox = new VBox(15);
-        cancelBox.setPadding(new Insets(15));
-        cancelBox.setStyle("-fx-background-color: #fff5f5; -fx-background-radius: 12; " +
-                "-fx-border-color: #fed7d7; -fx-border-radius: 12;");
+        VBox cancelBox = new VBox(12);
+        cancelBox.setPadding(new Insets(12));
+        cancelBox.setStyle("-fx-background-color: #fff5f5; -fx-background-radius: 8; " +
+                "-fx-border-color: #fed7d7; -fx-border-radius: 8;");
 
         Label cancelTitle = new Label("⚠️ Annuler ma participation");
         cancelTitle.setFont(Font.font("Arial", FontWeight.BOLD, 14));
@@ -871,7 +1041,7 @@ public class EventViewParticipant {
 
         Button cancelBtn = new Button("❌ Annuler ma participation");
         cancelBtn.setStyle("-fx-background-color: #c53030; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 25; -fx-background-radius: 8; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 13px;");
         cancelBtn.setMaxWidth(Double.MAX_VALUE);
         cancelBtn.setOnAction(e -> {
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
@@ -887,6 +1057,28 @@ public class EventViewParticipant {
                     );
 
                     if (success) {
+                        // Notification à l'organisateur
+                        User organisateur = userService.getUserById(event.getId_organisateur());
+                        if (organisateur != null) {
+                            notificationService.creerNotificationParticipantAnnule(
+                                    organisateur.getId(),
+                                    event.getId_evenement(),
+                                    event.getTitre(),
+                                    currentUser.getPrenom() + " " + currentUser.getNom(),
+                                    currentUser.getEmail()
+                            );
+                        }
+
+                        // Notification à l'admin
+                        List<User> admins = userService.getUsersByRole("admin");
+                        for (User admin : admins) {
+                            notificationService.creerNotificationAnnulation(
+                                    admin.getId(),
+                                    event.getId_evenement(),
+                                    event.getTitre() + " - Participant: " + currentUser.getPrenom() + " " + currentUser.getNom()
+                            );
+                        }
+
                         showAlert(manageStage, "Succès", "✅ Participation annulée avec succès");
                         manageStage.close();
                         refreshData();
@@ -897,33 +1089,28 @@ public class EventViewParticipant {
 
         cancelBox.getChildren().addAll(cancelTitle, cancelWarning, cancelBtn);
 
-        // Bouton fermer
         Button closeBtn = new Button("Fermer");
         closeBtn.setStyle("-fx-background-color: #e2e8f0; -fx-text-fill: #1e293b; " +
-                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 13px;");
         closeBtn.setOnAction(e -> manageStage.close());
 
         VBox buttonBox = new VBox(closeBtn);
         buttonBox.setAlignment(Pos.CENTER);
-        buttonBox.setPadding(new Insets(10, 0, 0, 0));
+        buttonBox.setPadding(new Insets(5, 0, 0, 0));
 
         content.getChildren().addAll(header, infoBox, modifyBox, cancelBox, buttonBox);
 
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
-
-        Scene scene = new Scene(scrollPane);
+        Scene scene = new Scene(content);
         manageStage.setScene(scene);
         manageStage.show();
     }
 
     private String getStatutStyle(String statut) {
         switch (statut.toLowerCase()) {
-            case "inscrit": return "-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;";
-            case "present": return "-fx-background-color: #10b981; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;";
-            case "absent": return "-fx-background-color: #ef4444; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;";
-            default: return "-fx-background-color: #94a3b8; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;";
+            case "inscrit": return "-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15; -fx-font-weight: bold; -fx-font-size: 12px;";
+            case "present": return "-fx-background-color: #10b981; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15; -fx-font-weight: bold; -fx-font-size: 12px;";
+            case "absent": return "-fx-background-color: #ef4444; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15; -fx-font-weight: bold; -fx-font-size: 12px;";
+            default: return "-fx-background-color: #94a3b8; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15; -fx-font-weight: bold; -fx-font-size: 12px;";
         }
     }
 
@@ -943,8 +1130,8 @@ public class EventViewParticipant {
 
         VBox content = new VBox(20);
         content.setPadding(new Insets(25));
-        content.setStyle("-fx-background-color: white;");
-        content.setPrefWidth(600);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        content.setPrefWidth(650);
         content.setPrefHeight(500);
 
         HBox header = new HBox(15);
@@ -953,7 +1140,7 @@ public class EventViewParticipant {
         header.setStyle("-fx-border-color: #e2e8f0; -fx-border-width: 0 0 1 0;");
 
         Label iconLabel = new Label("👥");
-        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
+        iconLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
 
         VBox headerText = new VBox(5);
         Label titleLabel = new Label("Mes participations");
@@ -1038,7 +1225,7 @@ public class EventViewParticipant {
 
                         Button gererBtn = new Button("Gérer");
                         gererBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
-                                "-fx-font-weight: bold; -fx-padding: 4 12; -fx-background-radius: 6; -fx-cursor: hand;");
+                                "-fx-font-weight: bold; -fx-padding: 4 12; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 12px;");
                         gererBtn.setOnAction(e -> {
                             Event event = eventService.getEventById(p.getIdEvenement());
                             participationsStage.close();
@@ -1061,7 +1248,7 @@ public class EventViewParticipant {
 
         Button closeBtn = new Button("Fermer");
         closeBtn.setStyle("-fx-background-color: #e2e8f0; -fx-text-fill: #1e293b; " +
-                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand;");
+                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-size: 13px;");
         closeBtn.setOnAction(e -> participationsStage.close());
 
         VBox buttonBox = new VBox(closeBtn);

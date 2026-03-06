@@ -3,7 +3,6 @@ package edu.Loopi.services;
 import edu.Loopi.entities.User;
 import edu.Loopi.tools.MyConnection;
 import java.sql.*;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,12 +11,37 @@ public class UserService {
 
     public UserService() {
         this.connection = MyConnection.getInstance().getConnection();
+        checkAndAddBadgeColumns();
+    }
+
+    private void checkAndAddBadgeColumns() {
+        try {
+            DatabaseMetaData metaData = connection.getMetaData();
+            ResultSet columns = metaData.getColumns(null, null, "users", "total_plastic");
+
+            if (!columns.next()) {
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN total_plastic DOUBLE DEFAULT 0");
+                    stmt.execute("ALTER TABLE users ADD COLUMN total_paper DOUBLE DEFAULT 0");
+                    stmt.execute("ALTER TABLE users ADD COLUMN total_glass DOUBLE DEFAULT 0");
+                    stmt.execute("ALTER TABLE users ADD COLUMN total_metal DOUBLE DEFAULT 0");
+                    stmt.execute("ALTER TABLE users ADD COLUMN total_cardboard DOUBLE DEFAULT 0");
+                    stmt.execute("ALTER TABLE users ADD COLUMN has_donated_first_time BOOLEAN DEFAULT FALSE");
+                    stmt.execute("ALTER TABLE users ADD COLUMN total_impact_collected DOUBLE DEFAULT 0");
+                    stmt.execute("ALTER TABLE users ADD COLUMN is_certified BOOLEAN DEFAULT FALSE");
+                    System.out.println("✅ Colonnes de badges ajoutées à la table users");
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("⚠️ Impossible de vérifier/ajouter les colonnes badges: " + e.getMessage());
+        }
     }
 
     // Ajouter un utilisateur
     public boolean addUser(User user) {
-        String query = "INSERT INTO users (nom, prenom, email, password, photo, role, id_genre) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String query = "INSERT INTO users (nom, prenom, email, password, photo, role, id_genre, " +
+                "total_plastic, total_paper, total_glass, total_metal, total_cardboard, has_donated_first_time, total_impact_collected, is_certified) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement stmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, user.getNom());
@@ -27,11 +51,18 @@ public class UserService {
             stmt.setString(5, user.getPhoto());
             stmt.setString(6, user.getRole());
             stmt.setInt(7, user.getIdGenre());
+            stmt.setDouble(8, user.getTotalPlastic());
+            stmt.setDouble(9, user.getTotalPaper());
+            stmt.setDouble(10, user.getTotalGlass());
+            stmt.setDouble(11, user.getTotalMetal());
+            stmt.setDouble(12, user.getTotalCardboard());
+            stmt.setBoolean(13, user.isHasDonatedFirstTime());
+            stmt.setDouble(14, user.getTotalImpactCollected());
+            stmt.setBoolean(15, user.isCertified());
 
             int rowsAffected = stmt.executeUpdate();
 
             if (rowsAffected > 0) {
-                // Récupérer l'ID généré
                 ResultSet generatedKeys = stmt.getGeneratedKeys();
                 if (generatedKeys.next()) {
                     user.setId(generatedKeys.getInt(1));
@@ -47,7 +78,10 @@ public class UserService {
     // Mettre à jour un utilisateur
     public boolean updateUser(User user) {
         String query = "UPDATE users SET nom = ?, prenom = ?, email = ?, password = ?, " +
-                "photo = ?, role = ?, id_genre = ? WHERE id = ?";
+                "photo = ?, role = ?, id_genre = ?, total_plastic = ?, total_paper = ?, " +
+                "total_glass = ?, total_metal = ?, total_cardboard = ?, has_donated_first_time = ?, " +
+                "total_impact_collected = ?, is_certified = ? " +
+                "WHERE id = ?";
 
         try (PreparedStatement stmt = connection.prepareStatement(query)) {
             stmt.setString(1, user.getNom());
@@ -57,7 +91,15 @@ public class UserService {
             stmt.setString(5, user.getPhoto());
             stmt.setString(6, user.getRole());
             stmt.setInt(7, user.getIdGenre());
-            stmt.setInt(8, user.getId());
+            stmt.setDouble(8, user.getTotalPlastic());
+            stmt.setDouble(9, user.getTotalPaper());
+            stmt.setDouble(10, user.getTotalGlass());
+            stmt.setDouble(11, user.getTotalMetal());
+            stmt.setDouble(12, user.getTotalCardboard());
+            stmt.setBoolean(13, user.isHasDonatedFirstTime());
+            stmt.setDouble(14, user.getTotalImpactCollected());
+            stmt.setBoolean(15, user.isCertified());
+            stmt.setInt(16, user.getId());
 
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -168,7 +210,7 @@ public class UserService {
 
     // Récupérer les statistiques par rôle
     public int[] getUserStatistics() {
-        int[] stats = new int[3]; // [admin, organisateur, participant]
+        int[] stats = new int[3];
         String query = "SELECT role, COUNT(*) as count FROM users GROUP BY role";
 
         try (Statement stmt = connection.createStatement();
@@ -236,7 +278,8 @@ public class UserService {
 
     // Mettre à jour le profil utilisateur
     public boolean updateProfile(User user) {
-        String query = "UPDATE users SET nom = ?, prenom = ?, email = ?, id_genre = ?, photo = ? WHERE id = ?";
+        String query = "UPDATE users SET nom = ?, prenom = ?, email = ?, id_genre = ?, photo = ? " +
+                "WHERE id = ?";
 
         try (PreparedStatement stmt = connection.prepareStatement(query)) {
             stmt.setString(1, user.getNom());
@@ -280,6 +323,19 @@ public class UserService {
         user.setRole(rs.getString("role"));
         user.setIdGenre(rs.getInt("id_genre"));
         user.setSexe(rs.getString("sexe"));
+
+        try {
+            user.setTotalPlastic(rs.getDouble("total_plastic"));
+            user.setTotalPaper(rs.getDouble("total_paper"));
+            user.setTotalGlass(rs.getDouble("total_glass"));
+            user.setTotalMetal(rs.getDouble("total_metal"));
+            user.setTotalCardboard(rs.getDouble("total_cardboard"));
+            user.setHasDonatedFirstTime(rs.getBoolean("has_donated_first_time"));
+            user.setTotalImpactCollected(rs.getDouble("total_impact_collected"));
+            user.setCertified(rs.getBoolean("is_certified"));
+        } catch (SQLException e) {
+            // Colonnes n'existent pas encore
+        }
 
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) {

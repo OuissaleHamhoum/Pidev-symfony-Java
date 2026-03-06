@@ -1,6 +1,7 @@
 package edu.Loopi.view;
 
 import edu.Loopi.entities.Event;
+import edu.Loopi.entities.Notification;
 import edu.Loopi.entities.User;
 import edu.Loopi.services.AIImageGenerationService;
 import edu.Loopi.services.EventService;
@@ -8,6 +9,7 @@ import edu.Loopi.services.NotificationService;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -34,6 +36,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("unchecked")
 public class EventView {
     private User currentUser;
     private VBox mainLayout;
@@ -71,6 +74,7 @@ public class EventView {
     private TextField searchField = new TextField();
     private ComboBox<String> statusFilter = new ComboBox<>();
     private ComboBox<String> validationFilter = new ComboBox<>();
+    private ComboBox<String> publicationFilter = new ComboBox<>();
     private ComboBox<String> sortCombo = new ComboBox<>();
     private HBox statsBar = new HBox(15);
     private Label messageInfoLabel;
@@ -252,6 +256,7 @@ public class EventView {
         Separator sep1 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep1.setStyle("-fx-background-color: " + BORDER_COLOR + ";");
 
+        // Filtre Statut (date)
         VBox statusBox = new VBox(2);
         Label statusLabel = new Label("Statut");
         statusLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #6c757d; -fx-font-weight: bold;");
@@ -267,6 +272,7 @@ public class EventView {
         Separator sep2 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep2.setStyle("-fx-background-color: " + BORDER_COLOR + ";");
 
+        // Filtre Validation
         VBox validationBox = new VBox(2);
         Label validationLabel = new Label("Validation");
         validationLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #6c757d; -fx-font-weight: bold;");
@@ -282,6 +288,23 @@ public class EventView {
         Separator sep3 = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep3.setStyle("-fx-background-color: " + BORDER_COLOR + ";");
 
+        // Filtre Publication
+        VBox publicationBox = new VBox(2);
+        Label publicationLabel = new Label("Publication");
+        publicationLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #6c757d; -fx-font-weight: bold;");
+
+        publicationFilter.getItems().addAll("Tous", "Brouillon", "Publiés");
+        publicationFilter.setValue("Tous");
+        publicationFilter.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 10; -fx-padding: 6 12; -fx-font-size: 12px;");
+        publicationFilter.setPrefWidth(120);
+        publicationFilter.setOnAction(e -> applyFilters());
+
+        publicationBox.getChildren().addAll(publicationLabel, publicationFilter);
+
+        Separator sep4 = new Separator(javafx.geometry.Orientation.VERTICAL);
+        sep4.setStyle("-fx-background-color: " + BORDER_COLOR + ";");
+
+        // Tri
         VBox sortBox = new VBox(2);
         Label sortLabel = new Label("Trier par");
         sortLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #6c757d; -fx-font-weight: bold;");
@@ -307,7 +330,7 @@ public class EventView {
                 "-fx-cursor: hand; -fx-font-weight: bold; -fx-font-size: 12px;");
         resetBtn.setOnAction(e -> resetFilters());
 
-        filterBar.getChildren().addAll(refreshBtn, searchBox, sep1, statusBox, sep2, validationBox, sep3, sortBox, spacer, resetBtn);
+        filterBar.getChildren().addAll(refreshBtn, searchBox, sep1, statusBox, sep2, validationBox, sep3, publicationBox, sep4, sortBox, spacer, resetBtn);
         return filterBar;
     }
 
@@ -334,6 +357,7 @@ public class EventView {
         searchField.clear();
         statusFilter.setValue("Tous");
         validationFilter.setValue("Tous");
+        publicationFilter.setValue("Tous");
         sortCombo.setValue("📅 Plus récent");
         applyFilters();
     }
@@ -342,6 +366,7 @@ public class EventView {
         String searchText = searchField.getText().toLowerCase().trim();
         String selectedStatus = statusFilter.getValue();
         String selectedValidation = validationFilter.getValue();
+        String selectedPublication = publicationFilter.getValue();
         String selectedSort = sortCombo.getValue();
 
         List<Event> filtered = allEvents.stream()
@@ -368,6 +393,13 @@ public class EventView {
                     if (filterValidation.equals("en attente") && "en_attente".equals(eventValidation)) return true;
                     if (filterValidation.equals("approuvés") && "approuve".equals(eventValidation)) return true;
                     if (filterValidation.equals("refusés") && "refuse".equals(eventValidation)) return true;
+                    return false;
+                })
+                .filter(event -> {
+                    if (selectedPublication == null || "Tous".equals(selectedPublication)) return true;
+                    boolean estPublie = event.isEstPublie();
+                    if (selectedPublication.equals("Brouillon") && !estPublie) return true;
+                    if (selectedPublication.equals("Publiés") && estPublie) return true;
                     return false;
                 })
                 .collect(Collectors.toList());
@@ -399,6 +431,8 @@ public class EventView {
         int enAttente = (int) allEvents.stream().filter(e -> "en_attente".equals(e.getStatutValidation())).count();
         int approuves = (int) allEvents.stream().filter(e -> "approuve".equals(e.getStatutValidation())).count();
         int refuses = (int) allEvents.stream().filter(e -> "refuse".equals(e.getStatutValidation())).count();
+        int publies = (int) allEvents.stream().filter(e -> e.isEstPublie()).count();
+        int brouillons = (int) allEvents.stream().filter(e -> !e.isEstPublie()).count();
         int totalParticipants = allEvents.stream().mapToInt(Event::getParticipantsCount).sum();
 
         statsBar.getChildren().addAll(
@@ -409,6 +443,8 @@ public class EventView {
                 createStatCard("⏰", String.valueOf(enAttente), "En attente", "#f39c12"),
                 createStatCard("✓", String.valueOf(approuves), "Approuvés", SUCCESS_COLOR),
                 createStatCard("❌", String.valueOf(refuses), "Refusés", DANGER_COLOR),
+                createStatCard("📢", String.valueOf(publies), "Publiés", "#2ecc71"),
+                createStatCard("📝", String.valueOf(brouillons), "Brouillons", "#95a5a6"),
                 createStatCard("👥", String.valueOf(totalParticipants), "Participants", "#9b59b6")
         );
     }
@@ -477,7 +513,7 @@ public class EventView {
 
     private VBox createEventCard(Event event) {
         VBox card = new VBox(0);
-        card.setPrefSize(280, 450);
+        card.setPrefSize(340, 520);
         card.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 3); -fx-cursor: hand;");
 
@@ -491,28 +527,28 @@ public class EventView {
         });
 
         StackPane imgContainer = new StackPane();
-        imgContainer.setPrefSize(280, 140);
+        imgContainer.setPrefSize(340, 160);
         imgContainer.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 16 16 0 0;");
 
         ImageView imgView = new ImageView();
-        imgView.setFitWidth(280);
-        imgView.setFitHeight(140);
+        imgView.setFitWidth(340);
+        imgView.setFitHeight(160);
         imgView.setPreserveRatio(false);
 
         Image image = loadImageFromStorage(event.getImage_evenement());
         if (image != null) {
             imgView.setImage(image);
         } else {
-            imgView.setImage(new Image("https://via.placeholder.com/280x140/" + PRIMARY_COLOR.substring(1) + "/ffffff?text=ÉVÉNEMENT"));
+            imgView.setImage(new Image("https://via.placeholder.com/340x160/" + PRIMARY_COLOR.substring(1) + "/ffffff?text=ÉVÉNEMENT"));
         }
 
-        Rectangle clip = new Rectangle(280, 140);
+        Rectangle clip = new Rectangle(340, 160);
         clip.setArcWidth(16);
         clip.setArcHeight(16);
         imgView.setClip(clip);
         imgContainer.getChildren().add(imgView);
 
-        // Badge statut événement
+        // Badge statut événement (date)
         String statut = event.getStatut();
         Label statusBadge = new Label(statut.substring(0, 1).toUpperCase() + statut.substring(1));
         statusBadge.setFont(Font.font("System", FontWeight.BOLD, 11));
@@ -548,6 +584,31 @@ public class EventView {
         StackPane.setMargin(validationBadge, new Insets(8, 0, 0, 8));
         imgContainer.getChildren().add(validationBadge);
 
+        // Badge publication
+        Label publishBadge = new Label(event.isEstPublie() ? "📢 Publié" : "📝 Brouillon");
+        publishBadge.setFont(Font.font("System", FontWeight.BOLD, 11));
+        publishBadge.setTextFill(Color.WHITE);
+        publishBadge.setPadding(new Insets(4, 12, 4, 12));
+        publishBadge.setStyle("-fx-background-color: " +
+                (event.isEstPublie() ? "#2ecc71" : "#95a5a6") + "; -fx-background-radius: 20;");
+        StackPane.setAlignment(publishBadge, Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(publishBadge, new Insets(0, 8, 8, 0));
+        imgContainer.getChildren().add(publishBadge);
+
+        // Badge commentaire (si existe)
+        if (event.getCommentaireValidation() != null && !event.getCommentaireValidation().isEmpty()) {
+            Label commentBadge = new Label("💬 Commentaire");
+            commentBadge.setFont(Font.font("System", FontWeight.BOLD, 10));
+            commentBadge.setTextFill(Color.WHITE);
+            commentBadge.setPadding(new Insets(3, 10, 3, 10));
+            commentBadge.setStyle("-fx-background-color: #3498db; -fx-background-radius: 20;");
+            StackPane.setAlignment(commentBadge, Pos.BOTTOM_LEFT);
+            StackPane.setMargin(commentBadge, new Insets(0, 0, 8, 8));
+            imgContainer.getChildren().add(commentBadge);
+
+            Tooltip.install(commentBadge, new Tooltip("Commentaire: " + event.getCommentaireValidation()));
+        }
+
         VBox content = new VBox(10);
         content.setPadding(new Insets(12, 15, 15, 15));
 
@@ -566,29 +627,30 @@ public class EventView {
         dateLieu.getChildren().addAll(dateLabel, lieuLabel);
 
         Label titreLabel = new Label(event.getTitre());
-        titreLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+        titreLabel.setFont(Font.font("System", FontWeight.BOLD, 18));
         titreLabel.setTextFill(Color.web(DARK_COLOR));
         titreLabel.setWrapText(true);
-        titreLabel.setMaxHeight(40);
+        titreLabel.setMaxHeight(44);
 
         Label descLabel = new Label();
         String desc = event.getDescription();
-        if (desc != null && desc.length() > 50) {
-            desc = desc.substring(0, 47) + "...";
+        if (desc != null && desc.length() > 70) {
+            desc = desc.substring(0, 67) + "...";
         }
         descLabel.setText(desc != null ? desc : "");
         descLabel.setWrapText(true);
         descLabel.setFont(Font.font(11));
         descLabel.setTextFill(Color.web("#6c757d"));
-        descLabel.setMaxHeight(35);
+        descLabel.setMaxHeight(40);
 
-        HBox participantsBox = new HBox(15);
-        participantsBox.setAlignment(Pos.CENTER_LEFT);
-        participantsBox.setPadding(new Insets(5, 0, 5, 0));
+        // Informations de capacité
+        HBox capacityInfo = new HBox(15);
+        capacityInfo.setAlignment(Pos.CENTER_LEFT);
+        capacityInfo.setPadding(new Insets(5, 0, 5, 0));
 
         VBox countBox = new VBox(2);
         Label participantsCount = new Label(String.valueOf(event.getParticipantsCount()));
-        participantsCount.setFont(Font.font("System", FontWeight.BOLD, 16));
+        participantsCount.setFont(Font.font("System", FontWeight.BOLD, 18));
         participantsCount.setTextFill(Color.web(PRIMARY_COLOR));
 
         Label participantsLabel = new Label("participants");
@@ -596,11 +658,63 @@ public class EventView {
         participantsLabel.setTextFill(Color.web("#6c757d"));
 
         countBox.getChildren().addAll(participantsCount, participantsLabel);
-        participantsBox.getChildren().add(countBox);
 
+        if (event.getCapacite_max() != null) {
+            VBox capaciteBox = new VBox(2);
+            Label capaciteCount = new Label(String.valueOf(event.getCapacite_max()));
+            capaciteCount.setFont(Font.font("System", FontWeight.BOLD, 18));
+            capaciteCount.setTextFill(Color.web("#9b59b6"));
+
+            Label capaciteLabel = new Label("places max");
+            capaciteLabel.setFont(Font.font(10));
+            capaciteLabel.setTextFill(Color.web("#6c757d"));
+
+            capaciteBox.getChildren().addAll(capaciteCount, capaciteLabel);
+            capacityInfo.getChildren().add(capaciteBox);
+        }
+
+        capacityInfo.getChildren().add(countBox);
+
+        // Actions
         HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.setPadding(new Insets(5, 0, 0, 0));
+
+        // Bouton Publier/Dépublier (uniquement si approuvé)
+        if ("approuve".equals(event.getStatutValidation())) {
+            Button publishBtn = new Button(event.isEstPublie() ? "🔒 Dépublier" : "📢 Publier");
+            publishBtn.setStyle("-fx-background-color: " +
+                    (event.isEstPublie() ? "#e67e22" : "#2ecc71") + "; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-background-radius: 6; -fx-padding: 6 12; -fx-font-size: 11px; -fx-cursor: hand;");
+            publishBtn.setOnAction(e -> {
+                if (event.isEstPublie()) {
+                    // Dépublier
+                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                    confirm.setTitle("Dépublier l'événement");
+                    confirm.setHeaderText(null);
+                    confirm.setContentText("Voulez-vous dépublier cet événement ? Il ne sera plus visible par les participants.");
+
+                    if (confirm.showAndWait().get() == ButtonType.OK) {
+                        eventService.depublierEvenement(event.getId_evenement());
+                        refreshData();
+                        showAlert("Succès", "Événement dépublié avec succès");
+                    }
+                } else {
+                    // Publier
+                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                    confirm.setTitle("Publier l'événement");
+                    confirm.setHeaderText(null);
+                    confirm.setContentText("Voulez-vous publier cet événement ? Il sera visible par tous les participants.");
+
+                    if (confirm.showAndWait().get() == ButtonType.OK) {
+                        eventService.publierEvenement(event.getId_evenement());
+                        refreshData();
+                        showAlert("Succès", "Événement publié avec succès");
+                    }
+                }
+            });
+            actions.getChildren().add(publishBtn);
+        }
 
         Button btnEdit = new Button("✏️ Modifier");
         btnEdit.setStyle("-fx-background-color: " + WARNING_COLOR + "; -fx-text-fill: white; " +
@@ -617,9 +731,14 @@ public class EventView {
                 "-fx-font-weight: bold; -fx-background-radius: 6; -fx-padding: 6 12; -fx-font-size: 11px; -fx-cursor: hand;");
         btnDelete.setOnAction(e -> deleteEvent(event));
 
-        actions.getChildren().addAll(btnEdit, btnParticipants, btnDelete);
+        Button btnNotif = new Button("🔔 Notif");
+        btnNotif.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-background-radius: 6; -fx-padding: 6 12; -fx-font-size: 11px; -fx-cursor: hand;");
+        btnNotif.setOnAction(e -> showEventNotifications(event));
 
-        content.getChildren().addAll(dateLieu, titreLabel, descLabel, participantsBox, actions);
+        actions.getChildren().addAll(btnEdit, btnParticipants, btnDelete, btnNotif);
+
+        content.getChildren().addAll(dateLieu, titreLabel, descLabel, capacityInfo, actions);
         card.getChildren().addAll(imgContainer, content);
 
         return card;
@@ -660,10 +779,12 @@ public class EventView {
         statsBox.setPadding(new Insets(15));
         statsBox.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 12;");
 
+        int placesRestantes = event.getPlacesRestantes();
         statsBox.getChildren().addAll(
                 createStatSmall("Inscrits", String.valueOf(event.getParticipantsInscrits()), WARNING_COLOR),
                 createStatSmall("Présents", String.valueOf(event.getParticipantsPresents()), SUCCESS_COLOR),
-                createStatSmall("Absents", String.valueOf(event.getParticipantsAbsents()), DANGER_COLOR)
+                createStatSmall("Absents", String.valueOf(event.getParticipantsAbsents()), DANGER_COLOR),
+                createStatSmall("Places restantes", placesRestantes >= 0 ? String.valueOf(placesRestantes) : "Illimité", "#9b59b6")
         );
 
         TableView<User> participantTable = new TableView<>();
@@ -697,7 +818,7 @@ public class EventView {
                 if (empty || statut == null) {
                     setText(null);
                 } else {
-                    setText(statut.substring(0, 1).toUpperCase());
+                    setText(statut.substring(0, 1).toUpperCase() + statut.substring(1));
                     setAlignment(Pos.CENTER);
                     setFont(Font.font("System", FontWeight.BOLD, 12));
 
@@ -762,6 +883,144 @@ public class EventView {
                 showAlert("Succès", "✅ Événement supprimé avec succès !");
             }
         }
+    }
+
+    private void showEventNotifications(Event event) {
+        Stage notifStage = new Stage();
+        notifStage.initModality(Modality.APPLICATION_MODAL);
+        notifStage.initOwner(mainLayout.getScene().getWindow());
+        notifStage.setTitle("Notifications - " + event.getTitre());
+
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(25));
+        content.setPrefWidth(600);
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 12;");
+
+        HBox header = new HBox(15);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label iconLabel = new Label("🔔");
+        iconLabel.setFont(Font.font("System", 32));
+
+        VBox headerText = new VBox(5);
+        Label titleLabel = new Label("Historique des notifications");
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
+        titleLabel.setTextFill(Color.web(DARK_COLOR));
+
+        Label eventLabel = new Label(event.getTitre());
+        eventLabel.setFont(Font.font("System", 14));
+        eventLabel.setTextFill(Color.web("#6c757d"));
+
+        headerText.getChildren().addAll(titleLabel, eventLabel);
+        header.getChildren().addAll(iconLabel, headerText);
+
+        ListView<Notification> notifList = new ListView<>();
+        notifList.setPrefHeight(400);
+        notifList.setCellFactory(lv -> new ListCell<Notification>() {
+            @Override
+            protected void updateItem(Notification n, boolean empty) {
+                super.updateItem(n, empty);
+                if (empty || n == null || n.getIdEvenement() != event.getId_evenement()) {
+                    setGraphic(null);
+                } else {
+                    VBox cell = new VBox(8);
+                    cell.setPadding(new Insets(12));
+                    cell.setStyle("-fx-background-color: " + (n.isRead() ? "#f8fafc" : "#eff6ff") +
+                            "; -fx-background-radius: 8; -fx-border-color: " + (n.isRead() ? "#e2e8f0" : "#3b82f6") +
+                            "; -fx-border-radius: 8;");
+
+                    HBox titleRow = new HBox(10);
+                    titleRow.setAlignment(Pos.CENTER_LEFT);
+
+                    String icon = "";
+                    if (n.getType().contains("APPROUVE")) {
+                        icon = "✅";
+                    } else if (n.getType().contains("REFUSE")) {
+                        icon = "❌";
+                    } else if (n.getType().contains("PUBLIE")) {
+                        icon = "📢";
+                    } else if (n.getType().contains("NOUVEAU_PARTICIPANT")) {
+                        icon = "👤";
+                    } else if (n.getType().contains("PARTICIPANT_ANNULE")) {
+                        icon = "🚫";
+                    } else {
+                        icon = "📝";
+                    }
+
+                    Label iconLabel = new Label(icon);
+                    iconLabel.setFont(Font.font("System", 16));
+
+                    Label titreNotif = new Label(n.getTitre());
+                    titreNotif.setFont(Font.font("System", FontWeight.BOLD, 14));
+                    titreNotif.setTextFill(Color.web("#0f172a"));
+
+                    if (!n.isRead()) {
+                        Label newBadge = new Label("NOUVEAU");
+                        newBadge.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; " +
+                                "-fx-padding: 2 8; -fx-background-radius: 12; -fx-font-size: 10; -fx-font-weight: bold;");
+                        titleRow.getChildren().addAll(iconLabel, titreNotif, newBadge);
+                    } else {
+                        titleRow.getChildren().addAll(iconLabel, titreNotif);
+                    }
+
+                    Label messageLabel = new Label(n.getMessage());
+                    messageLabel.setWrapText(true);
+                    messageLabel.setFont(Font.font("System", 12));
+                    messageLabel.setTextFill(Color.web("#475569"));
+
+                    // Détails supplémentaires
+                    VBox detailsBox = new VBox(5);
+                    if (n.getNomAdmin() != null && !n.getNomAdmin().isEmpty()) {
+                        Label adminLabel = new Label("👤 Admin: " + n.getNomAdmin() +
+                                (n.getEmailAdmin() != null ? " (" + n.getEmailAdmin() + ")" : ""));
+                        adminLabel.setFont(Font.font("System", 11));
+                        adminLabel.setTextFill(Color.web("#64748b"));
+                        detailsBox.getChildren().add(adminLabel);
+                    }
+
+                    if (n.getCommentaire() != null && !n.getCommentaire().isEmpty()) {
+                        Label commentLabel = new Label("💬 Commentaire: " + n.getCommentaire());
+                        commentLabel.setWrapText(true);
+                        commentLabel.setFont(Font.font("System", 11));
+                        commentLabel.setTextFill(Color.web("#64748b"));
+                        detailsBox.getChildren().add(commentLabel);
+                    }
+
+                    Label dateLabel = new Label(n.getFormattedDate());
+                    dateLabel.setFont(Font.font("System", 10));
+                    dateLabel.setTextFill(Color.web("#64748b"));
+
+                    cell.getChildren().addAll(titleRow, messageLabel);
+                    if (!detailsBox.getChildren().isEmpty()) {
+                        cell.getChildren().add(detailsBox);
+                    }
+                    cell.getChildren().add(dateLabel);
+
+                    setGraphic(cell);
+                }
+            }
+        });
+
+        // Filtrer les notifications pour cet événement
+        ObservableList<Notification> eventNotifs = FXCollections.observableArrayList();
+        List<Notification> allNotifs = notificationService.getNotificationsForOrganisateur(currentUser.getId());
+        for (Notification n : allNotifs) {
+            if (n.getIdEvenement() == event.getId_evenement()) {
+                eventNotifs.add(n);
+            }
+        }
+        notifList.setItems(eventNotifs);
+
+        Button closeBtn = new Button("Fermer");
+        closeBtn.setStyle("-fx-background-color: " + PRIMARY_COLOR +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+        closeBtn.setOnAction(e -> notifStage.close());
+
+        content.getChildren().addAll(header, notifList, closeBtn);
+
+        Scene scene = new Scene(content);
+        notifStage.setScene(scene);
+        notifStage.show();
     }
 
     @SuppressWarnings("unchecked")
@@ -913,15 +1172,26 @@ public class EventView {
         capaciteSpinner.setStyle("-fx-background-radius: 8; -fx-padding: 6; " +
                 "-fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 8;");
 
-        Label capaciteHelp = new Label("(optionnel)");
-        capaciteHelp.setFont(Font.font("System", FontWeight.NORMAL, 11));
-        capaciteHelp.setTextFill(Color.web("#6c757d"));
+        CheckBox capaciteIllimitee = new CheckBox("Illimitée");
+        capaciteIllimitee.setFont(Font.font("System", FontWeight.NORMAL, 12));
 
         if (existingEvent != null && existingEvent.getCapacite_max() != null) {
             capaciteSpinner.getValueFactory().setValue(existingEvent.getCapacite_max());
+        } else {
+            capaciteSpinner.getValueFactory().setValue(50);
         }
 
-        capaciteControl.getChildren().addAll(capaciteSpinner, capaciteHelp);
+        capaciteIllimitee.setOnAction(e -> {
+            if (capaciteIllimitee.isSelected()) {
+                capaciteSpinner.setDisable(true);
+                capaciteSpinner.getValueFactory().setValue(null);
+            } else {
+                capaciteSpinner.setDisable(false);
+                capaciteSpinner.getValueFactory().setValue(50);
+            }
+        });
+
+        capaciteControl.getChildren().addAll(capaciteSpinner, capaciteIllimitee);
         capaciteBox.getChildren().addAll(capaciteLabel, capaciteControl);
 
         // SECTION IMAGE
@@ -1164,7 +1434,12 @@ public class EventView {
             event.setDate_evenement(eventDateTime);
             event.setLieu(lieu);
             event.setId_organisateur(currentUser.getId());
-            event.setCapacite_max(capaciteSpinner.getValue());
+
+            if (!capaciteIllimitee.isSelected()) {
+                event.setCapacite_max(capaciteSpinner.getValue());
+            } else {
+                event.setCapacite_max(null);
+            }
 
             if (!selectedImagePath.isEmpty()) {
                 event.setImage_evenement(selectedImagePath);

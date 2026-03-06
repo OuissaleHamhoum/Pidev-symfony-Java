@@ -25,7 +25,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line; // AJOUTER CET IMPORT
+import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
@@ -41,9 +41,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-// Import pour les dashboards (à créer si nécessaire)
- import edu.Loopi.view.OrganizerDashboard;
- import edu.Loopi.view.UserDashboard;
+// Import pour les dashboards
+import edu.Loopi.view.OrganizerDashboard;
+import edu.Loopi.view.UserDashboard;
 
 public class LoginView extends Application {
 
@@ -859,91 +859,133 @@ public class LoginView extends Application {
 
     private void openQRLogin() {
         QRLoginService qrLoginService = new QRLoginService();
+        QRCodeWebServer webServer = null;
 
-        QRCodeWebServer webServer = new QRCodeWebServer(qrLoginService, user -> {
-            Platform.runLater(() -> {
-                System.out.println("✅ Connexion QR réussie pour: " + user.getEmail());
-                SessionManager.login(user);
+        try {
+            // Créer une copie final du webServer pour l'utiliser dans les lambdas
+            final QRCodeWebServer[] webServerRef = new QRCodeWebServer[1];
 
-                PauseTransition pause = new PauseTransition(Duration.seconds(1));
-                pause.setOnFinished(e -> openDashboard(user));
-                pause.play();
+            webServer = new QRCodeWebServer(qrLoginService, user -> {
+                Platform.runLater(() -> {
+                    System.out.println("✅ Connexion QR réussie pour: " + user.getEmail());
+                    SessionManager.login(user);
+
+                    // Arrêter le serveur après connexion réussie
+                    if (webServerRef[0] != null) {
+                        webServerRef[0].stop();
+                    }
+
+                    PauseTransition pause = new PauseTransition(Duration.seconds(1));
+                    pause.setOnFinished(e -> openDashboard(user));
+                    pause.play();
+                });
             });
-        });
 
-        webServer.start();
+            webServerRef[0] = webServer;
+            webServer.start();
 
-        Stage qrStage = new Stage();
-        qrStage.setTitle("Connexion par QR Code");
-        qrStage.initModality(Modality.APPLICATION_MODAL);
-        qrStage.initOwner(primaryStage);
-        qrStage.setOnCloseRequest(e -> webServer.stop());
+            Stage qrStage = new Stage();
+            qrStage.setTitle("Connexion par QR Code");
+            qrStage.initModality(Modality.APPLICATION_MODAL);
+            qrStage.initOwner(primaryStage);
 
-        BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #0f172a;");
+            final QRCodeWebServer finalWebServer = webServer;
+            qrStage.setOnCloseRequest(e -> {
+                if (finalWebServer != null) {
+                    finalWebServer.stop();
+                }
+                setButtonsDisabled(false);
+            });
 
-        VBox mainContent = new VBox(20);
-        mainContent.setAlignment(Pos.CENTER);
-        mainContent.setPadding(new Insets(30));
+            BorderPane root = new BorderPane();
+            root.setStyle("-fx-background-color: #0f172a;");
 
-        Label title = new Label("📱 Connexion par QR Code");
-        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
-        title.setTextFill(Color.WHITE);
+            VBox mainContent = new VBox(20);
+            mainContent.setAlignment(Pos.CENTER);
+            mainContent.setPadding(new Insets(30));
 
-        Label instruction = new Label(
-                "1. Scannez ce QR code avec votre téléphone\n" +
-                        "2. Connectez-vous avec vos identifiants\n" +
-                        "3. La connexion sera automatique sur cet ordinateur"
-        );
-        instruction.setFont(Font.font("Segoe UI", 14));
-        instruction.setTextFill(Color.web("#94a3b8"));
-        instruction.setTextAlignment(TextAlignment.CENTER);
-        instruction.setWrapText(true);
+            Label title = new Label("📱 Connexion par QR Code");
+            title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
+            title.setTextFill(Color.WHITE);
 
-        var result = qrLoginService.generateQRCode(webServer.getServerUrl());
+            Label instruction = new Label(
+                    "1. Scannez ce QR code avec votre téléphone\n" +
+                            "2. Connectez-vous avec vos identifiants\n" +
+                            "3. La connexion sera automatique sur cet ordinateur\n\n" +
+                            "⚠️ IMPORTANT: Votre téléphone doit être sur le MÊME réseau WiFi !"
+            );
+            instruction.setFont(Font.font("Segoe UI", 14));
+            instruction.setTextFill(Color.web("#94a3b8"));
+            instruction.setTextAlignment(TextAlignment.CENTER);
+            instruction.setWrapText(true);
 
-        if (result == null) {
-            showErrorAlert("Erreur", "Impossible de générer le QR code");
-            webServer.stop();
-            qrStage.close();
-            return;
+            var result = qrLoginService.generateQRCode(webServer.getServerUrl());
+
+            if (result == null) {
+                showErrorAlert("Erreur", "Impossible de générer le QR code");
+                webServer.stop();
+                qrStage.close();
+                setButtonsDisabled(false);
+                return;
+            }
+
+            ImageView qrImageView = new ImageView(result.getFXImage());
+            qrImageView.setFitWidth(280);
+            qrImageView.setFitHeight(280);
+            qrImageView.setPreserveRatio(true);
+
+            StackPane qrContainer = new StackPane(qrImageView);
+            qrContainer.setStyle("-fx-background-color: white; -fx-background-radius: 16; -fx-padding: 16;");
+
+            Label statusLabel = new Label("⏳ En attente de scan...");
+            statusLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+            statusLabel.setTextFill(Color.ORANGE);
+
+            Label infoLabel = new Label("QR code valable 2 minutes");
+            infoLabel.setFont(Font.font("Segoe UI", 12));
+            infoLabel.setTextFill(Color.YELLOW);
+
+            // Afficher l'URL complète
+            Label urlLabel = new Label("URL: " + webServer.getServerUrl() + "/login");
+            urlLabel.setFont(Font.font("Segoe UI", 10));
+            urlLabel.setTextFill(Color.web("#94a3b8"));
+            urlLabel.setWrapText(true);
+            urlLabel.setAlignment(Pos.CENTER);
+            urlLabel.setMaxWidth(400);
+
+            Button cancelBtn = new Button("❌ Fermer");
+            cancelBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 30; -fx-cursor: hand;");
+            cancelBtn.setOnAction(e -> {
+                if (finalWebServer != null) {
+                    finalWebServer.stop();
+                }
+                qrStage.close();
+                setButtonsDisabled(false);
+            });
+
+            VBox infoBox = new VBox(5, statusLabel, infoLabel, urlLabel);
+            infoBox.setAlignment(Pos.CENTER);
+
+            mainContent.getChildren().addAll(title, instruction, qrContainer, infoBox, cancelBtn);
+            root.setCenter(mainContent);
+
+            startQRPolling(result.sessionId, qrLoginService, qrStage, statusLabel, webServer);
+
+            Scene scene = new Scene(root, 550, 750);
+            qrStage.setScene(scene);
+            qrStage.showAndWait();
+
+        } catch (Exception e) {
+            System.err.println("❌ Erreur lors du démarrage du serveur QR: " + e.getMessage());
+            e.printStackTrace();
+            showErrorAlert("Erreur", "Impossible de démarrer le serveur QR: " + e.getMessage());
+            setButtonsDisabled(false);
+
+            if (webServer != null) {
+                webServer.stop();
+            }
         }
-
-        ImageView qrImageView = new ImageView(result.getFXImage());
-        qrImageView.setFitWidth(280);
-        qrImageView.setFitHeight(280);
-        qrImageView.setPreserveRatio(true);
-
-        StackPane qrContainer = new StackPane(qrImageView);
-        qrContainer.setStyle("-fx-background-color: white; -fx-background-radius: 16; -fx-padding: 16;");
-
-        Label statusLabel = new Label("⏳ En attente de scan...");
-        statusLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
-        statusLabel.setTextFill(Color.ORANGE);
-
-        Label infoLabel = new Label("QR code valable 2 minutes");
-        infoLabel.setFont(Font.font("Segoe UI", 12));
-        infoLabel.setTextFill(Color.YELLOW);
-
-        Button cancelBtn = new Button("❌ Fermer");
-        cancelBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
-                "-fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 30;");
-        cancelBtn.setOnAction(e -> {
-            webServer.stop();
-            qrStage.close();
-        });
-
-        VBox infoBox = new VBox(10, statusLabel, infoLabel);
-        infoBox.setAlignment(Pos.CENTER);
-
-        mainContent.getChildren().addAll(title, instruction, qrContainer, infoBox, cancelBtn);
-        root.setCenter(mainContent);
-
-        startQRPolling(result.sessionId, qrLoginService, qrStage, statusLabel, webServer);
-
-        Scene scene = new Scene(root, 500, 650);
-        qrStage.setScene(scene);
-        qrStage.showAndWait();
     }
 
     private void startQRPolling(String sessionId, QRLoginService service, Stage stage,
@@ -975,7 +1017,9 @@ public class LoginView extends Application {
                 Platform.runLater(() -> {
                     statusLabel.setText("⏰ QR code expiré");
                     statusLabel.setTextFill(Color.RED);
-                    webServer.stop();
+                    if (webServer != null) {
+                        webServer.stop();
+                    }
                 });
             }
         });
@@ -1044,13 +1088,12 @@ public class LoginView extends Application {
                 case "admin":
                     new AdminDashboard(user).start(dashboardStage);
                     break;
-                // Décommentez ces lignes quand vous aurez créé ces classes
-                 case "organisateur":
-                     new OrganizerDashboard(user).start(dashboardStage);
-                     break;
-                 case "participant":
-                     new UserDashboard(user).start(dashboardStage);
-                     break;
+                case "organisateur":
+                    new OrganizerDashboard(user).start(dashboardStage);
+                    break;
+                case "participant":
+                    new UserDashboard(user).start(dashboardStage);
+                    break;
                 default:
                     showErrorAlert("Erreur", "Rôle non reconnu: " + role);
             }

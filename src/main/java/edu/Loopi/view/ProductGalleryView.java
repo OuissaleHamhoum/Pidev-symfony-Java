@@ -350,4 +350,5 @@ public class ProductGalleryView {
 
         return card;
     }
+
 }

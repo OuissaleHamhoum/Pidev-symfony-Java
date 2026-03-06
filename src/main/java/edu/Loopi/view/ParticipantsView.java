@@ -6,6 +6,7 @@ import edu.Loopi.entities.User;
 import edu.Loopi.services.EventService;
 import edu.Loopi.services.ParticipationService;
 import edu.Loopi.services.UserService;
+import edu.Loopi.services.NotificationService;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -41,6 +42,7 @@ public class ParticipantsView {
     private EventService eventService = new EventService();
     private ParticipationService participationService = new ParticipationService();
     private UserService userService = new UserService();
+    private NotificationService notificationService = new NotificationService();
 
     // Constantes de couleurs
     private static final String PRIMARY_COLOR = "#2196F3";
@@ -106,31 +108,15 @@ public class ParticipantsView {
         mainContainer.setPadding(new Insets(25));
         mainContainer.setStyle("-fx-background-color: #f1f5f9;");
 
-        // En-tête
         VBox header = createHeader();
-
-        // Barre d'outils supérieure
         HBox topToolbar = createTopToolbar();
-
-        // Statistiques globales
         HBox globalStats = createGlobalStatistics();
-
-        // Sélecteur d'événement
         VBox eventSelectorBox = createEventSelector();
-
-        // Panel d'information de l'événement
         eventInfoPanel = createEventInfoPanel();
-
-        // Zone de filtres
         VBox filterBox = createFilterBox();
-
-        // Tableau des participants
         VBox tableBox = createParticipantsTable();
-
-        // Barre d'outils inférieure
         HBox bottomToolbar = createBottomToolbar();
 
-        // Assemblage
         mainContainer.getChildren().addAll(
                 header,
                 topToolbar,
@@ -142,7 +128,6 @@ public class ParticipantsView {
                 bottomToolbar
         );
 
-        // Charger les données
         loadData();
 
         ScrollPane scrollPane = new ScrollPane(mainContainer);
@@ -156,9 +141,6 @@ public class ParticipantsView {
         return root;
     }
 
-    /**
-     * EN-TÊTE
-     */
     private VBox createHeader() {
         VBox header = new VBox(10);
         header.setPadding(new Insets(0, 0, 15, 0));
@@ -187,7 +169,6 @@ public class ParticipantsView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Badge avec la date
         Label dateBadge = new Label(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE dd MMMM yyyy")));
         dateBadge.setFont(Font.font("Arial", FontWeight.BOLD, 13));
         dateBadge.setTextFill(Color.web(PRIMARY_COLOR));
@@ -200,9 +181,6 @@ public class ParticipantsView {
         return header;
     }
 
-    /**
-     * BARRE D'OUTILS SUPÉRIEURE
-     */
     private HBox createTopToolbar() {
         HBox toolbar = new HBox(15);
         toolbar.setPadding(new Insets(15));
@@ -231,7 +209,6 @@ public class ParticipantsView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Compteur de participants
         eventParticipantsCount = new Label("0 participant(s)");
         eventParticipantsCount.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         eventParticipantsCount.setTextFill(Color.web(PRIMARY_COLOR));
@@ -241,9 +218,6 @@ public class ParticipantsView {
         return toolbar;
     }
 
-    /**
-     * STATISTIQUES GLOBALES
-     */
     private HBox createGlobalStatistics() {
         HBox statsBox = new HBox(20);
         statsBox.setPadding(new Insets(20));
@@ -294,9 +268,6 @@ public class ParticipantsView {
         return card;
     }
 
-    /**
-     * SÉLECTEUR D'ÉVÉNEMENT
-     */
     private VBox createEventSelector() {
         VBox box = new VBox(12);
         box.setPadding(new Insets(20));
@@ -379,9 +350,6 @@ public class ParticipantsView {
         return box;
     }
 
-    /**
-     * PANEL D'INFORMATION DE L'ÉVÉNEMENT
-     */
     private VBox createEventInfoPanel() {
         VBox panel = new VBox(20);
         panel.setPadding(new Insets(20));
@@ -390,18 +358,15 @@ public class ParticipantsView {
         panel.setVisible(false);
         panel.setManaged(false);
 
-        // Titre du panel
         Label panelTitle = new Label("📊 Statistiques de l'événement sélectionné");
         panelTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         panelTitle.setTextFill(Color.web(PRIMARY_COLOR));
         panelTitle.setWrapText(true);
 
-        // Grille principale à 2 colonnes
         GridPane mainGrid = new GridPane();
         mainGrid.setHgap(30);
         mainGrid.setVgap(15);
 
-        // COLONNE GAUCHE - Informations générales
         VBox leftColumn = new VBox(15);
         leftColumn.setPadding(new Insets(10));
         leftColumn.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 12; -fx-padding: 15;");
@@ -415,7 +380,6 @@ public class ParticipantsView {
         infoGrid.setHgap(15);
         infoGrid.setVgap(12);
 
-        // Ligne 1 : Titre
         Label titreLabel = new Label("📝 Titre :");
         titreLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         titreLabel.setWrapText(true);
@@ -425,7 +389,6 @@ public class ParticipantsView {
         infoGrid.add(titreLabel, 0, 0);
         infoGrid.add(eventTitreValue, 1, 0);
 
-        // Ligne 2 : Date
         Label dateLabel = new Label("📅 Date :");
         dateLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         dateLabel.setWrapText(true);
@@ -434,7 +397,6 @@ public class ParticipantsView {
         infoGrid.add(dateLabel, 0, 1);
         infoGrid.add(eventDateValue, 1, 1);
 
-        // Ligne 3 : Lieu
         Label lieuLabel = new Label("📍 Lieu :");
         lieuLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         lieuLabel.setWrapText(true);
@@ -443,7 +405,6 @@ public class ParticipantsView {
         infoGrid.add(lieuLabel, 0, 2);
         infoGrid.add(eventLieuValue, 1, 2);
 
-        // Ligne 4 : Capacité
         Label capaciteLabel = new Label("👥 Capacité :");
         capaciteLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         capaciteLabel.setWrapText(true);
@@ -452,7 +413,6 @@ public class ParticipantsView {
         infoGrid.add(capaciteLabel, 0, 3);
         infoGrid.add(eventCapaciteValue, 1, 3);
 
-        // Ligne 5 : Statut
         Label statutLabel = new Label("📊 Statut :");
         statutLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         statutLabel.setWrapText(true);
@@ -463,7 +423,6 @@ public class ParticipantsView {
 
         leftColumn.getChildren().addAll(infoTitle, infoGrid);
 
-        // COLONNE DROITE - Statistiques détaillées
         VBox rightColumn = new VBox(15);
         rightColumn.setPadding(new Insets(10));
         rightColumn.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 12; -fx-padding: 15;");
@@ -477,7 +436,6 @@ public class ParticipantsView {
         statsGrid.setHgap(20);
         statsGrid.setVgap(12);
 
-        // Ligne 1 : Inscrits
         Label inscritLabel = new Label("📝 Inscrits :");
         inscritLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         inscritLabel.setWrapText(true);
@@ -488,7 +446,6 @@ public class ParticipantsView {
         statsGrid.add(inscritLabel, 0, 0);
         statsGrid.add(eventInscritsValue, 1, 0);
 
-        // Ligne 2 : Présents
         Label presentLabel = new Label("✅ Présents :");
         presentLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         presentLabel.setWrapText(true);
@@ -499,7 +456,6 @@ public class ParticipantsView {
         statsGrid.add(presentLabel, 0, 1);
         statsGrid.add(eventPresentsValue, 1, 1);
 
-        // Ligne 3 : Absents
         Label absentLabel = new Label("❌ Absents :");
         absentLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         absentLabel.setWrapText(true);
@@ -510,7 +466,6 @@ public class ParticipantsView {
         statsGrid.add(absentLabel, 0, 2);
         statsGrid.add(eventAbsentsValue, 1, 2);
 
-        // Ligne 4 : Taux de remplissage
         Label completionLabel = new Label("📊 Taux remplissage :");
         completionLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         completionLabel.setWrapText(true);
@@ -521,7 +476,6 @@ public class ParticipantsView {
         statsGrid.add(completionLabel, 0, 3);
         statsGrid.add(eventCompletionValue, 1, 3);
 
-        // Ligne 5 : Taux de présence
         Label presenceLabel = new Label("✅ Taux présence :");
         presenceLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         presenceLabel.setWrapText(true);
@@ -534,7 +488,6 @@ public class ParticipantsView {
 
         rightColumn.getChildren().addAll(statsTitle, statsGrid);
 
-        // Barre de progression visuelle
         ProgressBar progressBar = new ProgressBar(0);
         progressBar.setPrefWidth(Double.MAX_VALUE);
         progressBar.setStyle("-fx-accent: " + PRIMARY_COLOR + ";");
@@ -546,9 +499,6 @@ public class ParticipantsView {
         return panel;
     }
 
-    /**
-     * ZONE DE FILTRES
-     */
     private VBox createFilterBox() {
         VBox box = new VBox(10);
         box.setPadding(new Insets(15, 20, 15, 20));
@@ -601,9 +551,6 @@ public class ParticipantsView {
         return box;
     }
 
-    /**
-     * TABLEAU DES PARTICIPANTS AVEC BOUTONS ICÔNES
-     */
     @SuppressWarnings("unchecked")
     private VBox createParticipantsTable() {
         VBox box = new VBox(15);
@@ -626,7 +573,6 @@ public class ParticipantsView {
         participantsTable.setMinHeight(300);
         participantsTable.setStyle("-fx-background-color: transparent; -fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 8;");
 
-        // Colonnes
         TableColumn<Participation, Integer> idCol = new TableColumn<>("ID");
         idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
         idCol.setPrefWidth(60);
@@ -686,7 +632,6 @@ public class ParticipantsView {
         dateCol.setPrefWidth(130);
         dateCol.setStyle("-fx-alignment: CENTER;");
 
-        // COLONNE ACTIONS AVEC BOUTONS ICÔNES
         TableColumn<Participation, Void> actionsCol = new TableColumn<>("Actions");
         actionsCol.setPrefWidth(200);
         actionsCol.setCellFactory(col -> new TableCell<Participation, Void>() {
@@ -730,10 +675,8 @@ public class ParticipantsView {
                 statutCol, dateCol, actionsCol
         );
 
-        // Info-bulle pour double-clic
         participantsTable.setTooltip(new Tooltip("Double-cliquez sur un participant pour voir ses détails"));
 
-        // Double-clic pour voir détails
         participantsTable.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && participantsTable.getSelectionModel().getSelectedItem() != null) {
                 showParticipantDetails(participantsTable.getSelectionModel().getSelectedItem());
@@ -746,9 +689,6 @@ public class ParticipantsView {
         return box;
     }
 
-    /**
-     * BOUTON AVEC ICÔNE POUR LE TABLEAU
-     */
     private Button createIconButton(String icon, String color, String tooltip) {
         Button btn = new Button(icon);
         btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
@@ -781,9 +721,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * BARRE D'OUTILS INFÉRIEURE
-     */
     private HBox createBottomToolbar() {
         HBox toolbar = new HBox(15);
         toolbar.setPadding(new Insets(15));
@@ -811,15 +748,10 @@ public class ParticipantsView {
         return toolbar;
     }
 
-    /**
-     * CHARGEMENT DES DONNÉES
-     */
     private void loadData() {
-        // Charger les événements
         List<Event> events = eventService.getEventsByOrganisateur(currentUser.getId());
         eventsData.setAll(events);
 
-        // Option "Tous les événements"
         Event allEventsOption = new Event();
         allEventsOption.setId_evenement(-1);
         allEventsOption.setTitre("Tous les participants");
@@ -830,20 +762,17 @@ public class ParticipantsView {
         eventSelector.setItems(comboItems);
         eventSelector.setValue(allEventsOption);
 
-        // Charger toutes les participations
         allParticipations.clear();
         for (Event event : events) {
             List<Participation> participants = participationService.getParticipationsByEvent(event.getId_evenement());
             allParticipations.addAll(participants);
         }
 
-        // Configurer les listes filtrées
         filteredParticipations = new FilteredList<>(allParticipations, p -> true);
         sortedParticipations = new SortedList<>(filteredParticipations);
         sortedParticipations.comparatorProperty().bind(participantsTable.comparatorProperty());
         participantsTable.setItems(sortedParticipations);
 
-        // Mettre à jour les statistiques
         updateGlobalStats();
         updateParticipantCount();
     }
@@ -858,9 +787,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * APPLICATION DES FILTRES
-     */
     private void applyFilters() {
         if (filteredParticipations == null) return;
 
@@ -868,7 +794,6 @@ public class ParticipantsView {
         String statusValue = statusFilter.getValue();
 
         filteredParticipations.setPredicate(participation -> {
-            // Filtre par statut
             if (statusValue != null && !"Tous".equals(statusValue)) {
                 String expectedStatus = statusValue.equals("Inscrits") ? "inscrit" :
                         statusValue.equals("Présents") ? "present" : "absent";
@@ -877,7 +802,6 @@ public class ParticipantsView {
                 }
             }
 
-            // Filtre par recherche
             if (!searchText.isEmpty()) {
                 User user = userService.getUserById(participation.getIdUser());
                 if (user == null) return false;
@@ -902,13 +826,9 @@ public class ParticipantsView {
         applyFilters();
     }
 
-    /**
-     * SÉLECTION D'ÉVÉNEMENT
-     */
     private void selectEvent(Event event) {
         currentSelectedEvent = event;
 
-        // Filtrer les participations
         List<Participation> eventParticipations = allParticipations.stream()
                 .filter(p -> p.getIdEvenement() == event.getId_evenement())
                 .collect(Collectors.toList());
@@ -918,16 +838,13 @@ public class ParticipantsView {
         sortedParticipations.comparatorProperty().bind(participantsTable.comparatorProperty());
         participantsTable.setItems(sortedParticipations);
 
-        // Afficher le panel d'information
         eventInfoPanel.setVisible(true);
         eventInfoPanel.setManaged(true);
 
-        // Mettre à jour les informations
         updateEventInfo(event);
         updateEventStats(eventParticipations);
         updateParticipantCount();
 
-        // Réappliquer les filtres
         applyFilters();
     }
 
@@ -945,9 +862,6 @@ public class ParticipantsView {
         applyFilters();
     }
 
-    /**
-     * MISE À JOUR DES INFORMATIONS D'ÉVÉNEMENT
-     */
     private void updateEventInfo(Event event) {
         eventTitreValue.setText(event.getTitre());
         eventDateValue.setText(event.getFormattedDate());
@@ -955,7 +869,6 @@ public class ParticipantsView {
         eventCapaciteValue.setText(event.getCapacite_max() != null ?
                 event.getCapacite_max() + " places" : "Illimitée");
 
-        // Statut avec couleur
         String statut = event.getStatut();
         eventStatutValue.setText(statut.substring(0, 1).toUpperCase() + statut.substring(1));
 
@@ -970,21 +883,16 @@ public class ParticipantsView {
         eventStatutValue.setStyle("-fx-font-weight: bold;");
     }
 
-    /**
-     * MISE À JOUR DES STATISTIQUES DÉTAILLÉES
-     */
     private void updateEventStats(List<Participation> participants) {
         long inscrits = participants.stream().filter(p -> "inscrit".equals(p.getStatut())).count();
         long presents = participants.stream().filter(p -> "present".equals(p.getStatut())).count();
         long absents = participants.stream().filter(p -> "absent".equals(p.getStatut())).count();
         long total = participants.size();
 
-        // Mise à jour des valeurs
         eventInscritsValue.setText(String.valueOf(inscrits));
         eventPresentsValue.setText(String.valueOf(presents));
         eventAbsentsValue.setText(String.valueOf(absents));
 
-        // Calcul des taux
         if (total > 0) {
             double tauxPresence = (presents * 100.0) / total;
             eventTauxPresenceValue.setText(String.format("%.1f%%", tauxPresence));
@@ -997,7 +905,6 @@ public class ParticipantsView {
             double tauxRemplissage = (total * 100.0) / currentSelectedEvent.getCapacite_max();
             eventCompletionValue.setText(String.format("%.1f%%", tauxRemplissage));
 
-            // Mise à jour de la barre de progression
             ProgressBar progressBar = (ProgressBar) eventInfoPanel.getChildren().get(2);
             progressBar.setProgress(Math.min(tauxRemplissage / 100, 1.0));
         } else {
@@ -1026,9 +933,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * ACTIONS SUR LES PARTICIPANTS
-     */
     private void updateStatus(Participation participation, String newStatus) {
         String statusText = newStatus.equals("present") ? "PRÉSENT" : "ABSENT";
 
@@ -1046,6 +950,13 @@ public class ParticipantsView {
             );
 
             if (success) {
+                // Notification au participant
+                notificationService.creerNotificationModification(
+                        participation.getIdUser(),
+                        participation.getIdEvenement(),
+                        eventService.getEventById(participation.getIdEvenement()).getTitre(),
+                        "Votre statut a été mis à jour: " + statusText
+                );
                 refreshData();
                 showSuccess("Statut mis à jour avec succès !");
             } else {
@@ -1062,12 +973,32 @@ public class ParticipantsView {
 
         Optional<ButtonType> result = confirm.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
+            Event event = eventService.getEventById(participation.getIdEvenement());
+            User participant = userService.getUserById(participation.getIdUser());
+
             boolean success = participationService.annulerParticipation(
                     participation.getIdEvenement(),
                     participation.getIdUser()
             );
 
             if (success) {
+                // Notification au participant
+                notificationService.creerNotificationAnnulation(
+                        participation.getIdUser(),
+                        participation.getIdEvenement(),
+                        event.getTitre()
+                );
+
+                // Notification à l'admin
+                List<User> admins = userService.getUsersByRole("admin");
+                for (User admin : admins) {
+                    notificationService.creerNotificationAnnulation(
+                            admin.getId(),
+                            participation.getIdEvenement(),
+                            event.getTitre() + " - Participant supprimé: " + participant.getPrenom() + " " + participant.getNom()
+                    );
+                }
+
                 refreshData();
                 showSuccess("Participation supprimée avec succès !");
             } else {
@@ -1140,9 +1071,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * FICHE DÉTAILLÉE DU PARTICIPANT
-     */
     private void showParticipantDetails(Participation participation) {
         User participant = userService.getUserById(participation.getIdUser());
         Event event = eventService.getEventById(participation.getIdEvenement());
@@ -1161,7 +1089,6 @@ public class ParticipantsView {
         content.setStyle("-fx-background-color: white;");
         content.setPrefWidth(550);
 
-        // En-tête
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(0, 0, 15, 0));
@@ -1184,7 +1111,6 @@ public class ParticipantsView {
         headerText.getChildren().addAll(titleLabel, nameLabel);
         header.getChildren().addAll(avatarIcon, headerText);
 
-        // Section Informations personnelles
         VBox personalSection = createDetailSection("📋 Informations personnelles");
         GridPane personalGrid = createDetailGrid();
         addDetailRow(personalGrid, "📧 Email :", participant.getEmail(), 0);
@@ -1192,12 +1118,10 @@ public class ParticipantsView {
         addDetailRow(personalGrid, "⚥ Genre :", getGenderString(participant), 2);
         personalSection.getChildren().add(personalGrid);
 
-        // Section Participation
         VBox participationSection = createDetailSection("🎟️ Détails de participation");
         GridPane participationGrid = createDetailGrid();
         addDetailRow(participationGrid, "📞 Contact :", participation.getContact(), 0);
 
-        // Ligne avec badge de statut
         Label statutLabel = new Label("📊 Statut :");
         statutLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + DARK_COLOR + ";");
         statutLabel.setWrapText(true);
@@ -1215,21 +1139,18 @@ public class ParticipantsView {
         addDetailRow(participationGrid, "📅 Date d'inscription :", participation.getFormattedDate(), 2);
         participationSection.getChildren().add(participationGrid);
 
-        // Section Événement
         VBox eventSection = createDetailSection("📅 Événement associé");
         GridPane eventGrid = createDetailGrid();
         addDetailRow(eventGrid, "🎯 Titre :", event.getTitre(), 0);
         addDetailRow(eventGrid, "📆 Date :", event.getFormattedDate(), 1);
         addDetailRow(eventGrid, "📍 Lieu :", event.getLieu() != null ? event.getLieu() : "Non spécifié", 2);
 
-        // Organisateur
         User organizer = userService.getUserById(event.getId_organisateur());
         String organizerName = organizer != null ? organizer.getPrenom() + " " + organizer.getNom() : "Inconnu";
         addDetailRow(eventGrid, "👤 Organisateur :", organizerName, 3);
 
         eventSection.getChildren().add(eventGrid);
 
-        // Boutons d'action
         HBox buttons = new HBox(10);
         buttons.setAlignment(Pos.CENTER);
         buttons.setPadding(new Insets(20, 0, 0, 0));
@@ -1314,9 +1235,6 @@ public class ParticipantsView {
         return btn;
     }
 
-    /**
-     * RAPPORT STATISTIQUE AMÉLIORÉ - CORRIGÉ
-     */
     private void showDetailedStats() {
         Stage statsStage = new Stage();
         statsStage.initModality(Modality.APPLICATION_MODAL);
@@ -1328,7 +1246,6 @@ public class ParticipantsView {
         content.setPrefWidth(750);
         content.setMaxWidth(800);
 
-        // Titre
         Label title = new Label("📊 RAPPORT STATISTIQUE DÉTAILLÉ");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 26));
         title.setTextFill(Color.web(PRIMARY_COLOR));
@@ -1336,18 +1253,15 @@ public class ParticipantsView {
         title.setAlignment(Pos.CENTER);
         title.setTextAlignment(TextAlignment.CENTER);
 
-        // Date du rapport
         Label dateLabel = new Label("Généré le " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy à HH:mm")));
         dateLabel.setFont(Font.font("Arial", 14));
         dateLabel.setTextFill(Color.web(DARK_COLOR));
         dateLabel.setWrapText(true);
         dateLabel.setAlignment(Pos.CENTER);
 
-        // Séparateur
         Separator sep1 = new Separator();
         sep1.setPadding(new Insets(10, 0, 10, 0));
 
-        // ========== SECTION 1 : STATISTIQUES GLOBALES ==========
         VBox globalSection = new VBox(15);
         globalSection.setPadding(new Insets(15));
         globalSection.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 12; -fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 12;");
@@ -1362,7 +1276,6 @@ public class ParticipantsView {
         globalGrid.setVgap(15);
         globalGrid.setPadding(new Insets(10, 0, 5, 0));
 
-        // Ligne 1 : Total participants
         Label totalLabel = new Label("👥 Total participants :");
         totalLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         totalLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1374,7 +1287,6 @@ public class ParticipantsView {
         globalGrid.add(totalLabel, 0, 0);
         globalGrid.add(totalValue, 1, 0);
 
-        // Ligne 2 : Inscrits
         Label inscritTotalLabel = new Label("📝 Inscrits :");
         inscritTotalLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         inscritTotalLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1386,7 +1298,6 @@ public class ParticipantsView {
         globalGrid.add(inscritTotalLabel, 0, 1);
         globalGrid.add(inscritTotalValue, 1, 1);
 
-        // Ligne 3 : Présents
         Label presentTotalLabel = new Label("✅ Présents :");
         presentTotalLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         presentTotalLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1398,7 +1309,6 @@ public class ParticipantsView {
         globalGrid.add(presentTotalLabel, 0, 2);
         globalGrid.add(presentTotalValue, 1, 2);
 
-        // Ligne 4 : Absents
         Label absentTotalLabel = new Label("❌ Absents :");
         absentTotalLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         absentTotalLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1410,7 +1320,6 @@ public class ParticipantsView {
         globalGrid.add(absentTotalLabel, 0, 3);
         globalGrid.add(absentTotalValue, 1, 3);
 
-        // Ligne 5 : Taux de présence global
         int totalGlobal = Integer.parseInt(totalParticipantsLabel.getText());
         int presentsGlobal = Integer.parseInt(totalPresentsLabel.getText());
         double tauxPresenceGlobal = totalGlobal > 0 ? (presentsGlobal * 100.0 / totalGlobal) : 0;
@@ -1428,7 +1337,6 @@ public class ParticipantsView {
 
         globalSection.getChildren().addAll(globalTitle, globalGrid);
 
-        // ========== SECTION 2 : STATISTIQUES PAR ÉVÉNEMENT ==========
         VBox eventSection = new VBox(15);
         eventSection.setPadding(new Insets(15));
         eventSection.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 12; -fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 12;");
@@ -1459,25 +1367,21 @@ public class ParticipantsView {
                 eventCard.setPadding(new Insets(15));
                 eventCard.setStyle("-fx-background-color: white; -fx-background-radius: 8; -fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 8;");
 
-                // Nom de l'événement
                 Label eventName = new Label("🎯 " + event.getTitre());
                 eventName.setFont(Font.font("Arial", FontWeight.BOLD, 16));
                 eventName.setTextFill(Color.web(PRIMARY_COLOR));
                 eventName.setWrapText(true);
 
-                // Date et lieu
                 Label eventInfo = new Label(event.getFormattedDate() + " - " + (event.getLieu() != null ? event.getLieu() : "Lieu non spécifié"));
                 eventInfo.setFont(Font.font("Arial", 13));
                 eventInfo.setTextFill(Color.web("#64748b"));
                 eventInfo.setWrapText(true);
 
-                // Grille des statistiques
                 GridPane eventStatGrid = new GridPane();
                 eventStatGrid.setHgap(25);
                 eventStatGrid.setVgap(10);
                 eventStatGrid.setPadding(new Insets(10, 0, 5, 0));
 
-                // Total
                 Label totalEventLabel = new Label("Total :");
                 totalEventLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
                 totalEventLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1489,7 +1393,6 @@ public class ParticipantsView {
                 eventStatGrid.add(totalEventLabel, 0, 0);
                 eventStatGrid.add(totalEventValue, 1, 0);
 
-                // Inscrits
                 Label inscritEventLabel = new Label("Inscrits :");
                 inscritEventLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
                 inscritEventLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1501,7 +1404,6 @@ public class ParticipantsView {
                 eventStatGrid.add(inscritEventLabel, 2, 0);
                 eventStatGrid.add(inscritEventValue, 3, 0);
 
-                // Présents
                 Label presentEventLabel = new Label("Présents :");
                 presentEventLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
                 presentEventLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1513,7 +1415,6 @@ public class ParticipantsView {
                 eventStatGrid.add(presentEventLabel, 0, 1);
                 eventStatGrid.add(presentEventValue, 1, 1);
 
-                // Absents
                 Label absentEventLabel = new Label("Absents :");
                 absentEventLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
                 absentEventLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1525,7 +1426,6 @@ public class ParticipantsView {
                 eventStatGrid.add(absentEventLabel, 2, 1);
                 eventStatGrid.add(absentEventValue, 3, 1);
 
-                // Taux de présence
                 double tauxPresenceEvent = total > 0 ? (presents * 100.0 / total) : 0;
                 Label tauxEventLabel = new Label("Taux présence :");
                 tauxEventLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
@@ -1545,7 +1445,6 @@ public class ParticipantsView {
 
         eventSection.getChildren().addAll(eventSectionTitle, eventsContainer);
 
-        // ========== SECTION 3 : RÉPARTITION PAR STATUT ==========
         VBox repartitionSection = new VBox(15);
         repartitionSection.setPadding(new Insets(15));
         repartitionSection.setStyle("-fx-background-color: " + LIGHT_GRAY + "; -fx-background-radius: 12; -fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 12;");
@@ -1565,12 +1464,10 @@ public class ParticipantsView {
         int presents = Integer.parseInt(totalPresentsLabel.getText());
         int absents = Integer.parseInt(totalAbsentsLabel.getText());
 
-        // Pourcentages
         double pInscrits = total > 0 ? (inscrits * 100.0 / total) : 0;
         double pPresents = total > 0 ? (presents * 100.0 / total) : 0;
         double pAbsents = total > 0 ? (absents * 100.0 / total) : 0;
 
-        // Ligne Inscrits
         Label repInscritLabel = new Label("📝 Inscrits :");
         repInscritLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         repInscritLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1582,7 +1479,6 @@ public class ParticipantsView {
         repartitionGrid.add(repInscritLabel, 0, 0);
         repartitionGrid.add(repInscritValue, 1, 0);
 
-        // Ligne Présents
         Label repPresentLabel = new Label("✅ Présents :");
         repPresentLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         repPresentLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1594,7 +1490,6 @@ public class ParticipantsView {
         repartitionGrid.add(repPresentLabel, 0, 1);
         repartitionGrid.add(repPresentValue, 1, 1);
 
-        // Ligne Absents
         Label repAbsentLabel = new Label("❌ Absents :");
         repAbsentLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         repAbsentLabel.setTextFill(Color.web(DARK_COLOR));
@@ -1608,7 +1503,6 @@ public class ParticipantsView {
 
         repartitionSection.getChildren().addAll(repartitionTitle, repartitionGrid);
 
-        // Bouton Fermer
         Button closeBtn = new Button("Fermer le rapport");
         closeBtn.setStyle("-fx-background-color: " + PRIMARY_COLOR + "; -fx-text-fill: white; " +
                 "-fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-size: 14px;");
@@ -1618,7 +1512,6 @@ public class ParticipantsView {
         buttonBox.setAlignment(Pos.CENTER);
         buttonBox.setPadding(new Insets(20, 0, 0, 0));
 
-        // Assemblage final
         content.getChildren().addAll(
                 title,
                 dateLabel,
@@ -1639,11 +1532,6 @@ public class ParticipantsView {
         statsStage.show();
     }
 
-    // ==================== MÉTHODES D'EXPORT ====================
-
-    /**
-     * EXPORT TOUS LES PARTICIPANTS
-     */
     private void exportAllParticipants() {
         if (allParticipations.isEmpty()) {
             showWarning("Aucun participant à exporter");
@@ -1661,17 +1549,13 @@ public class ParticipantsView {
 
         try (PrintWriter writer = new PrintWriter(new FileWriter(file, StandardCharsets.UTF_8))) {
 
-            // En-tête du rapport
             writer.println("#RAPPORT DES PARTICIPANTS");
             writer.println("#Date d'export: " + LocalDateTime.now().format(EXPORT_DATETIME_FORMAT));
             writer.println("#Exporté par: " + currentUser.getPrenom() + " " + currentUser.getNom());
             writer.println("#Total participants: " + allParticipations.size());
             writer.println("#");
-
-            // En-tête des colonnes
             writer.println("ID_Participant;Nom;Prénom;Email;Contact;Âge;Statut;Nom_Événement;Date_Événement;Lieu_Événement;Date_Inscription");
 
-            // Données
             for (Participation p : allParticipations) {
                 User user = userService.getUserById(p.getIdUser());
                 Event event = eventService.getEventById(p.getIdEvenement());
@@ -1701,9 +1585,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * EXPORT D'UN SEUL PARTICIPANT
-     */
     private void exportSingleParticipant(Participation p) {
         User user = userService.getUserById(p.getIdUser());
         Event event = eventService.getEventById(p.getIdEvenement());
@@ -1724,7 +1605,6 @@ public class ParticipantsView {
             writer.println("#Date d'export: " + LocalDateTime.now().format(EXPORT_DATETIME_FORMAT));
             writer.println("#Exporté par: " + currentUser.getPrenom() + " " + currentUser.getNom());
             writer.println("#");
-
             writer.println("Catégorie;Information");
             writer.println("ID Participant;" + p.getId());
             writer.println("Nom;" + escapeCSV(user.getNom()));
@@ -1757,9 +1637,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * ÉCHAPPEMENT CSV
-     */
     private String escapeCSV(String value) {
         if (value == null || value.isEmpty()) return "";
 
@@ -1786,9 +1663,6 @@ public class ParticipantsView {
         }
     }
 
-    /**
-     * MESSAGES
-     */
     private void showSuccess(String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Succès");

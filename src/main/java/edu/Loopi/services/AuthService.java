@@ -75,7 +75,6 @@ public class AuthService {
         return null;
     }
 
-    // NOUVELLE MÉTHODE AJOUTÉE
     public User getUserById(int id) {
         String query = "SELECT u.*, g.sexe FROM users u " +
                 "LEFT JOIN genre g ON u.id_genre = g.id_genre " +

@@ -27,22 +27,39 @@ public class ParticipationService implements IParticipationService {
 
     @Override
     public boolean participer(int idEvent, int idUser, String contact, Integer age) {
-        // Vérifier si l'utilisateur participe déjà
+        if (contact == null || contact.trim().isEmpty()) {
+            System.err.println("❌ Contact requis");
+            return false;
+        }
+
         if (isParticipant(idEvent, idUser)) {
             System.out.println("⚠️ L'utilisateur participe déjà à cet événement");
             return false;
         }
 
-        // Vérifier si l'événement est complet
         if (isEventComplet(idEvent)) {
             System.out.println("⚠️ Événement complet");
             return false;
         }
 
-        // Vérifier si l'événement est approuvé
         Event event = eventService.getEventById(idEvent);
-        if (event == null || !"approuve".equals(event.getStatutValidation())) {
-            System.out.println("⚠️ Événement non disponible");
+        if (event == null) {
+            System.out.println("⚠️ Événement non trouvé");
+            return false;
+        }
+
+        if (!"approuve".equals(event.getStatutValidation())) {
+            System.out.println("⚠️ Événement non approuvé");
+            return false;
+        }
+
+        if (!event.isEstPublie()) {
+            System.out.println("⚠️ Événement non publié");
+            return false;
+        }
+
+        if (event.isDatePassee()) {
+            System.out.println("⚠️ Événement passé");
             return false;
         }
 
@@ -63,44 +80,38 @@ public class ParticipationService implements IParticipationService {
             int affectedRows = pst.executeUpdate();
 
             if (affectedRows > 0) {
-                ResultSet rs = pst.getGeneratedKeys();
-                if (rs.next()) {
-                    int idParticipation = rs.getInt(1);
+                User participant = userService.getUserById(idUser);
+                User organisateur = userService.getUserById(event.getId_organisateur());
 
-                    // Récupérer les informations nécessaires
-                    User participant = userService.getUserById(idUser);
-                    User organisateur = userService.getUserById(event.getId_organisateur());
+                if (participant != null && organisateur != null) {
+                    // Notification au participant
+                    notificationService.creerNotificationParticipation(idUser, idEvent, event.getTitre());
 
-                    if (participant != null && organisateur != null) {
-                        // Notification pour le participant
-                        notificationService.creerNotificationParticipation(idUser, idEvent, event.getTitre());
-
-                        // Notification pour l'organisateur
-                        notificationService.creerNotificationNouveauParticipant(
-                                organisateur.getId(),
-                                idEvent,
-                                participant.getPrenom() + " " + participant.getNom()
-                        );
-                    }
-
-                    System.out.println("✅ Participation ajoutée avec succès. ID: " + idParticipation);
+                    // Notification à l'organisateur avec tous les paramètres requis
+                    notificationService.creerNotificationNouveauParticipant(
+                            organisateur.getId(),
+                            idEvent,
+                            event.getTitre(),
+                            participant.getPrenom() + " " + participant.getNom(),
+                            participant.getEmail()
+                    );
                 }
+                System.out.println("✅ Participation ajoutée avec succès");
                 return true;
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de la participation: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
 
     @Override
     public boolean annulerParticipation(int idEvent, int idUser) {
-        // Récupérer les informations avant suppression
         Event event = eventService.getEventById(idEvent);
         if (event == null) return false;
 
         User participant = userService.getUserById(idUser);
-        User organisateur = userService.getUserById(event.getId_organisateur());
 
         String query = "DELETE FROM participation WHERE id_evenement = ? AND id_user = ?";
 
@@ -110,29 +121,36 @@ public class ParticipationService implements IParticipationService {
 
             int affectedRows = pst.executeUpdate();
             if (affectedRows > 0) {
-                // Notification pour le participant
+                // Notification au participant
                 notificationService.creerNotificationAnnulation(idUser, idEvent, event.getTitre());
 
-                // Notification pour l'organisateur
-                if (organisateur != null && participant != null) {
+                // Notification à l'organisateur avec tous les paramètres requis
+                if (participant != null) {
                     notificationService.creerNotificationParticipantAnnule(
-                            organisateur.getId(),
+                            event.getId_organisateur(),
                             idEvent,
-                            participant.getPrenom() + " " + participant.getNom()
+                            event.getTitre(),
+                            participant.getPrenom() + " " + participant.getNom(),
+                            participant.getEmail()
                     );
                 }
-
                 System.out.println("✅ Participation annulée avec succès");
                 return true;
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de l'annulation: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
 
     @Override
     public boolean modifierParticipation(int idEvent, int idUser, String contact, Integer age) {
+        if (contact == null || contact.trim().isEmpty()) {
+            System.err.println("❌ Contact requis");
+            return false;
+        }
+
         String query = "UPDATE participation SET contact = ?, age = ? WHERE id_evenement = ? AND id_user = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
@@ -164,12 +182,18 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de la modification: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
 
     @Override
     public boolean updateStatut(int idEvent, int idUser, String statut) {
+        if (!statut.equals("inscrit") && !statut.equals("present") && !statut.equals("absent")) {
+            System.err.println("❌ Statut invalide: " + statut);
+            return false;
+        }
+
         String query = "UPDATE participation SET statut = ? WHERE id_evenement = ? AND id_user = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
@@ -205,6 +229,7 @@ public class ParticipationService implements IParticipationService {
             return updated;
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de la mise à jour du statut: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
@@ -231,6 +256,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors du chargement des participations: " + e.getMessage());
+            e.printStackTrace();
         }
         return participations;
     }
@@ -259,7 +285,6 @@ public class ParticipationService implements IParticipationService {
                 p.setDateInscription(rs.getTimestamp("date_inscription"));
                 p.setStatut(rs.getString("statut"));
 
-                // Informations utilisateur
                 p.setUserNom(rs.getString("nom"));
                 p.setUserPrenom(rs.getString("prenom"));
                 p.setUserEmail(rs.getString("email"));
@@ -268,6 +293,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors du chargement des participants: " + e.getMessage());
+            e.printStackTrace();
         }
         return participations;
     }
@@ -288,6 +314,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de la récupération de la participation: " + e.getMessage());
+            e.printStackTrace();
         }
         return null;
     }
@@ -308,6 +335,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de la vérification: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
@@ -327,13 +355,14 @@ public class ParticipationService implements IParticipationService {
             if (rs.next()) {
                 Integer capaciteMax = rs.getInt("capacite_max");
                 if (rs.wasNull()) {
-                    return false; // Pas de limite
+                    return false;
                 }
                 int nbParticipants = rs.getInt("nb_participants");
                 return nbParticipants >= capaciteMax;
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors de la vérification de la capacité: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
@@ -353,6 +382,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors du comptage: " + e.getMessage());
+            e.printStackTrace();
         }
         return 0;
     }
@@ -370,6 +400,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors du comptage: " + e.getMessage());
+            e.printStackTrace();
         }
         return 0;
     }
@@ -404,14 +435,21 @@ public class ParticipationService implements IParticipationService {
                     event.setCapacite_max(null);
                 }
                 event.setImage_evenement(rs.getString("image_evenement"));
-                event.setStatutValidation(rs.getString("statut_validation"));
 
-                // Charger les statistiques de participation pour cet événement
+                try {
+                    event.setStatutValidation(rs.getString("statut_validation"));
+                    event.setEstPublie(rs.getBoolean("est_publie"));
+                } catch (SQLException e) {
+                    event.setStatutValidation("approuve");
+                    event.setEstPublie(true);
+                }
+
                 eventService.loadParticipationStats(event);
                 events.add(event);
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur lors du chargement des événements: " + e.getMessage());
+            e.printStackTrace();
         }
         return events;
     }
@@ -428,6 +466,7 @@ public class ParticipationService implements IParticipationService {
             return true;
         } catch (SQLException e) {
             System.err.println("❌ Erreur suppression participations: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
@@ -442,6 +481,7 @@ public class ParticipationService implements IParticipationService {
             return true;
         } catch (SQLException e) {
             System.err.println("❌ Erreur suppression participations: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
@@ -459,7 +499,6 @@ public class ParticipationService implements IParticipationService {
         p.setDateInscription(rs.getTimestamp("date_inscription"));
         p.setStatut(rs.getString("statut"));
 
-        // Informations supplémentaires
         try {
             p.setEventTitre(rs.getString("titre"));
             p.setEventLieu(rs.getString("lieu"));
@@ -469,22 +508,24 @@ public class ParticipationService implements IParticipationService {
                 p.setEventDate(eventDate.toLocalDateTime());
             }
         } catch (SQLException e) {
-            // Ignorer si les colonnes n'existent pas
+            // Ignorer
         }
 
         try {
             String orgPrenom = rs.getString("org_prenom");
             String orgNom = rs.getString("org_nom");
-            p.setOrganisateurNom(orgPrenom + " " + orgNom);
+            if (orgPrenom != null && orgNom != null) {
+                p.setOrganisateurNom(orgPrenom + " " + orgNom);
+            }
         } catch (SQLException e) {
-            // Ignorer si les colonnes n'existent pas
+            // Ignorer
         }
 
         return p;
     }
 
     public int[] getStatistiquesParticipation(int idEvent) {
-        int[] stats = new int[3]; // [inscrits, presents, absents]
+        int[] stats = new int[3];
         String query = "SELECT statut, COUNT(*) as count FROM participation " +
                 "WHERE id_evenement = ? GROUP BY statut";
 
@@ -510,6 +551,7 @@ public class ParticipationService implements IParticipationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur récupération statistiques: " + e.getMessage());
+            e.printStackTrace();
         }
         return stats;
     }

@@ -3,9 +3,11 @@ package edu.Loopi.view.AdminDashboard;
 import edu.Loopi.entities.Event;
 import edu.Loopi.entities.User;
 import edu.Loopi.services.EventService;
+import edu.Loopi.services.GeocodingService;
 import edu.Loopi.services.UserService;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
+import javafx.animation.PauseTransition;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Worker;
@@ -24,24 +26,27 @@ import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import netscape.javascript.JSObject;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class EventMapView {
     private User currentUser;
     private UserService userService;
     private EventService eventService;
     private AdminDashboard adminDashboard;
+    private GeocodingService geocodingService;
 
     // Composants UI
     private WebView webView;
@@ -65,6 +70,10 @@ public class EventMapView {
     private ToggleGroup filterGroup;
     private boolean mapReady = false;
     private ProgressIndicator loadingIndicator;
+    private List<Event> allEventsWithCoords = new ArrayList<>();
+
+    // Timer pour le rafraîchissement automatique
+    private PauseTransition autoRefreshTimer;
 
     // Constantes
     private static final String PROJECT_ROOT = System.getProperty("user.dir");
@@ -78,6 +87,7 @@ public class EventMapView {
         this.userService = userService;
         this.adminDashboard = adminDashboard;
         this.eventService = new EventService();
+        this.geocodingService = new GeocodingService();
     }
 
     public void showEventMapView(StackPane mainContentArea, boolean isDarkMode) {
@@ -97,6 +107,43 @@ public class EventMapView {
         mainContentArea.getChildren().add(mainContainer);
 
         loadMap();
+
+        // Démarrer le rafraîchissement automatique
+        setupAutoRefresh();
+    }
+
+    private void setupAutoRefresh() {
+        if (autoRefreshTimer != null) {
+            autoRefreshTimer.stop();
+        }
+
+        autoRefreshTimer = new PauseTransition(Duration.seconds(10));
+        autoRefreshTimer.setOnFinished(e -> {
+            if (mapReady) {
+                refreshMap();
+            }
+            autoRefreshTimer.play();
+        });
+        autoRefreshTimer.play();
+    }
+
+    private void refreshMap() {
+        Platform.runLater(() -> {
+            // Nettoyer les anciens marqueurs
+            try {
+                if (mapReady) {
+                    webEngine.executeScript(
+                            "if (allMarkers) { allMarkers.forEach(function(m) { if (map.hasLayer(m)) map.removeLayer(m); }); } " +
+                                    "allMarkers = []; markers = {};"
+                    );
+                }
+            } catch (Exception ex) {
+                System.err.println("⚠️ Erreur nettoyage marqueurs: " + ex.getMessage());
+            }
+
+            // Recharger les événements
+            loadEvents();
+        });
     }
 
     private VBox createTopBar(boolean isDarkMode) {
@@ -138,7 +185,7 @@ public class EventMapView {
             if (mapReady) webEngine.executeScript("if(window.map) map.zoomIn()");
         });
 
-        zoomSlider = new Slider(1, 18, 3);
+        zoomSlider = new Slider(1, 18, 8);
         zoomSlider.setPrefWidth(150);
         zoomSlider.valueProperty().addListener((obs, old, val) -> {
             if (mapReady) webEngine.executeScript("if(window.map) map.setZoom(" + val.intValue() + ")");
@@ -198,6 +245,17 @@ public class EventMapView {
         Region spacer2 = new Region();
         HBox.setHgrow(spacer2, Priority.ALWAYS);
 
+        // Bouton de rafraîchissement manuel
+        Button refreshMapBtn = new Button("🔄");
+        refreshMapBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
+                "; -fx-text-fill: white; -fx-font-size: 16px; -fx-min-width: 36; -fx-min-height: 36; -fx-background-radius: 18; -fx-cursor: hand;");
+        refreshMapBtn.setTooltip(new Tooltip("Rafraîchir la carte"));
+        refreshMapBtn.setOnAction(e -> {
+            if (mapReady) {
+                refreshMap();
+            }
+        });
+
         Button fitBoundsBtn = new Button("Ajuster la vue");
         fitBoundsBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
                 "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 20; -fx-cursor: hand;");
@@ -208,7 +266,7 @@ public class EventMapView {
         secondRow.getChildren().addAll(
                 styleLabel, mapStyleSelector,
                 filterLabel, filterButtons,
-                spacer2, fitBoundsBtn
+                spacer2, refreshMapBtn, fitBoundsBtn
         );
 
         topBar.getChildren().addAll(firstRow, secondRow);
@@ -327,6 +385,11 @@ public class EventMapView {
         storyImageView.setFitWidth(280);
         storyImageView.setFitHeight(180);
         storyImageView.setPreserveRatio(true);
+
+        // Appliquer un cercle de clipping pour l'image
+        Circle imageClip = new Circle(90, 90, 90);
+        storyImageView.setClip(imageClip);
+
         storyImageView.setStyle("-fx-background-radius: 15;");
 
         storyLoadingIndicator = new ProgressIndicator();
@@ -348,11 +411,13 @@ public class EventMapView {
 
         storyDateLabel = new Label();
         storyDateLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+        storyDateLabel.setWrapText(true);
         infoGrid.add(new Label("📅"), 0, 0);
         infoGrid.add(storyDateLabel, 1, 0);
 
         storyLocationLabel = new Label();
         storyLocationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+        storyLocationLabel.setWrapText(true);
         infoGrid.add(new Label("📍"), 0, 1);
         infoGrid.add(storyLocationLabel, 1, 1);
 
@@ -363,6 +428,7 @@ public class EventMapView {
 
         storyOrganizerLabel = new Label();
         storyOrganizerLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+        storyOrganizerLabel.setWrapText(true);
         infoGrid.add(new Label("👤"), 0, 3);
         infoGrid.add(storyOrganizerLabel, 1, 3);
 
@@ -418,28 +484,100 @@ public class EventMapView {
     }
 
     private void loadEvents() {
-        List<Event> allEvents = eventService.getAllEvents();
+        // Utiliser refreshEvents pour forcer le rechargement depuis la base
+        List<Event> allEvents = eventService.refreshEvents();
+        allEventsWithCoords.clear();
+        eventCache.clear();
 
-        // Compter les événements avec coordonnées
-        List<Event> eventsWithCoords = new ArrayList<>();
+        int geocoded = 0;
+
         for (Event event : allEvents) {
-            if ("approuve".equals(event.getStatutValidation()) && event.hasCoordinates()) {
-                eventsWithCoords.add(event);
-                eventCache.put(event.getId_evenement(), event);
+            if ("approuve".equals(event.getStatutValidation())) {
+                // Si l'événement n'a pas de coordonnées, essayer de les géocoder
+                if (!event.hasCoordinates()) {
+                    System.out.println("📍 Géocodage de: " + event.getLieu() + " pour " + event.getTitre());
+                    double[] coords = geocodingService.geocodeAddress(event.getLieu());
+                    if (coords != null) {
+                        event.setLatitude(coords[0]);
+                        event.setLongitude(coords[1]);
+                        // Sauvegarder en base de données
+                        eventService.updateEvent(event);
+                        geocoded++;
+                        System.out.println("✅ Coordonnées trouvées: " + coords[0] + ", " + coords[1]);
+                    }
+                }
+
+                if (event.hasCoordinates()) {
+                    allEventsWithCoords.add(event);
+                    eventCache.put(event.getId_evenement(), event);
+                }
             }
         }
 
-        final int eventCount = eventsWithCoords.size();
+        int eventCount = allEventsWithCoords.size();
+        System.out.println("📊 " + eventCount + " événements avec coordonnées trouvés");
+        if (geocoded > 0) {
+            System.out.println("🆕 " + geocoded + " nouveaux événements géocodés");
+        }
 
-        // Ajouter les événements immédiatement (pas de délai, positions fixes)
-        for (Event event : eventsWithCoords) {
+        // Nettoyer les anciens marqueurs avant d'ajouter les nouveaux
+        if (mapReady) {
+            try {
+                webEngine.executeScript(
+                        "if (allMarkers) { allMarkers.forEach(function(m) { if (map.hasLayer(m)) map.removeLayer(m); }); } " +
+                                "allMarkers = []; markers = {};"
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ Erreur nettoyage marqueurs: " + e.getMessage());
+            }
+        }
+
+        // Ajouter les événements à la carte
+        for (Event event : allEventsWithCoords) {
             addEventMarker(event);
         }
 
         Platform.runLater(() -> {
             totalEventsLabel.setText("(" + eventCount + " événements)");
-            System.out.println("✅ " + eventCount + " événements chargés");
         });
+    }
+
+    private String sanitizeForJS(String text) {
+        if (text == null) return "";
+        // Remplacer les caractères problématiques
+        return text.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\"", "\\\"")
+                .replace("\n", " ")
+                .replace("\r", " ")
+                .replace("\t", " ")
+                .replace("é", "e")
+                .replace("è", "e")
+                .replace("ê", "e")
+                .replace("ë", "e")
+                .replace("à", "a")
+                .replace("â", "a")
+                .replace("ä", "a")
+                .replace("ï", "i")
+                .replace("î", "i")
+                .replace("ô", "o")
+                .replace("ö", "o")
+                .replace("ù", "u")
+                .replace("û", "u")
+                .replace("ü", "u")
+                .replace("ç", "c")
+                .replace("ÿ", "y")
+                .replace("œ", "oe")
+                .replace("æ", "ae");
+    }
+
+    private String encodeForUrl(String text) {
+        if (text == null) return "";
+        try {
+            return URLEncoder.encode(text, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException e) {
+            return text.replace(" ", "+");
+        }
     }
 
     private void addEventMarker(Event event) {
@@ -450,15 +588,19 @@ public class EventMapView {
 
         String imageUrl = getEventImageUrl(event);
         String statut = event.getStatut() != null ? event.getStatut() : "Inconnu";
+
+        // Nettoyer le statut pour éviter les caractères spéciaux
+        if (statut.equals("À venir")) statut = "A venir";
+
         String description = event.getDescription() != null ? event.getDescription() : "";
         if (description.length() > 100) {
             description = description.substring(0, 97) + "...";
         }
 
-        String safeTitle = escapeJS(event.getTitre() != null ? event.getTitre() : "Sans titre");
-        String safeDate = escapeJS(event.getFormattedDate() != null ? event.getFormattedDate() : "Date inconnue");
-        String safeLieu = escapeJS(event.getLieu() != null ? event.getLieu() : "Lieu inconnu");
-        String safeDesc = escapeJS(description);
+        String safeTitle = sanitizeForJS(event.getTitre() != null ? event.getTitre() : "Sans titre");
+        String safeDate = sanitizeForJS(event.getFormattedDate() != null ? event.getFormattedDate() : "Date inconnue");
+        String safeLieu = sanitizeForJS(event.getLieu() != null ? event.getLieu() : "Lieu inconnu");
+        String safeDesc = sanitizeForJS(description);
         String safeImageUrl = imageUrl.replace("'", "\\'");
 
         String script = String.format(Locale.US,
@@ -477,6 +619,7 @@ public class EventMapView {
 
         try {
             webEngine.executeScript(script);
+            System.out.println("📍 Marqueur ajouté: " + event.getTitre() + " (" + lat + ", " + lng + ")");
         } catch (Exception e) {
             System.err.println("⚠️ Erreur ajout marqueur: " + e.getMessage());
         }
@@ -492,8 +635,10 @@ public class EventMapView {
             }
         }
 
-        // Image par défaut
-        return "https://via.placeholder.com/300x150/3182ce/ffffff?text=Event";
+        // Image par défaut avec le titre de l'événement encodé proprement
+        String title = event.getTitre() != null ? event.getTitre() : "Event";
+        String encodedTitle = encodeForUrl(title);
+        return "https://via.placeholder.com/300x150/3182ce/ffffff?text=" + encodedTitle;
     }
 
     private void changeMapStyle(String style) {
@@ -554,6 +699,7 @@ public class EventMapView {
                         height: 150px;
                         object-fit: cover;
                         background: #f0f0f0;
+                        border-radius: 12px 12px 0 0;
                     }
                     .popup-content {
                         padding: 15px;
@@ -604,7 +750,7 @@ public class EventMapView {
             <body>
                 <div id="map"></div>
                 <script>
-                    var map = L.map('map').setView([20.0, 0.0], 2);
+                    var map = L.map('map').setView([36.8065, 10.1815], 8);
                     
                     var currentLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '© OpenStreetMap'
@@ -630,7 +776,7 @@ public class EventMapView {
                     
                     function addEventMarker(id, title, lat, lng, date, lieu, description, statut, participants, imageUrl) {
                         try {
-                            var color = statut === 'À venir' ? '#f39c12' : 
+                            var color = statut === 'A venir' ? '#f39c12' : 
                                        statut === 'En cours' ? '#9b59b6' : '#6c757d';
                             
                             var marker = L.marker([lat, lng], {
@@ -690,6 +836,8 @@ public class EventMapView {
                             });
                             
                             markers[id] = marker;
+                            
+                            console.log('Marqueur ajouté: ' + title + ' à ' + lat + ',' + lng);
                         } catch(e) {
                             console.log('Erreur création marqueur: '+e);
                         }
@@ -699,7 +847,7 @@ public class EventMapView {
                         allMarkers.forEach(function(m) {
                             var data = m.options.eventData;
                             var show = type === 'all' ? true :
-                                      type === 'upcoming' ? data.statut === 'À venir' :
+                                      type === 'upcoming' ? data.statut === 'A venir' :
                                       type === 'ongoing' ? data.statut === 'En cours' :
                                       type === 'past' ? data.statut === 'Passé' : true;
                             if (show) {
@@ -714,6 +862,9 @@ public class EventMapView {
                         if (allMarkers.length > 0) {
                             var group = L.featureGroup(allMarkers);
                             map.fitBounds(group.getBounds(), { padding: [50, 50] });
+                            console.log('Vue ajustée à ' + allMarkers.length + ' événements');
+                        } else {
+                            map.setView([36.8065, 10.1815], 8);
                         }
                     }
                     
@@ -833,13 +984,23 @@ public class EventMapView {
 
         VBox content = new VBox(20);
         content.setPadding(new Insets(25));
-        content.setPrefWidth(450);
+        content.setPrefWidth(500);
         content.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + "; -fx-background-radius: 12;");
 
+        // Image avec cercle
+        StackPane imageContainer = new StackPane();
+        imageContainer.setPrefSize(200, 200);
+        imageContainer.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "20; -fx-background-radius: 100;");
+        imageContainer.setAlignment(Pos.CENTER);
+
         ImageView imgView = new ImageView();
-        imgView.setFitWidth(400);
-        imgView.setFitHeight(200);
+        imgView.setFitWidth(180);
+        imgView.setFitHeight(180);
         imgView.setPreserveRatio(true);
+
+        // Cercle de clipping pour l'image
+        Circle clipCircle = new Circle(90, 90, 90);
+        imgView.setClip(clipCircle);
 
         String imgUrl = getEventImageUrl(event);
         if (imgUrl != null) {
@@ -847,18 +1008,26 @@ public class EventMapView {
                 Image img = new Image(imgUrl, true);
                 imgView.setImage(img);
             } catch (Exception e) {
-                // Ignorer les erreurs d'image
+                // Image par défaut si erreur
+                imgView.setImage(new Image("https://via.placeholder.com/180x180/3182ce/ffffff?text=" +
+                        encodeForUrl(event.getTitre())));
             }
+        } else {
+            imgView.setImage(new Image("https://via.placeholder.com/180x180/3182ce/ffffff?text=" +
+                    encodeForUrl(event.getTitre())));
         }
 
+        imageContainer.getChildren().add(imgView);
+
+        // Grille d'informations
         GridPane grid = new GridPane();
         grid.setHgap(15);
         grid.setVgap(12);
-        grid.setAlignment(Pos.CENTER);
+        grid.setPadding(new Insets(10, 0, 10, 0));
 
-        // Ligne 0: Titre (centré)
+        // Ligne 0: Titre
         Label titleLabel = new Label(event.getTitre());
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 22));
         titleLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
         titleLabel.setWrapText(true);
         titleLabel.setAlignment(Pos.CENTER);
@@ -866,68 +1035,110 @@ public class EventMapView {
         GridPane.setHalignment(titleLabel, javafx.geometry.HPos.CENTER);
 
         // Ligne 1: Date
-        grid.add(new Label("📅 Date:"), 0, 1);
-        grid.add(new Label(event.getFormattedDate() != null ? event.getFormattedDate() : "Non définie"), 1, 1);
+        Label dateIcon = new Label("📅");
+        dateIcon.setFont(Font.font("System", 16));
+        Label dateValue = new Label(event.getFormattedDate() != null ? event.getFormattedDate() : "Non définie");
+        dateValue.setWrapText(true);
+        dateValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+        grid.add(dateIcon, 0, 1);
+        grid.add(dateValue, 1, 1);
 
         // Ligne 2: Lieu
-        grid.add(new Label("📍 Lieu:"), 0, 2);
-        grid.add(new Label(event.getLieu() != null ? event.getLieu() : "Non défini"), 1, 2);
+        Label lieuIcon = new Label("📍");
+        lieuIcon.setFont(Font.font("System", 16));
+        Label lieuValue = new Label(event.getLieu() != null ? event.getLieu() : "Non défini");
+        lieuValue.setWrapText(true);
+        lieuValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+        grid.add(lieuIcon, 0, 2);
+        grid.add(lieuValue, 1, 2);
 
         // Ligne 3: Coordonnées
         if (event.hasCoordinates()) {
-            grid.add(new Label("🌍 Position:"), 0, 3);
-            grid.add(new Label(String.format("%.4f, %.4f", event.getLatitude(), event.getLongitude())), 1, 3);
+            Label coordIcon = new Label("🌍");
+            coordIcon.setFont(Font.font("System", 16));
+            Label coordValue = new Label(String.format("%.4f, %.4f", event.getLatitude(), event.getLongitude()));
+            coordValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+            grid.add(coordIcon, 0, 3);
+            grid.add(coordValue, 1, 3);
         }
 
         // Ligne 4: Participants
-        grid.add(new Label("👥 Participants:"), 0, 4);
-        grid.add(new Label(event.getParticipantsCount() + " inscrits"), 1, 4);
+        Label partIcon = new Label("👥");
+        partIcon.setFont(Font.font("System", 16));
+        Label partValue = new Label(event.getParticipantsCount() + " inscrits");
+        partValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+        grid.add(partIcon, 0, 4);
+        grid.add(partValue, 1, 4);
 
         // Ligne 5: Capacité
         if (event.getCapacite_max() != null) {
-            grid.add(new Label("📊 Capacité:"), 0, 5);
-            grid.add(new Label(event.getCapacite_max() + " places"), 1, 5);
+            Label capIcon = new Label("📊");
+            capIcon.setFont(Font.font("System", 16));
+            Label capValue = new Label(event.getCapacite_max() + " places");
+            capValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+            grid.add(capIcon, 0, 5);
+            grid.add(capValue, 1, 5);
         }
 
         // Ligne 6: Organisateur
+        Label orgIcon = new Label("👤");
+        orgIcon.setFont(Font.font("System", 16));
         User org = userService.getUserById(event.getId_organisateur());
-        grid.add(new Label("👤 Organisateur:"), 0, 6);
-        grid.add(new Label(org != null ? org.getNomComplet() : "Inconnu"), 1, 6);
+        Label orgValue = new Label(org != null ? org.getNomComplet() : "Inconnu");
+        orgValue.setWrapText(true);
+        orgValue.setTextFill(Color.web(adminDashboard.getTextColor()));
+        grid.add(orgIcon, 0, 6);
+        grid.add(orgValue, 1, 6);
 
         // Ligne 7: Statut
-        grid.add(new Label("📌 Statut:"), 0, 7);
+        Label statutIcon = new Label("📌");
+        statutIcon.setFont(Font.font("System", 16));
         String statut = event.getStatut() != null ? event.getStatut() : "Inconnu";
         Label statutLabel = new Label(statut);
         String statutColor = statut.equals("À venir") ? "#f39c12" :
                 statut.equals("En cours") ? "#9b59b6" : "#6c757d";
         statutLabel.setStyle("-fx-background-color: " + statutColor +
                 "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
+        grid.add(statutIcon, 0, 7);
         grid.add(statutLabel, 1, 7);
 
         // Ligne 8: Description
         if (event.getDescription() != null && !event.getDescription().isEmpty()) {
-            grid.add(new Label("📝 Description:"), 0, 8);
+            Label descIcon = new Label("📝");
+            descIcon.setFont(Font.font("System", 16));
             Label descLabel = new Label(event.getDescription());
             descLabel.setWrapText(true);
-            descLabel.setMaxWidth(300);
+            descLabel.setMaxWidth(350);
+            descLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+            grid.add(descIcon, 0, 8);
             grid.add(descLabel, 1, 8);
         }
 
         ColumnConstraints col1 = new ColumnConstraints();
-        col1.setPrefWidth(100);
+        col1.setPrefWidth(50);
+        col1.setHalignment(javafx.geometry.HPos.CENTER);
         ColumnConstraints col2 = new ColumnConstraints();
-        col2.setPrefWidth(300);
+        col2.setPrefWidth(380);
+        col2.setHgrow(Priority.ALWAYS);
         grid.getColumnConstraints().addAll(col1, col2);
 
+        // Bouton Fermer
         Button closeBtn = new Button("Fermer");
-        closeBtn.setMaxWidth(Double.MAX_VALUE);
+        closeBtn.setMaxWidth(200);
         closeBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
-                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 12; -fx-background-radius: 8; -fx-cursor: hand;");
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 8; -fx-cursor: hand;");
         closeBtn.setOnAction(e -> stage.close());
 
-        content.getChildren().addAll(imgView, grid, closeBtn);
+        VBox buttonBox = new VBox(closeBtn);
+        buttonBox.setAlignment(Pos.CENTER);
 
-        Scene scene = new Scene(content);
+        content.getChildren().addAll(imageContainer, grid, buttonBox);
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+
+        Scene scene = new Scene(scrollPane, 550, 700);
         stage.setScene(scene);
         stage.show();
     }

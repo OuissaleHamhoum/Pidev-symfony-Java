@@ -2,6 +2,8 @@ package edu.Loopi.view.AdminDashboard;
 
 import edu.Loopi.entities.User;
 import edu.Loopi.services.UserService;
+import edu.Loopi.services.PhotoService;
+import edu.Loopi.services.CameraService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -10,16 +12,21 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.scene.image.ImageView;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.application.Platform;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,12 +36,16 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.awt.image.BufferedImage;
+
 import javafx.scene.input.KeyCode;
 
 public class UserManagementView {
     private User currentUser;
     private UserService userService;
     private AdminDashboard adminDashboard;
+    private PhotoService photoService;
+    private CameraService cameraService;
 
     private TableView<User> userTable;
     private ObservableList<User> masterData;
@@ -46,6 +57,8 @@ public class UserManagementView {
         this.currentUser = currentUser;
         this.userService = userService;
         this.adminDashboard = adminDashboard;
+        this.photoService = new PhotoService();
+        this.cameraService = new CameraService();
     }
 
     @SuppressWarnings("unchecked")
@@ -212,9 +225,19 @@ public class UserManagementView {
         idCol.setPrefWidth(60);
         idCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
 
-        TableColumn<User, String> avatarCol = new TableColumn<>("");
-        avatarCol.setPrefWidth(60);
+        TableColumn<User, String> avatarCol = new TableColumn<>("Photo");
+        avatarCol.setPrefWidth(80);
         avatarCol.setCellFactory(col -> new TableCell<User, String>() {
+            private final ImageView imageView = new ImageView();
+            private final Circle clip = new Circle(20, 20, 20);
+
+            {
+                imageView.setFitWidth(40);
+                imageView.setFitHeight(40);
+                imageView.setPreserveRatio(true);
+                imageView.setClip(clip);
+            }
+
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -222,20 +245,20 @@ public class UserManagementView {
                     setGraphic(null);
                 } else {
                     User user = getTableView().getItems().get(getIndex());
-                    StackPane avatarContainer = new StackPane();
-                    Circle avatarCircle = new Circle(18);
-                    avatarCircle.setFill(Color.web(adminDashboard.getAccentColor()));
-
-                    ImageView img = adminDashboard.loadProfileImage(user, 36);
+                    ImageView img = loadUserAvatar(user, 40);
                     if (img != null) {
-                        avatarContainer.getChildren().add(img);
+                        setGraphic(img);
                     } else {
-                        Label initials = new Label(adminDashboard.getInitials(user));
+                        // Afficher les initiales si pas de photo
+                        StackPane avatarContainer = new StackPane();
+                        Circle avatarCircle = new Circle(20);
+                        avatarCircle.setFill(Color.web(adminDashboard.getAccentColor()));
+                        Label initials = new Label(getInitials(user));
                         initials.setFont(Font.font("System", FontWeight.BOLD, 12));
                         initials.setTextFill(Color.WHITE);
                         avatarContainer.getChildren().addAll(avatarCircle, initials);
+                        setGraphic(avatarContainer);
                     }
-                    setGraphic(avatarContainer);
                     setAlignment(Pos.CENTER);
                 }
             }
@@ -355,6 +378,56 @@ public class UserManagementView {
         userTable.setItems(filteredData);
     }
 
+    private ImageView loadUserAvatar(User user, double size) {
+        if (user.getPhoto() != null && !user.getPhoto().isEmpty() && !user.getPhoto().equals("default.jpg")) {
+            try {
+                File imageFile = null;
+                String photoPath = user.getPhoto();
+
+                // Essayer différents chemins possibles
+                if (photoPath.startsWith("profiles/")) {
+                    imageFile = new File("src/main/resources/" + photoPath);
+                    if (!imageFile.exists()) {
+                        imageFile = new File(photoPath);
+                    }
+                } else {
+                    imageFile = new File("src/main/resources/profiles/" + photoPath);
+                    if (!imageFile.exists()) {
+                        imageFile = new File("profiles/" + photoPath);
+                    }
+                }
+
+                if (imageFile.exists() && imageFile.isFile()) {
+                    Image avatarImage = new Image(new FileInputStream(imageFile), size, size, true, true);
+                    ImageView avatarImageView = new ImageView(avatarImage);
+                    avatarImageView.setFitWidth(size);
+                    avatarImageView.setFitHeight(size);
+                    avatarImageView.setPreserveRatio(true);
+
+                    // Forme circulaire
+                    Circle clip = new Circle(size/2, size/2, size/2);
+                    avatarImageView.setClip(clip);
+
+                    return avatarImageView;
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Erreur chargement avatar: " + e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private String getInitials(User user) {
+        String initials = "";
+        if (user.getPrenom() != null && !user.getPrenom().isEmpty()) {
+            initials += String.valueOf(user.getPrenom().charAt(0)).toUpperCase();
+        }
+        if (user.getNom() != null && !user.getNom().isEmpty()) {
+            initials += String.valueOf(user.getNom().charAt(0)).toUpperCase();
+        }
+        return initials.isEmpty() ? "U" : initials;
+    }
+
     private String getRoleInFrench(String role) {
         if (role == null) return "";
         switch (role.toLowerCase()) {
@@ -387,6 +460,7 @@ public class UserManagementView {
         Stage dialogStage = new Stage();
         dialogStage.setTitle("Ajouter un utilisateur");
         dialogStage.initOwner(adminDashboard.getPrimaryStage());
+        dialogStage.initModality(Modality.WINDOW_MODAL);
 
         VBox mainLayout = new VBox(20);
         mainLayout.setPadding(new Insets(24));
@@ -410,15 +484,97 @@ public class UserManagementView {
         Button closeBtn = new Button("✕");
         closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColorMuted() +
                 "; -fx-font-size: 16px; -fx-cursor: hand; -fx-padding: 4 8;");
-        closeBtn.setOnAction(e -> dialogStage.close());
+        closeBtn.setOnAction(e -> {
+            stopCamera();
+            dialogStage.close();
+        });
 
         header.getChildren().addAll(headerText, closeBtn);
 
+        // ========== SECTION PHOTO ==========
+        VBox photoSection = new VBox(15);
+        photoSection.setPadding(new Insets(10));
+        photoSection.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#F3F4F6") +
+                "; -fx-background-radius: 12; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 12;");
+
+        Label photoTitle = new Label("📷 Photo de profil");
+        photoTitle.setFont(Font.font("System", FontWeight.BOLD, 14));
+        photoTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        HBox photoContainer = new HBox(30);
+        photoContainer.setAlignment(Pos.CENTER_LEFT);
+
+        // Conteneur pour l'aperçu de la photo
+        StackPane avatarPreviewContainer = new StackPane();
+        avatarPreviewContainer.setPrefSize(120, 120);
+        avatarPreviewContainer.setMinSize(120, 120);
+        avatarPreviewContainer.setMaxSize(120, 120);
+        avatarPreviewContainer.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "20; -fx-background-radius: 60; -fx-border-color: " + adminDashboard.getAccentColor() + "; -fx-border-radius: 60; -fx-border-width: 2;");
+
+        ImageView avatarPreview = new ImageView();
+        avatarPreview.setFitWidth(114);
+        avatarPreview.setFitHeight(114);
+        avatarPreview.setPreserveRatio(true);
+
+        // Cercle de clipping pour l'aperçu
+        Circle previewClip = new Circle(57, 57, 57);
+        avatarPreview.setClip(previewClip);
+
+        // Image par défaut
+        try {
+            Image defaultImage = new Image("https://ui-avatars.com/api/?name=User&size=114&background=" +
+                    adminDashboard.getAccentColor().substring(1) + "&color=fff&bold=true");
+            avatarPreview.setImage(defaultImage);
+        } catch (Exception e) {
+            Label placeholder = new Label("👤");
+            placeholder.setFont(Font.font("System", FontWeight.BOLD, 48));
+            placeholder.setTextFill(Color.web(adminDashboard.getAccentColor()));
+            avatarPreviewContainer.getChildren().add(placeholder);
+        }
+        avatarPreviewContainer.getChildren().add(avatarPreview);
+
+        // Variables pour stocker la photo
+        final File[] selectedPhotoFile = {null};
+        final BufferedImage[] capturedPhoto = {null};
+        final boolean[] isUsingCamera = {false};
+
+        VBox photoButtons = new VBox(10);
+        photoButtons.setAlignment(Pos.CENTER_LEFT);
+
+        Label photoStatus = new Label("Aucune photo sélectionnée");
+        photoStatus.setFont(Font.font("System", 11));
+        photoStatus.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+
+        HBox buttonRow = new HBox(10);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+
+        Button choosePhotoBtn = new Button("📁 Choisir un fichier");
+        choosePhotoBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 12px;");
+
+        Button takePhotoBtn = new Button("📷 Prendre une photo");
+        takePhotoBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 12px;");
+
+        Button clearPhotoBtn = new Button("🗑️ Effacer");
+        clearPhotoBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getDangerColor() +
+                "; -fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 6; -fx-cursor: hand; -fx-border-color: " +
+                adminDashboard.getDangerColor() + "; -fx-border-radius: 6; -fx-font-size: 12px;");
+        clearPhotoBtn.setVisible(false);
+
+        buttonRow.getChildren().addAll(choosePhotoBtn, takePhotoBtn, clearPhotoBtn);
+        photoButtons.getChildren().addAll(buttonRow, photoStatus);
+
+        photoContainer.getChildren().addAll(avatarPreviewContainer, photoButtons);
+        photoSection.getChildren().addAll(photoTitle, photoContainer);
+
+        // ========== FORMULAIRE ==========
         GridPane formGrid = new GridPane();
         formGrid.setHgap(16);
         formGrid.setVgap(14);
         formGrid.setPadding(new Insets(20, 0, 20, 0));
 
+        // Labels
         Label nomLabel = new Label("Nom *");
         nomLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
         nomLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
@@ -447,6 +603,7 @@ public class UserManagementView {
         genreLabel.setFont(Font.font("System", FontWeight.MEDIUM, 13));
         genreLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
+        // Champs
         TextField nomField = new TextField();
         nomField.setPromptText("Nom");
         styleFormTextField(nomField);
@@ -498,12 +655,14 @@ public class UserManagementView {
         col2.setPrefWidth(300);
         formGrid.getColumnConstraints().addAll(col1, col2);
 
+        // Label d'erreur
         Label errorLabel = new Label();
         errorLabel.setFont(Font.font("System", 12));
         errorLabel.setTextFill(Color.web(adminDashboard.getDangerColor()));
         errorLabel.setVisible(false);
         errorLabel.setWrapText(true);
 
+        // Boutons
         HBox buttonBox = new HBox(12);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
         buttonBox.setPadding(new Insets(16, 0, 0, 0));
@@ -512,36 +671,262 @@ public class UserManagementView {
         cancelBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColor() +
                 "; -fx-font-weight: 500; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand; -fx-border-color: " +
                 adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-font-size: 13px;");
-        cancelBtn.setOnAction(e -> dialogStage.close());
+        cancelBtn.setOnAction(e -> {
+            stopCamera();
+            dialogStage.close();
+        });
 
         Button addBtn = new Button("Ajouter");
         addBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; " +
                 "-fx-font-weight: 600; -fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 13px;");
+
+        // ========== GESTIONNAIRES D'ÉVÉNEMENTS POUR LA PHOTO ==========
+
+        // Choisir un fichier
+        choosePhotoBtn.setOnAction(e -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Choisir une photo de profil");
+            fileChooser.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif")
+            );
+
+            File file = fileChooser.showOpenDialog(dialogStage);
+            if (file != null) {
+                try {
+                    Image image = new Image(file.toURI().toString(), 114, 114, true, true);
+                    avatarPreview.setImage(image);
+                    selectedPhotoFile[0] = file;
+                    isUsingCamera[0] = false;
+                    capturedPhoto[0] = null;
+                    photoStatus.setText("✅ Photo chargée: " + file.getName());
+                    photoStatus.setTextFill(Color.GREEN);
+                    clearPhotoBtn.setVisible(true);
+                } catch (Exception ex) {
+                    photoStatus.setText("❌ Erreur lors du chargement");
+                    photoStatus.setTextFill(Color.web(adminDashboard.getDangerColor()));
+                }
+            }
+        });
+
+        // Prendre une photo avec la caméra
+        takePhotoBtn.setOnAction(e -> openCameraDialog(dialogStage, avatarPreview, capturedPhoto, isUsingCamera, photoStatus, clearPhotoBtn));
+
+        // Effacer la photo
+        clearPhotoBtn.setOnAction(e -> {
+            try {
+                Image defaultImage = new Image("https://ui-avatars.com/api/?name=User&size=114&background=" +
+                        adminDashboard.getAccentColor().substring(1) + "&color=fff&bold=true");
+                avatarPreview.setImage(defaultImage);
+            } catch (Exception ex) {
+                avatarPreview.setImage(null);
+            }
+            selectedPhotoFile[0] = null;
+            capturedPhoto[0] = null;
+            isUsingCamera[0] = false;
+            photoStatus.setText("Aucune photo sélectionnée");
+            photoStatus.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+            clearPhotoBtn.setVisible(false);
+        });
+
+        // Ajouter l'utilisateur
         addBtn.setOnAction(e -> {
             if (validateAndAddUser(nomField, prenomField, emailField, passwordField,
-                    confirmPasswordField, roleCombo, genreCombo, errorLabel)) {
+                    confirmPasswordField, roleCombo, genreCombo, selectedPhotoFile[0],
+                    capturedPhoto[0], isUsingCamera[0], errorLabel)) {
                 refreshUserTable();
                 adminDashboard.showAlert("Succès", "Utilisateur ajouté avec succès");
+                stopCamera();
                 dialogStage.close();
             }
         });
 
         buttonBox.getChildren().addAll(cancelBtn, addBtn);
 
-        mainLayout.getChildren().addAll(header, formGrid, errorLabel, buttonBox);
+        mainLayout.getChildren().addAll(header, photoSection, formGrid, errorLabel, buttonBox);
 
         ScrollPane scrollPane = new ScrollPane(mainLayout);
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-background: transparent; -fx-border-color: transparent;");
 
-        Scene scene = new Scene(scrollPane, 550, 600);
+        Scene scene = new Scene(scrollPane, 600, 800);
         dialogStage.setScene(scene);
         dialogStage.showAndWait();
     }
 
+    private void openCameraDialog(Stage parentStage, ImageView previewImage,
+                                  BufferedImage[] capturedPhoto, boolean[] isUsingCamera,
+                                  Label statusLabel, Button clearBtn) {
+        if (cameraService == null) {
+            cameraService = new CameraService();
+        }
+
+        Stage cameraStage = new Stage();
+        cameraStage.setTitle("Prendre une photo");
+        cameraStage.initModality(Modality.APPLICATION_MODAL);
+        cameraStage.initOwner(parentStage);
+
+        VBox layout = new VBox(20);
+        layout.setPadding(new Insets(20));
+        layout.setStyle("-fx-background-color: #1e293b;");
+        layout.setAlignment(Pos.CENTER);
+
+        Label title = new Label("📷 Prendre une photo");
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
+        title.setTextFill(Color.WHITE);
+
+        StackPane cameraPane = new StackPane();
+        cameraPane.setPrefSize(400, 300);
+        cameraPane.setStyle("-fx-background-color: #0f172a; -fx-background-radius: 10; " +
+                "-fx-border-color: " + adminDashboard.getAccentColor() + "; -fx-border-radius: 10; -fx-border-width: 2;");
+
+        Label cameraPlaceholder = new Label("📷 CAMÉRA");
+        cameraPlaceholder.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
+        cameraPlaceholder.setTextFill(Color.web("#64748b"));
+        cameraPane.getChildren().add(cameraPlaceholder);
+
+        ImageView cameraFeed = new ImageView();
+        cameraFeed.setFitWidth(380);
+        cameraFeed.setFitHeight(280);
+        cameraFeed.setPreserveRatio(true);
+        cameraFeed.setVisible(false);
+
+        HBox buttons = new HBox(10);
+        buttons.setAlignment(Pos.CENTER);
+
+        Button startBtn = new Button("▶ Démarrer");
+        startBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 25; -fx-cursor: hand;");
+
+        Button captureBtn = new Button("📸 Capturer");
+        captureBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 25; -fx-cursor: hand;");
+        captureBtn.setDisable(true);
+
+        Button acceptBtn = new Button("✅ Accepter");
+        acceptBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 25; -fx-cursor: hand;");
+        acceptBtn.setVisible(false);
+
+        Button cancelBtn = new Button("❌ Annuler");
+        cancelBtn.setStyle("-fx-background-color: " + adminDashboard.getDangerColor() + "; -fx-text-fill: white; " +
+                "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 25; -fx-cursor: hand;");
+        cancelBtn.setOnAction(e -> {
+            stopCamera();
+            cameraStage.close();
+        });
+
+        Label camStatusLabel = new Label();
+        camStatusLabel.setFont(Font.font("Segoe UI", 12));
+        camStatusLabel.setTextFill(Color.WHITE);
+
+        final boolean[] isCameraRunning = {false};
+        final BufferedImage[] lastFrame = new BufferedImage[1];
+
+        startBtn.setOnAction(ev -> {
+            new Thread(() -> {
+                boolean started = cameraService.startCamera();
+                Platform.runLater(() -> {
+                    if (started) {
+                        isCameraRunning[0] = true;
+                        startBtn.setDisable(true);
+                        captureBtn.setDisable(false);
+                        camStatusLabel.setText("✅ Caméra prête");
+                        cameraPane.getChildren().clear();
+                        cameraFeed.setVisible(true);
+                        cameraPane.getChildren().add(cameraFeed);
+
+                        new Thread(() -> {
+                            while (isCameraRunning[0]) {
+                                BufferedImage frame = cameraService.captureImage();
+                                if (frame != null) {
+                                    lastFrame[0] = frame;
+                                    Image fxImage = SwingFXUtils.toFXImage(frame, null);
+                                    Platform.runLater(() -> cameraFeed.setImage(fxImage));
+                                }
+                                try {
+                                    Thread.sleep(100);
+                                } catch (InterruptedException ex) {
+                                    break;
+                                }
+                            }
+                        }).start();
+                    } else {
+                        camStatusLabel.setText("❌ Erreur: Aucune caméra trouvée");
+                    }
+                });
+            }).start();
+        });
+
+        captureBtn.setOnAction(ev -> {
+            camStatusLabel.setText("🔄 Capture...");
+
+            new Thread(() -> {
+                BufferedImage captured = cameraService.captureImage();
+                Platform.runLater(() -> {
+                    if (captured != null) {
+                        lastFrame[0] = captured;
+
+                        Image fxImage = SwingFXUtils.toFXImage(captured, null);
+                        cameraFeed.setImage(fxImage);
+
+                        captureBtn.setVisible(false);
+                        acceptBtn.setVisible(true);
+                        camStatusLabel.setText("✅ Photo capturée - Cliquez sur Accepter");
+                    } else {
+                        camStatusLabel.setText("❌ Erreur capture");
+                    }
+                });
+            }).start();
+        });
+
+        acceptBtn.setOnAction(ev -> {
+            if (lastFrame[0] != null) {
+                try {
+                    // Redimensionner l'image pour l'aperçu
+                    java.awt.Image awtImage = lastFrame[0].getScaledInstance(114, 114, java.awt.Image.SCALE_SMOOTH);
+                    BufferedImage resizedImage = new BufferedImage(114, 114, BufferedImage.TYPE_INT_RGB);
+                    java.awt.Graphics2D g = resizedImage.createGraphics();
+                    g.drawImage(awtImage, 0, 0, null);
+                    g.dispose();
+
+                    Image fxImage = SwingFXUtils.toFXImage(resizedImage, null);
+                    previewImage.setImage(fxImage);
+
+                    capturedPhoto[0] = lastFrame[0];
+                    isUsingCamera[0] = true;
+
+                    statusLabel.setText("✅ Photo prise avec succès");
+                    statusLabel.setTextFill(Color.GREEN);
+                    clearBtn.setVisible(true);
+
+                    stopCamera();
+                    cameraStage.close();
+                } catch (Exception ex) {
+                    camStatusLabel.setText("❌ Erreur traitement image");
+                }
+            }
+        });
+
+        buttons.getChildren().addAll(startBtn, captureBtn, acceptBtn, cancelBtn);
+        layout.getChildren().addAll(title, cameraPane, buttons, camStatusLabel);
+
+        Scene scene = new Scene(layout, 500, 500);
+        cameraStage.setScene(scene);
+        cameraStage.setOnCloseRequest(e -> stopCamera());
+        cameraStage.showAndWait();
+    }
+
+    private void stopCamera() {
+        if (cameraService != null) {
+            cameraService.stopCamera();
+        }
+    }
+
     private boolean validateAndAddUser(TextField nomField, TextField prenomField, TextField emailField,
                                        PasswordField passwordField, PasswordField confirmPasswordField,
-                                       ComboBox<String> roleCombo, ComboBox<String> genreCombo, Label errorLabel) {
+                                       ComboBox<String> roleCombo, ComboBox<String> genreCombo,
+                                       File selectedPhotoFile, BufferedImage capturedPhoto, boolean isUsingCamera,
+                                       Label errorLabel) {
         if (nomField.getText().isEmpty() || prenomField.getText().isEmpty() ||
                 emailField.getText().isEmpty() || passwordField.getText().isEmpty()) {
             showError(errorLabel, "Tous les champs obligatoires doivent être remplis");
@@ -581,7 +966,30 @@ public class UserManagementView {
         else if ("Femme".equals(genre)) newUser.setIdGenre(2);
         else newUser.setIdGenre(3);
 
-        return userService.addUser(newUser);
+        boolean userAdded = userService.addUser(newUser);
+
+        if (userAdded) {
+            // Récupérer l'utilisateur fraîchement créé pour obtenir son ID
+            User createdUser = userService.getUserByEmail(emailField.getText());
+
+            if (createdUser != null) {
+                // Sauvegarder la photo si elle existe
+                if (isUsingCamera && capturedPhoto != null) {
+                    String photoPath = cameraService.saveProfilePhoto(capturedPhoto, createdUser.getId());
+                    createdUser.setPhoto(photoPath);
+                    userService.updateUser(createdUser);
+                    System.out.println("✅ Photo caméra sauvegardée: " + photoPath);
+                } else if (selectedPhotoFile != null) {
+                    String photoPath = photoService.saveProfilePhoto(selectedPhotoFile, createdUser.getId());
+                    createdUser.setPhoto(photoPath);
+                    userService.updateUser(createdUser);
+                    System.out.println("✅ Photo fichier sauvegardée: " + photoPath);
+                }
+            }
+            return true;
+        }
+
+        return false;
     }
 
     private void editSelectedUser(User user) {
@@ -609,7 +1017,7 @@ public class UserManagementView {
         if (avatarImageView != null) {
             avatarContainer.getChildren().add(avatarImageView);
         } else {
-            Label avatarText = new Label(adminDashboard.getInitials(user));
+            Label avatarText = new Label(getInitials(user));
             avatarText.setFont(Font.font("System", FontWeight.BOLD, 16));
             avatarText.setTextFill(Color.WHITE);
             avatarContainer.getChildren().addAll(avatarCircle, avatarText);
@@ -914,7 +1322,6 @@ public class UserManagementView {
         int dotIndex = fileName.lastIndexOf('.');
         return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
     }
-
 
     private void showError(Label errorLabel, String message) {
         errorLabel.setText(message);

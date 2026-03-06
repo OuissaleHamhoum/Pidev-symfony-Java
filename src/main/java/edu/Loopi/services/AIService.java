@@ -7,7 +7,7 @@ import java.net.http.HttpResponse;
 
 public class AIService {
     // Replace with your Groq key (gsk_...)
-    private static final String API_KEY = "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";
+    private static final String API_KEY = "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";
     private static final String API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     public String getRecyclingImpact(String material, double amount, String unit) {

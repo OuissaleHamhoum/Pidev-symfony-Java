@@ -16,6 +16,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.application.Platform;  // IMPORT AJOUTÉ
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -301,14 +302,14 @@ public class DashboardView {
 
         registrationChart.getData().add(series);
 
-        // Styliser la ligne et les points
-        series.getNode().setStyle("-fx-stroke: " + adminDashboard.getAccentColor() + "; -fx-stroke-width: 2;");
+        // Styliser la ligne et les points avec la couleur d'accent
+        series.getNode().setStyle("-fx-stroke: " + adminDashboard.getAccentColor() + "; -fx-stroke-width: 3;");
 
         for (XYChart.Data<String, Number> data : series.getData()) {
             Node node = data.getNode();
             if (node != null) {
                 node.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
-                        "; -fx-background-radius: 4px; -fx-padding: 4px;");
+                        "; -fx-background-radius: 6px; -fx-padding: 5px;");
             }
         }
     }
@@ -416,7 +417,19 @@ public class DashboardView {
             PieChart.Data adminSlice = new PieChart.Data("Admins", roleStats[0]);
             PieChart.Data orgSlice = new PieChart.Data("Organisateurs", roleStats[1]);
             PieChart.Data partSlice = new PieChart.Data("Participants", roleStats[2]);
+
             pieChart.getData().addAll(adminSlice, orgSlice, partSlice);
+
+            // Appliquer les couleurs aux segments après l'ajout au graphique
+            Platform.runLater(() -> {
+                Node adminNode = adminSlice.getNode();
+                Node orgNode = orgSlice.getNode();
+                Node partNode = partSlice.getNode();
+
+                if (adminNode != null) adminNode.setStyle("-fx-pie-color: " + adminDashboard.getAccentColor() + ";");
+                if (orgNode != null) orgNode.setStyle("-fx-pie-color: " + adminDashboard.getSuccessColor() + ";");
+                if (partNode != null) partNode.setStyle("-fx-pie-color: " + adminDashboard.getWarningColor() + ";");
+            });
         }
 
         VBox legendBox = new VBox(8);
@@ -529,7 +542,7 @@ public class DashboardView {
         for (XYChart.Data<String, Number> data : series.getData()) {
             Node node = data.getNode();
             if (node != null) {
-                node.setStyle("-fx-bar-fill: " + adminDashboard.getAccentColor() + ";");
+                node.setStyle("-fx-bar-fill: " + adminDashboard.getSuccessColor() + ";");
             }
         }
     }
@@ -655,17 +668,35 @@ public class DashboardView {
 
         if (total > 0) {
             if (hommes > 0) {
-                pieChart.getData().add(new PieChart.Data("Hommes", hommes));
-                addGenderLegendItem(legendBox, "#3B82F6", "Hommes", hommes, total);
+                PieChart.Data hommeData = new PieChart.Data("Hommes", hommes);
+                pieChart.getData().add(hommeData);
             }
             if (femmes > 0) {
-                pieChart.getData().add(new PieChart.Data("Femmes", femmes));
-                addGenderLegendItem(legendBox, "#EC4899", "Femmes", femmes, total);
+                PieChart.Data femmeData = new PieChart.Data("Femmes", femmes);
+                pieChart.getData().add(femmeData);
             }
             if (autres > 0) {
-                pieChart.getData().add(new PieChart.Data("Autres", autres));
-                addGenderLegendItem(legendBox, "#8B5CF6", "Autres", autres, total);
+                PieChart.Data autreData = new PieChart.Data("Autres", autres);
+                pieChart.getData().add(autreData);
             }
+
+            // Appliquer les couleurs après l'ajout au graphique
+            Platform.runLater(() -> {
+                for (PieChart.Data data : pieChart.getData()) {
+                    Node node = data.getNode();
+                    if (node != null) {
+                        String color;
+                        if ("Hommes".equals(data.getName())) color = "#3B82F6";
+                        else if ("Femmes".equals(data.getName())) color = "#EC4899";
+                        else color = "#8B5CF6";
+                        node.setStyle("-fx-pie-color: " + color + ";");
+                    }
+                }
+            });
+
+            addGenderLegendItem(legendBox, "#3B82F6", "Hommes", hommes, total);
+            addGenderLegendItem(legendBox, "#EC4899", "Femmes", femmes, total);
+            addGenderLegendItem(legendBox, "#8B5CF6", "Autres", autres, total);
         }
     }
 
@@ -739,7 +770,6 @@ public class DashboardView {
         Button viewAllBtn = new Button("Voir tout →");
         viewAllBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getAccentColor() +
                 "; -fx-font-weight: 600; -fx-cursor: hand; -fx-font-size: 13px;");
-        // CORRECTION: Remplacer showUserManagementViewInCenter() par showUserManagementView()
         viewAllBtn.setOnAction(e -> adminDashboard.showUserManagementView());
 
         header.getChildren().addAll(headerText, viewAllBtn);

@@ -1,6 +1,8 @@
 package edu.Loopi.services;
 
 import edu.Loopi.entities.Notification;
+import edu.Loopi.entities.Event;
+import edu.Loopi.entities.User;
 import edu.Loopi.interfaces.INotificationService;
 import edu.Loopi.tools.MyConnection;
 
@@ -26,6 +28,13 @@ public class NotificationService implements INotificationService {
                 "is_read BOOLEAN DEFAULT FALSE," +
                 "id_evenement INT," +
                 "id_participation INT," +
+                "nom_organisateur VARCHAR(200)," +
+                "email_organisateur VARCHAR(200)," +
+                "nom_participant VARCHAR(200)," +
+                "email_participant VARCHAR(200)," +
+                "nom_admin VARCHAR(200)," +
+                "email_admin VARCHAR(200)," +
+                "commentaire TEXT," +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
                 "FOREIGN KEY (id_user) REFERENCES users(id) ON DELETE CASCADE," +
                 "FOREIGN KEY (id_evenement) REFERENCES evenement(id_evenement) ON DELETE CASCADE," +
@@ -41,128 +50,169 @@ public class NotificationService implements INotificationService {
         }
     }
 
-    // ============ NOTIFICATIONS POUR LES PARTICIPANTS ============
-
     @Override
     public void creerNotificationParticipation(int idUser, int idEvenement, String eventTitre) {
-        String titre = "✅ Participation confirmée";
-        String message = String.format("Vous êtes inscrit à l'événement \"%s\". Votre participation a été enregistrée avec succès.", eventTitre);
+        String titre = "✅ Nouvelle participation";
+        String message = eventTitre;
 
-        ajouterNotification(new Notification(idUser, "PARTICIPATION", titre, message), idEvenement, null);
+        Notification notif = new Notification(idUser, "PARTICIPATION", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
     }
 
     @Override
     public void creerNotificationAnnulation(int idUser, int idEvenement, String eventTitre) {
         String titre = "❌ Participation annulée";
-        String message = String.format("Votre participation à l'événement \"%s\" a été annulée avec succès.", eventTitre);
+        String message = eventTitre;
 
-        ajouterNotification(new Notification(idUser, "ANNULATION", titre, message), idEvenement, null);
+        Notification notif = new Notification(idUser, "ANNULATION", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
     }
 
     @Override
     public void creerNotificationModification(int idUser, int idEvenement, String eventTitre, String modification) {
         String titre = "📅 Événement modifié";
-        String message = String.format("L'événement \"%s\" a été modifié : %s", eventTitre, modification);
+        String message = eventTitre + " - " + modification;
 
-        ajouterNotification(new Notification(idUser, "MODIFICATION", titre, message), idEvenement, null);
+        Notification notif = new Notification(idUser, "MODIFICATION", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
     }
 
     @Override
     public void creerNotificationRappel(int idUser, int idEvenement, String eventTitre) {
         String titre = "⏰ Rappel d'événement";
-        String message = String.format("N'oubliez pas votre participation à l'événement \"%s\" qui a lieu demain !", eventTitre);
+        String message = "Rappel: " + eventTitre + " a lieu demain";
 
-        ajouterNotification(new Notification(idUser, "RAPPEL", titre, message), idEvenement, null);
+        Notification notif = new Notification(idUser, "RAPPEL", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
     }
 
-    // ============ NOTIFICATIONS POUR LES ORGANISATEURS ============
-
     @Override
-    public void creerNotificationNouveauParticipant(int idOrganisateur, int idEvenement, String participantNom) {
+    public void creerNotificationNouveauParticipant(int idOrganisateur, int idEvenement, String eventTitre, String participantNom, String participantEmail) {
         String titre = "👥 Nouveau participant";
-        String message = String.format("%s s'est inscrit à votre événement.", participantNom);
+        String message = eventTitre + " - " + participantNom;
 
         Notification notif = new Notification(idOrganisateur, "NOUVEAU_PARTICIPANT", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setNomParticipant(participantNom);
+        notif.setEmailParticipant(participantEmail);
+        notif.setEventTitre(eventTitre);
         ajouterNotification(notif, idEvenement, null);
     }
 
     @Override
-    public void creerNotificationParticipantAnnule(int idOrganisateur, int idEvenement, String participantNom) {
+    public void creerNotificationParticipantAnnule(int idOrganisateur, int idEvenement, String eventTitre, String participantNom, String participantEmail) {
         String titre = "🚫 Participant annulé";
-        String message = String.format("%s a annulé sa participation à votre événement.", participantNom);
+        String message = eventTitre + " - " + participantNom;
 
         Notification notif = new Notification(idOrganisateur, "PARTICIPANT_ANNULE", titre, message);
         notif.setIdEvenement(idEvenement);
+        notif.setNomParticipant(participantNom);
+        notif.setEmailParticipant(participantEmail);
+        notif.setEventTitre(eventTitre);
         ajouterNotification(notif, idEvenement, null);
     }
 
-    // ============ NOTIFICATIONS POUR LES ADMINISTRATEURS ============
-
-    public void creerNotificationAdminNouvelEvenement(int idEvenement, String eventTitre, String organisateurNom) {
+    public void creerNotificationAdminNouvelEvenement(int idAdmin, int idEvenement, String eventTitre, String organisateurNom, String organisateurEmail) {
         String titre = "📅 Nouvel événement en attente";
-        String message = String.format("L'organisateur %s a créé l'événement \"%s\" en attente de validation.",
-                organisateurNom, eventTitre);
+        String message = organisateurNom + " - " + eventTitre;
 
-        // Récupérer tous les administrateurs
-        String query = "SELECT id FROM users WHERE role = 'admin'";
+        Notification notif = new Notification(idAdmin, "NOUVEL_EVENEMENT_ADMIN", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setNomOrganisateur(organisateurNom);
+        notif.setEmailOrganisateur(organisateurEmail);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
+    }
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+    public void creerNotificationEvenementApprouve(int idOrganisateur, int idEvenement, String eventTitre, String commentaire, String adminNom, String adminEmail) {
+        String titre = "✅ Événement approuvé";
+        String message = eventTitre;
 
-            while (rs.next()) {
-                int adminId = rs.getInt("id");
-                ajouterNotification(new Notification(adminId, "NOUVEL_EVENEMENT_ADMIN", titre, message), idEvenement, null);
-            }
-            System.out.println("✅ Notifications envoyées aux admins pour le nouvel événement");
+        Notification notif = new Notification(idOrganisateur, "EVENEMENT_APPROUVE", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setNomAdmin(adminNom);
+        notif.setEmailAdmin(adminEmail);
+        notif.setCommentaire(commentaire);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
+    }
 
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur envoi notifications admins: " + e.getMessage());
+    public void creerNotificationEvenementRefuse(int idOrganisateur, int idEvenement, String eventTitre, String commentaire, String adminNom, String adminEmail) {
+        String titre = "❌ Événement refusé";
+        String message = eventTitre;
+
+        Notification notif = new Notification(idOrganisateur, "EVENEMENT_REFUSE", titre, message);
+        notif.setIdEvenement(idEvenement);
+        notif.setNomAdmin(adminNom);
+        notif.setEmailAdmin(adminEmail);
+        notif.setCommentaire(commentaire);
+        notif.setEventTitre(eventTitre);
+        ajouterNotification(notif, idEvenement, null);
+    }
+
+    public void creerNotificationEvenementPublie(int idEvenement, String eventTitre) {
+        EventService eventService = new EventService();
+        Event event = eventService.getEventById(idEvenement);
+
+        if (event != null) {
+            String titreOrg = "📢 Événement publié";
+            String messageOrg = eventTitre;
+
+            Notification notifOrg = new Notification(event.getId_organisateur(), "EVENEMENT_PUBLIE", titreOrg, messageOrg);
+            notifOrg.setIdEvenement(idEvenement);
+            notifOrg.setEventTitre(eventTitre);
+            notifOrg.setNomAdmin(event.getOrganisateurNom());
+            notifOrg.setEmailAdmin(event.getOrganisateurEmail());
+            ajouterNotification(notifOrg, idEvenement, null);
         }
     }
 
-    public void creerNotificationEvenementApprouve(int idOrganisateur, int idEvenement, String eventTitre) {
-        String titre = "✅ Événement approuvé";
-        String message = String.format("Félicitations ! Votre événement \"%s\" a été approuvé par l'administrateur et est maintenant visible pour les participants.",
-                eventTitre);
-
-        ajouterNotification(new Notification(idOrganisateur, "EVENEMENT_APPROUVE", titre, message), idEvenement, null);
-    }
-
-    public void creerNotificationEvenementRefuse(int idOrganisateur, int idEvenement, String eventTitre, String motif) {
-        String titre = "❌ Événement refusé";
-        String message = String.format("Votre événement \"%s\" a été refusé. Motif : %s",
-                eventTitre, motif);
-
-        ajouterNotification(new Notification(idOrganisateur, "EVENEMENT_REFUSE", titre, message), idEvenement, null);
-    }
-
     public void creerNotificationEvenementModifie(int idEvenement, String eventTitre, String modification) {
-        String titre = "📅 Événement modifié";
-        String message = String.format("L'événement \"%s\" auquel vous participez a été modifié : %s",
-                eventTitre, modification);
+        EventService eventService = new EventService();
+        Event event = eventService.getEventById(idEvenement);
 
-        String query = "SELECT id_user FROM participation WHERE id_evenement = ?";
+        if (event != null) {
+            List<Integer> participantIds = getParticipantIdsForEvent(idEvenement);
+            for (int participantId : participantIds) {
+                String titre = "📅 Événement modifié";
+                String message = eventTitre + " - " + modification;
 
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, idEvenement);
-            ResultSet rs = pst.executeQuery();
-
-            while (rs.next()) {
-                int participantId = rs.getInt("id_user");
-                ajouterNotification(new Notification(participantId, "EVENEMENT_MODIFIE", titre, message), idEvenement, null);
+                Notification notif = new Notification(participantId, "EVENEMENT_MODIFIE", titre, message);
+                notif.setIdEvenement(idEvenement);
+                notif.setEventTitre(eventTitre);
+                ajouterNotification(notif, idEvenement, null);
             }
-            System.out.println("✅ Notifications envoyées aux participants pour modification d'événement");
-
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur envoi notifications participants: " + e.getMessage());
         }
     }
 
     public void creerNotificationEvenementAnnule(int idEvenement, String eventTitre) {
-        String titre = "❌ Événement annulé";
-        String message = String.format("L'événement \"%s\" auquel vous participiez a été annulé.", eventTitre);
+        EventService eventService = new EventService();
+        Event event = eventService.getEventById(idEvenement);
 
+        if (event != null) {
+            List<Integer> participantIds = getParticipantIdsForEvent(idEvenement);
+            for (int participantId : participantIds) {
+                String titre = "❌ Événement annulé";
+                String message = eventTitre;
+
+                Notification notif = new Notification(participantId, "EVENEMENT_ANNULE", titre, message);
+                notif.setIdEvenement(idEvenement);
+                notif.setEventTitre(eventTitre);
+                ajouterNotification(notif, idEvenement, null);
+            }
+        }
+    }
+
+    private List<Integer> getParticipantIdsForEvent(int idEvenement) {
+        List<Integer> ids = new ArrayList<>();
         String query = "SELECT id_user FROM participation WHERE id_evenement = ?";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
@@ -170,22 +220,20 @@ public class NotificationService implements INotificationService {
             ResultSet rs = pst.executeQuery();
 
             while (rs.next()) {
-                int participantId = rs.getInt("id_user");
-                ajouterNotification(new Notification(participantId, "EVENEMENT_ANNULE", titre, message), idEvenement, null);
+                ids.add(rs.getInt("id_user"));
             }
-            System.out.println("✅ Notifications envoyées aux participants pour annulation d'événement");
-
         } catch (SQLException e) {
-            System.err.println("❌ Erreur envoi notifications participants: " + e.getMessage());
+            System.err.println("❌ Erreur récupération participants: " + e.getMessage());
         }
+        return ids;
     }
-
-    // ============ MÉTHODES DE GESTION DES NOTIFICATIONS ============
 
     @Override
     public List<Notification> getNotificationsByUser(int idUser) {
         List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT * FROM notifications WHERE id_user = ? ORDER BY created_at DESC LIMIT 50";
+        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
+                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
+                "WHERE n.id_user = ? ORDER BY n.created_at DESC LIMIT 100";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idUser);
@@ -196,6 +244,27 @@ public class NotificationService implements INotificationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur chargement notifications: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return notifications;
+    }
+
+    public List<Notification> getAllNotificationsByUser(int idUser) {
+        List<Notification> notifications = new ArrayList<>();
+        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
+                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
+                "WHERE n.id_user = ? ORDER BY n.created_at DESC LIMIT 200";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idUser);
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                notifications.add(mapResultSetToNotification(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur chargement notifications: " + e.getMessage());
+            e.printStackTrace();
         }
         return notifications;
     }
@@ -203,7 +272,9 @@ public class NotificationService implements INotificationService {
     @Override
     public List<Notification> getNotificationsNonLues(int idUser) {
         List<Notification> notifications = new ArrayList<>();
-        String query = "SELECT * FROM notifications WHERE id_user = ? AND is_read = FALSE ORDER BY created_at DESC";
+        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
+                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
+                "WHERE n.id_user = ? AND n.is_read = FALSE ORDER BY n.created_at DESC";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idUser);
@@ -214,6 +285,7 @@ public class NotificationService implements INotificationService {
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur chargement notifications non lues: " + e.getMessage());
+            e.printStackTrace();
         }
         return notifications;
     }
@@ -224,20 +296,41 @@ public class NotificationService implements INotificationService {
         String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
                 "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
                 "WHERE n.id_user = ? AND n.type IN ('NOUVEAU_PARTICIPANT', 'PARTICIPANT_ANNULE', " +
-                "'EVENEMENT_APPROUVE', 'EVENEMENT_REFUSE') " +
-                "ORDER BY n.created_at DESC LIMIT 50";
+                "'EVENEMENT_APPROUVE', 'EVENEMENT_REFUSE', 'EVENEMENT_PUBLIE', 'EVENEMENT_MODIFIE') " +
+                "ORDER BY n.created_at DESC LIMIT 100";
 
         try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, idOrganisateur);
             ResultSet rs = pst.executeQuery();
 
             while (rs.next()) {
-                Notification notif = mapResultSetToNotification(rs);
-                notif.setEventTitre(rs.getString("event_titre"));
-                notifications.add(notif);
+                notifications.add(mapResultSetToNotification(rs));
             }
         } catch (SQLException e) {
             System.err.println("❌ Erreur chargement notifications organisateur: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return notifications;
+    }
+
+    public List<Notification> getNotificationsForAdmin(int idAdmin) {
+        List<Notification> notifications = new ArrayList<>();
+        String query = "SELECT n.*, e.titre as event_titre FROM notifications n " +
+                "LEFT JOIN evenement e ON n.id_evenement = e.id_evenement " +
+                "WHERE n.id_user = ? AND n.type IN ('NOUVEL_EVENEMENT_ADMIN', 'PARTICIPATION', 'ANNULATION', " +
+                "'EVENEMENT_PUBLIE', 'EVENEMENT_APPROUVE', 'EVENEMENT_REFUSE') " +
+                "ORDER BY n.created_at DESC LIMIT 200";
+
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
+            pst.setInt(1, idAdmin);
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                notifications.add(mapResultSetToNotification(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur chargement notifications admin: " + e.getMessage());
+            e.printStackTrace();
         }
         return notifications;
     }
@@ -284,13 +377,13 @@ public class NotificationService implements INotificationService {
         return 0;
     }
 
-    // ============ MÉTHODES PRIVÉES ============
-
     private void ajouterNotification(Notification notification, int idEvenement, Integer idParticipation) {
-        String query = "INSERT INTO notifications (id_user, type, titre, message, id_evenement, id_participation, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+        String query = "INSERT INTO notifications (id_user, type, titre, message, id_evenement, " +
+                "id_participation, nom_organisateur, email_organisateur, nom_participant, email_participant, " +
+                "nom_admin, email_admin, commentaire, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-        try (PreparedStatement pst = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement pst = connection.prepareStatement(query)) {
             pst.setInt(1, notification.getIdUser());
             pst.setString(2, notification.getType());
             pst.setString(3, notification.getTitre());
@@ -308,18 +401,21 @@ public class NotificationService implements INotificationService {
                 pst.setNull(6, Types.INTEGER);
             }
 
-            int affectedRows = pst.executeUpdate();
+            pst.setString(7, notification.getNomOrganisateur());
+            pst.setString(8, notification.getEmailOrganisateur());
+            pst.setString(9, notification.getNomParticipant());
+            pst.setString(10, notification.getEmailParticipant());
+            pst.setString(11, notification.getNomAdmin());
+            pst.setString(12, notification.getEmailAdmin());
+            pst.setString(13, notification.getCommentaire());
 
-            if (affectedRows > 0) {
-                ResultSet rs = pst.getGeneratedKeys();
-                if (rs.next()) {
-                    notification.setId(rs.getInt(1));
-                }
-                System.out.println("✅ Notification créée pour l'utilisateur " + notification.getIdUser() +
-                        " (type: " + notification.getType() + ")");
-            }
+            pst.executeUpdate();
+            System.out.println("✅ Notification créée pour l'utilisateur " + notification.getIdUser() +
+                    " (type: " + notification.getType() + ")");
+
         } catch (SQLException e) {
             System.err.println("❌ Erreur création notification: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -340,74 +436,21 @@ public class NotificationService implements INotificationService {
         try {
             n.setEventTitre(rs.getString("event_titre"));
         } catch (SQLException e) {
-            // Ignorer si la colonne n'existe pas
+            // Ignorer
+        }
+
+        try {
+            n.setNomOrganisateur(rs.getString("nom_organisateur"));
+            n.setEmailOrganisateur(rs.getString("email_organisateur"));
+            n.setNomParticipant(rs.getString("nom_participant"));
+            n.setEmailParticipant(rs.getString("email_participant"));
+            n.setNomAdmin(rs.getString("nom_admin"));
+            n.setEmailAdmin(rs.getString("email_admin"));
+            n.setCommentaire(rs.getString("commentaire"));
+        } catch (SQLException e) {
+            // Ignorer
         }
 
         return n;
-    }
-
-    public void supprimerNotificationsUtilisateur(int idUser) {
-        String query = "DELETE FROM notifications WHERE id_user = ?";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, idUser);
-            int count = pst.executeUpdate();
-            System.out.println("✅ " + count + " notifications supprimées pour l'utilisateur " + idUser);
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur suppression notifications: " + e.getMessage());
-        }
-    }
-
-    public void supprimerNotification(int idNotification) {
-        String query = "DELETE FROM notifications WHERE id = ?";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, idNotification);
-            pst.executeUpdate();
-            System.out.println("✅ Notification " + idNotification + " supprimée");
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur suppression notification: " + e.getMessage());
-        }
-    }
-
-    public void supprimerNotificationsEvenement(int idEvenement) {
-        String query = "DELETE FROM notifications WHERE id_evenement = ?";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setInt(1, idEvenement);
-            int count = pst.executeUpdate();
-            System.out.println("✅ " + count + " notifications supprimées pour l'événement " + idEvenement);
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur suppression notifications événement: " + e.getMessage());
-        }
-    }
-
-    public int getTotalNotifications() {
-        String query = "SELECT COUNT(*) FROM notifications";
-
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur comptage total notifications: " + e.getMessage());
-        }
-        return 0;
-    }
-
-    public int getNotificationsCountByType(String type) {
-        String query = "SELECT COUNT(*) FROM notifications WHERE type = ?";
-
-        try (PreparedStatement pst = connection.prepareStatement(query)) {
-            pst.setString(1, type);
-            ResultSet rs = pst.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ Erreur comptage notifications par type: " + e.getMessage());
-        }
-        return 0;
     }
 }

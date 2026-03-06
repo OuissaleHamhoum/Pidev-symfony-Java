@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter;
 public class Notification {
     private int id;
     private int idUser;
-    private String type; // PARTICIPATION, ANNULATION, MODIFICATION, RAPPEL
+    private String type;
     private String titre;
     private String message;
     private boolean isRead;
@@ -16,6 +16,15 @@ public class Notification {
     private String eventTitre;
     private int idEvenement;
     private int idParticipation;
+
+    // Détails pour les notifications détaillées
+    private String nomOrganisateur;
+    private String emailOrganisateur;
+    private String nomParticipant;
+    private String emailParticipant;
+    private String nomAdmin;
+    private String emailAdmin;
+    private String commentaire;
 
     public Notification() {}
 
@@ -57,6 +66,27 @@ public class Notification {
 
     public int getIdParticipation() { return idParticipation; }
     public void setIdParticipation(int idParticipation) { this.idParticipation = idParticipation; }
+
+    public String getNomOrganisateur() { return nomOrganisateur; }
+    public void setNomOrganisateur(String nomOrganisateur) { this.nomOrganisateur = nomOrganisateur; }
+
+    public String getEmailOrganisateur() { return emailOrganisateur; }
+    public void setEmailOrganisateur(String emailOrganisateur) { this.emailOrganisateur = emailOrganisateur; }
+
+    public String getNomParticipant() { return nomParticipant; }
+    public void setNomParticipant(String nomParticipant) { this.nomParticipant = nomParticipant; }
+
+    public String getEmailParticipant() { return emailParticipant; }
+    public void setEmailParticipant(String emailParticipant) { this.emailParticipant = emailParticipant; }
+
+    public String getNomAdmin() { return nomAdmin; }
+    public void setNomAdmin(String nomAdmin) { this.nomAdmin = nomAdmin; }
+
+    public String getEmailAdmin() { return emailAdmin; }
+    public void setEmailAdmin(String emailAdmin) { this.emailAdmin = emailAdmin; }
+
+    public String getCommentaire() { return commentaire; }
+    public void setCommentaire(String commentaire) { this.commentaire = commentaire; }
 
     public String getFormattedDate() {
         if (createdAt == null) return "";

@@ -16,7 +16,8 @@ public class SessionManager {
         loginTime = System.currentTimeMillis();
         token = generateToken(user.getEmail());
         System.out.println("✅ Session démarrée pour: " + user.getEmail());
-        printSessionInfo();
+
+                printSessionInfo();
     }
 
     public static void logout() {
@@ -74,6 +75,7 @@ public class SessionManager {
 
     public static void printSessionInfo() {
         if (currentUser != null) {
+
             System.out.println("\n=== INFORMATIONS SESSION ===");
             System.out.println("Utilisateur: " + currentUser.getNomComplet());
             System.out.println("Email: " + currentUser.getEmail());
