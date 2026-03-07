@@ -578,3 +578,23 @@ ALTER TABLE notifications ADD INDEX idx_type (type);
 -- 4. MISE À JOUR DES DONNÉES EXISTANTES
 UPDATE evenement SET statut_validation = 'approuve' WHERE statut_validation IS NULL;
 UPDATE evenement SET date_soumission = created_at WHERE date_soumission IS NULL;
+
+
+-- ajoute Des exemples des evenements
+INSERT INTO evenement (titre, description, date_evenement, lieu, id_organisateur, capacite_max, statut_validation, latitude, longitude)
+VALUES
+    ('Collecte de plastique', 'Collecte de plastique dans le parc', '2026-04-10 10:00:00', 'Parc Belvedere Tunis', 2, 40, 'approuve', 36.8065, 10.1815),
+    ('Nettoyage forêt', 'Action écologique pour nettoyer la forêt', '2026-04-15 09:00:00', 'Forêt de Sejnane', 6, 30, 'approuve', 37.0572, 9.2380),
+    ('Atelier recyclage créatif', 'Créer des objets avec matériaux recyclés', '2026-04-20 14:00:00', 'Centre culturel Sfax', 2, 25, 'approuve', 34.7406, 10.7603),
+    ('Collecte de verre', 'Collecte de bouteilles en verre', '2026-04-22 11:00:00', 'Plage Hammamet', 6, 50, 'approuve', 36.4000, 10.6167),
+    ('Formation tri des déchets', 'Apprendre à trier les déchets', '2026-04-30 15:00:00', 'Université Tunis', 2, 60, 'approuve', 36.8189, 10.1658);
+-- ajoute Des exemples des notifications
+
+INSERT INTO notifications (id_user, type, titre, message, id_evenement, nom_organisateur, email_organisateur, event_titre)
+VALUES
+    (3, 'inscription', 'Inscription confirmée', 'Vous êtes inscrit à l’événement Collecte de plastique', 3, 'Organisateur Eco', 'organisateur@loopi.tn', 'Collecte de plastique'),
+    (4, 'inscription', 'Participation enregistrée', 'Votre participation à Atelier recyclage créatif est confirmée', 3, 'Organisateur Eco', 'organisateur@loopi.tn', 'Atelier recyclage créatif'),
+    (2, 'nouvelle_participation', 'Nouveau participant', 'Un participant vient de rejoindre votre événement', 4, 'Pierre Martin', 'pierre@email.com', 'Collecte de verre'),
+    (3, 'rappel', 'Rappel événement', 'Rappel : votre événement commence bientôt', 4, 'Pierre Martin', 'pierre@email.com', 'Collecte de verre'),
+    (7, 'nouvel_evenement', 'Nouvel événement disponible', 'Un nouvel événement écologique est disponible', 5, 'Organisateur Eco', 'organisateur@loopi.tn', 'Formation tri des déchets');
+

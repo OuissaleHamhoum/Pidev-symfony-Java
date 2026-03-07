@@ -8,7 +8,9 @@ import edu.Loopi.services.UserService;
 import edu.Loopi.services.NotificationService;
 import edu.Loopi.services.ParticipationService;
 import edu.Loopi.services.AddressSuggestionService;
+import edu.Loopi.services.AIImageGenerationService;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -31,13 +33,18 @@ import javafx.util.Duration;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @SuppressWarnings("unchecked")
 public class EventManagementView {
@@ -48,6 +55,7 @@ public class EventManagementView {
     private ParticipationService participationService;
     private AddressSuggestionService addressService;
     private AdminDashboard adminDashboard;
+    private String selectedImagePath = ""; // Pour stocker le chemin de l'image sélectionnée
 
     // Composants UI
     private TableView<Event> eventsTable;
@@ -73,12 +81,26 @@ public class EventManagementView {
     // Timer pour le rafraîchissement automatique
     private PauseTransition autoRefreshTimer;
 
-    // Constantes pour les chemins d'images
+    // Constantes pour les couleurs
+    private static final String AI_COLOR = "#9b59b6";
+    private static final String DANGER_COLOR = "#e74c3c";
+    private static final String SUCCESS_COLOR = "#2ecc71";
+    private static final String WARNING_COLOR = "#f39c12";
+    private static final String BORDER_COLOR = "#e9ecef";
+
+    // Constantes pour les chemins d'images - MÊMES CHEMINS QUE DANS EVENTVIEW
     private static final String PROJECT_ROOT = System.getProperty("user.dir");
-    private static final String IMAGE_STORAGE_DIR = "src" + File.separator + "main" + File.separator +
-            "resources" + File.separator + "uploads" + File.separator +
-            "events" + File.separator;
-    private static final String FULL_IMAGE_PATH = PROJECT_ROOT + File.separator + IMAGE_STORAGE_DIR;
+    private static final String RESOURCES_DIR = "src" + File.separator + "main" + File.separator +
+            "resources" + File.separator;
+    private static final String UPLOADS_DIR = RESOURCES_DIR + "uploads" + File.separator;
+    private static final String EVENTS_DIR = UPLOADS_DIR + "events" + File.separator;
+    private static final String AI_DIR = UPLOADS_DIR + "ai_generated" + File.separator;
+
+    private static final String FULL_EVENTS_PATH = PROJECT_ROOT + File.separator + EVENTS_DIR;
+    private static final String FULL_AI_PATH = PROJECT_ROOT + File.separator + AI_DIR;
+
+    private static final String DB_EVENTS_PATH = "uploads/events/";
+    private static final String DB_AI_PATH = "uploads/ai_generated/";
 
     // Formatteurs de date
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -92,6 +114,109 @@ public class EventManagementView {
         this.notificationService = new NotificationService();
         this.participationService = new ParticipationService();
         this.addressService = new AddressSuggestionService();
+        createUploadDirectories();
+    }
+
+    /**
+     * Crée les dossiers d'upload s'ils n'existent pas (MÊME QUE DANS EVENTVIEW)
+     */
+    private void createUploadDirectories() {
+        try {
+            File eventsDir = new File(FULL_EVENTS_PATH);
+            File aiDir = new File(FULL_AI_PATH);
+
+            if (!eventsDir.exists()) {
+                boolean created = eventsDir.mkdirs();
+                System.out.println("📁 Dossier events " + (created ? "créé" : "existe déjà") + ": " + FULL_EVENTS_PATH);
+            }
+
+            if (!aiDir.exists()) {
+                boolean created = aiDir.mkdirs();
+                System.out.println("📁 Dossier AI " + (created ? "créé" : "existe déjà") + ": " + FULL_AI_PATH);
+            }
+
+            // Vérifier les permissions
+            System.out.println("   - Dossier events accessible en écriture: " + eventsDir.canWrite());
+            System.out.println("   - Dossier AI accessible en écriture: " + aiDir.canWrite());
+        } catch (Exception e) {
+            System.err.println("❌ Erreur création dossiers: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Copie une image dans le stockage (MÊME QUE DANS EVENTVIEW)
+     */
+    private String copyImageToStorage(File sourceFile) {
+        try {
+            File directory = new File(FULL_EVENTS_PATH);
+            if (!directory.exists()) directory.mkdirs();
+
+            if (!directory.canWrite()) {
+                System.err.println("❌ Le dossier n'est pas accessible en écriture: " + FULL_EVENTS_PATH);
+                return null;
+            }
+
+            String extension = "";
+            String fileName = sourceFile.getName();
+            int dotIndex = fileName.lastIndexOf('.');
+            extension = (dotIndex > 0) ? fileName.substring(dotIndex) : ".jpg";
+
+            if (!extension.matches("\\.(jpg|jpeg|png|gif|bmp)$")) {
+                System.err.println("❌ Extension non supportée: " + extension);
+                return null;
+            }
+
+            String uniqueFileName = "event_" + UUID.randomUUID().toString() + extension;
+            String fullPath = FULL_EVENTS_PATH + uniqueFileName;
+
+            Files.copy(sourceFile.toPath(), Paths.get(fullPath), StandardCopyOption.REPLACE_EXISTING);
+
+            File savedFile = new File(fullPath);
+            if (savedFile.exists() && savedFile.length() > 0) {
+                System.out.println("✅ Image copiée: " + fullPath + " (" + savedFile.length() + " bytes)");
+                return DB_EVENTS_PATH + uniqueFileName;
+            }
+            return null;
+
+        } catch (IOException e) {
+            System.err.println("❌ Erreur lors de la copie: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Charge une image depuis le stockage (MÊME QUE DANS EVENTVIEW)
+     */
+    private Image loadImageFromStorage(String imagePath) {
+        if (imagePath == null || imagePath.isEmpty()) {
+            return null;
+        }
+
+        try {
+            String fileName = imagePath.substring(imagePath.lastIndexOf('/') + 1);
+
+            String[] possiblePaths = {
+                    FULL_EVENTS_PATH + fileName,
+                    FULL_AI_PATH + fileName,
+                    PROJECT_ROOT + File.separator + "src" + File.separator + "main" + File.separator +
+                            "resources" + File.separator + imagePath.replace('/', File.separatorChar)
+            };
+
+            for (String path : possiblePaths) {
+                File imgFile = new File(path);
+                if (imgFile.exists() && imgFile.isFile()) {
+                    Image image = new Image(imgFile.toURI().toString(), true);
+                    if (!image.isError()) {
+                        return image;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Exception lors du chargement: " + e.getMessage());
+        }
+        return null;
     }
 
     public void showEventManagementView(StackPane mainContentArea, boolean isDarkMode) {
@@ -446,10 +571,9 @@ public class EventManagementView {
                     Event event = getTableView().getItems().get(getIndex());
                     try {
                         if (event.getImage_evenement() != null && !event.getImage_evenement().isEmpty()) {
-                            String fileName = event.getImage_evenement().substring(event.getImage_evenement().lastIndexOf('/') + 1);
-                            File imgFile = new File(FULL_IMAGE_PATH + fileName);
-                            if (imgFile.exists()) {
-                                imageView.setImage(new Image(imgFile.toURI().toString()));
+                            Image img = loadImageFromStorage(event.getImage_evenement());
+                            if (img != null) {
+                                imageView.setImage(img);
                             } else {
                                 imageView.setImage(new Image("https://via.placeholder.com/60x50/3182ce/ffffff?text=📅"));
                             }
@@ -804,9 +928,16 @@ public class EventManagementView {
     }
 
     private void refreshData() {
+        // Forcer le rafraîchissement depuis la base de données
         eventService.refreshEvents();
+
+        // Recharger les événements
         loadEvents();
+
+        // Réappliquer les filtres
         applyFilters();
+
+        System.out.println("✅ Données actualisées");
     }
 
     private void updateStats() {
@@ -1369,8 +1500,79 @@ public class EventManagementView {
     }
 
     /**
+     * Crée un TextField avec autocomplétion d'adresses
+     */
+    private TextField createAddressTextField(String initialValue, Stage dialog) {
+        TextField textField = new TextField(initialValue);
+        textField.setPromptText("Saisissez une adresse...");
+        textField.setStyle("-fx-background-radius: 8; -fx-padding: 10; " +
+                "-fx-border-color: " + BORDER_COLOR + "; -fx-border-radius: 8;");
+
+        // Créer un ContextMenu pour les suggestions
+        ContextMenu suggestionsMenu = new ContextMenu();
+
+        // Timer pour le debounce (éviter trop de requêtes)
+        PauseTransition debounceTimer = new PauseTransition(Duration.millis(500));
+
+        textField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null || newVal.trim().length() < 3) {
+                suggestionsMenu.hide();
+                return;
+            }
+
+            // Réinitialiser le timer
+            debounceTimer.setOnFinished(event -> {
+                String query = newVal.trim();
+
+                // Exécuter la recherche dans un thread séparé
+                new Thread(() -> {
+                    List<String> suggestions = addressService.getAddressSuggestions(query);
+
+                    // Mettre à jour l'interface JavaFX
+                    Platform.runLater(() -> {
+                        suggestionsMenu.getItems().clear();
+
+                        if (suggestions.isEmpty()) {
+                            MenuItem noResultItem = new MenuItem("Aucune suggestion");
+                            noResultItem.setDisable(true);
+                            suggestionsMenu.getItems().add(noResultItem);
+                        } else {
+                            for (String suggestion : suggestions) {
+                                MenuItem item = new MenuItem(suggestion);
+                                item.setOnAction(e -> {
+                                    textField.setText(suggestion);
+                                    suggestionsMenu.hide();
+                                });
+                                suggestionsMenu.getItems().add(item);
+                            }
+                        }
+
+                        // Afficher le menu sous le TextField
+                        if (!suggestionsMenu.getItems().isEmpty()) {
+                            suggestionsMenu.show(textField, javafx.geometry.Side.BOTTOM, 0, 0);
+                        } else {
+                            suggestionsMenu.hide();
+                        }
+                    });
+                }).start();
+            });
+
+            debounceTimer.playFromStart();
+        });
+
+        // Cacher le menu quand le champ perd le focus
+        textField.focusedProperty().addListener((obs, oldVal, newVal) -> {
+            if (!newVal) {
+                suggestionsMenu.hide();
+            }
+        });
+
+        return textField;
+    }
+
+    /**
      * Affiche la boîte de dialogue de modification d'événement
-     * Format compact avec tous les détails et boutons Enregistrer/Annuler
+     * AVEC GÉNÉRATION IA ET AUTOCOMPLÉTION DU LIEU
      */
     private void showEditEventDialog(Event event) {
         Stage dialog = new Stage();
@@ -1410,7 +1612,7 @@ public class EventManagementView {
         form.setPadding(new Insets(25));
         form.setStyle("-fx-background-color: " + adminDashboard.getCardBg() + ";");
 
-        // Titre
+        // ========== TITRE ==========
         VBox titleBox = new VBox(3);
         Label titleLabel = new Label("📝 Titre *");
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
@@ -1431,7 +1633,7 @@ public class EventManagementView {
 
         titleBox.getChildren().addAll(titleLabel, titreField, titreError);
 
-        // Description
+        // ========== DESCRIPTION ==========
         VBox descBox = new VBox(3);
         Label descLabel = new Label("📄 Description *");
         descLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
@@ -1453,7 +1655,7 @@ public class EventManagementView {
 
         descBox.getChildren().addAll(descLabel, descArea, descError);
 
-        // Date et Heure
+        // ========== DATE ET HEURE ==========
         VBox dateBox = new VBox(3);
         Label dateLabel = new Label("📅 Date & Heure *");
         dateLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
@@ -1496,18 +1698,13 @@ public class EventManagementView {
 
         dateBox.getChildren().addAll(dateLabel, dateTimeBox, dateError);
 
-        // Lieu
+        // ========== LIEU AVEC AUTOCOMPLÉTION ==========
         VBox lieuBox = new VBox(3);
         Label lieuLabel = new Label("📍 Lieu *");
         lieuLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
         lieuLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
 
-        TextField lieuField = new TextField(event.getLieu());
-        lieuField.setPromptText("Ex: Plage de Sousse");
-        lieuField.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#FFFFFF") +
-                "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; " +
-                "-fx-padding: 10 12; -fx-font-size: 13px; -fx-text-fill: " + adminDashboard.getTextColor() + ";");
-        lieuField.setPrefWidth(500);
+        TextField lieuField = createAddressTextField(event.getLieu(), dialog);
 
         Label lieuError = new Label();
         lieuError.setFont(Font.font("System", 11));
@@ -1517,7 +1714,7 @@ public class EventManagementView {
 
         lieuBox.getChildren().addAll(lieuLabel, lieuField, lieuError);
 
-        // Capacité
+        // ========== CAPACITÉ ==========
         VBox capaciteBox = new VBox(3);
         Label capaciteLabel = new Label("👥 Capacité max");
         capaciteLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
@@ -1554,8 +1751,178 @@ public class EventManagementView {
         capaciteControl.getChildren().addAll(capaciteSpinner, capaciteIllimitee);
         capaciteBox.getChildren().addAll(capaciteLabel, capaciteControl);
 
+        // ========== SECTION IMAGE ==========
+        VBox imageSection = new VBox(10);
+        imageSection.setPadding(new Insets(15));
+        imageSection.setStyle("-fx-background-color: " + (adminDashboard.isDarkMode() ? "#2D3748" : "#F3F4F6") +
+                "; -fx-background-radius: 12; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 12;");
+
+        Label imageTitle = new Label("🖼️ Image");
+        imageTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        imageTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
+
+        // Conteneur pour l'aperçu de l'image
+        ImageView previewImageView = new ImageView();
+        previewImageView.setFitWidth(200);
+        previewImageView.setFitHeight(120);
+        previewImageView.setPreserveRatio(true);
+
+        Rectangle previewClip = new Rectangle(200, 120);
+        previewClip.setArcWidth(12);
+        previewClip.setArcHeight(12);
+        previewImageView.setClip(previewClip);
+
+        // Charger l'image existante si disponible
+        String currentImagePath = event.getImage_evenement();
+        selectedImagePath = currentImagePath != null ? currentImagePath : "";
+
+        if (currentImagePath != null && !currentImagePath.isEmpty()) {
+            System.out.println("📸 Chargement de l'image existante: " + currentImagePath);
+            Image existingImage = loadImageFromStorage(currentImagePath);
+            if (existingImage != null) {
+                previewImageView.setImage(existingImage);
+                System.out.println("✅ Image chargée avec succès");
+            } else {
+                System.out.println("❌ Échec du chargement de l'image existante, utilisation du placeholder");
+                previewImageView.setImage(new Image("https://via.placeholder.com/200x120/3182ce/ffffff?text=Image"));
+            }
+        } else {
+            System.out.println("🖼️ Aucune image existante, utilisation du placeholder");
+            previewImageView.setImage(new Image("https://via.placeholder.com/200x120/3182ce/ffffff?text=Image"));
+        }
+
+        VBox previewBox = new VBox(5, previewImageView);
+        previewBox.setAlignment(Pos.CENTER);
+
+        // Boutons pour les actions sur l'image
+        FlowPane imageButtons = new FlowPane();
+        imageButtons.setAlignment(Pos.CENTER);
+        imageButtons.setHgap(10);
+        imageButtons.setVgap(10);
+        imageButtons.setPadding(new Insets(5, 0, 5, 0));
+
+        Button browseBtn = new Button("📁 Choisir");
+        browseBtn.setStyle("-fx-background-color: " + adminDashboard.getAccentColor() +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 6; " +
+                "-fx-font-size: 12px; -fx-cursor: hand;");
+
+        Button clearImageBtn = new Button("🗑️ Effacer");
+        clearImageBtn.setStyle("-fx-background-color: " + DANGER_COLOR +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 6; " +
+                "-fx-font-size: 12px; -fx-cursor: hand;");
+        clearImageBtn.setVisible(currentImagePath != null && !currentImagePath.isEmpty());
+
+        Button aiGenerateBtn = new Button("✨ Générer avec IA");
+        aiGenerateBtn.setStyle("-fx-background-color: " + AI_COLOR +
+                "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15; -fx-background-radius: 6; " +
+                "-fx-font-size: 12px; -fx-cursor: hand;");
+        aiGenerateBtn.setTooltip(new Tooltip("Générer une image avec Stability AI"));
+
+        ProgressIndicator aiProgressIndicator = new ProgressIndicator();
+        aiProgressIndicator.setVisible(false);
+        aiProgressIndicator.setPrefSize(25, 25);
+
+        imageButtons.getChildren().addAll(browseBtn, clearImageBtn, aiGenerateBtn, aiProgressIndicator);
+        imageSection.getChildren().addAll(imageTitle, previewBox, imageButtons);
+
+        // Action pour choisir une image
+        browseBtn.setOnAction(e -> {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Choisir une image");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"));
+
+            File file = fc.showOpenDialog(dialog);
+            if (file != null) {
+                String storedPath = copyImageToStorage(file);
+                if (storedPath != null) {
+                    selectedImagePath = storedPath;
+                    Image newImage = loadImageFromStorage(storedPath);
+                    if (newImage != null) {
+                        previewImageView.setImage(newImage);
+                        clearImageBtn.setVisible(true);
+                        adminDashboard.showAlert("Succès", "Image chargée avec succès !");
+                    } else {
+                        adminDashboard.showError("Erreur", "❌ Échec du chargement de l'image");
+                    }
+                } else {
+                    adminDashboard.showError("Erreur", "❌ Échec de la copie de l'image");
+                }
+            }
+        });
+
+        // Action pour effacer l'image
+        clearImageBtn.setOnAction(e -> {
+            selectedImagePath = "";
+            previewImageView.setImage(new Image("https://via.placeholder.com/200x120/3182ce/ffffff?text=Image"));
+            clearImageBtn.setVisible(false);
+        });
+
+        // Action pour générer une image avec l'IA
+        AIImageGenerationService aiImageService = new AIImageGenerationService();
+
+        if (aiImageService.isConfigured()) {
+            aiGenerateBtn.setText("✨ Générer avec " + aiImageService.getModelName());
+        }
+
+        aiGenerateBtn.setOnAction(e -> {
+            String titre = titreField.getText().trim();
+            String description = descArea.getText().trim();
+
+            if (titre.isEmpty()) {
+                adminDashboard.showError("Information manquante", "Veuillez d'abord saisir un titre");
+                return;
+            }
+
+            if (description.isEmpty()) {
+                adminDashboard.showError("Information manquante", "Veuillez d'abord saisir une description");
+                return;
+            }
+
+            // Désactiver les boutons pendant la génération
+            aiGenerateBtn.setDisable(true);
+            browseBtn.setDisable(true);
+            aiProgressIndicator.setVisible(true);
+            previewImageView.setImage(new Image("https://via.placeholder.com/200x120/9b59b6/ffffff?text=Génération..."));
+
+            new Thread(() -> {
+                try {
+                    String generatedPath = aiImageService.generateEventImage(titre, description);
+
+                    Platform.runLater(() -> {
+                        aiProgressIndicator.setVisible(false);
+                        aiGenerateBtn.setDisable(false);
+                        browseBtn.setDisable(false);
+
+                        if (generatedPath != null) {
+                            selectedImagePath = generatedPath;
+                            Image newImage = loadImageFromStorage(generatedPath);
+                            if (newImage != null) {
+                                previewImageView.setImage(newImage);
+                                clearImageBtn.setVisible(true);
+                                adminDashboard.showAlert("Succès", "✅ Image générée avec succès !");
+                            } else {
+                                previewImageView.setImage(new Image("https://via.placeholder.com/200x120/3182ce/ffffff?text=Image"));
+                                adminDashboard.showError("Erreur", "❌ Échec du chargement de l'image");
+                            }
+                        } else {
+                            previewImageView.setImage(new Image("https://via.placeholder.com/200x120/3182ce/ffffff?text=Image"));
+                            adminDashboard.showError("Erreur", "❌ Échec de la génération");
+                        }
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        aiProgressIndicator.setVisible(false);
+                        aiGenerateBtn.setDisable(false);
+                        browseBtn.setDisable(false);
+                        previewImageView.setImage(new Image("https://via.placeholder.com/200x120/3182ce/ffffff?text=Image"));
+                        adminDashboard.showError("Erreur", "❌ Erreur: " + ex.getMessage());
+                    });
+                }
+            }).start();
+        });
+
         // Assemblage du formulaire
-        form.getChildren().addAll(titleBox, descBox, dateBox, lieuBox, capaciteBox);
+        form.getChildren().addAll(titleBox, descBox, dateBox, lieuBox, capaciteBox, imageSection);
 
         // ScrollPane pour le formulaire
         ScrollPane scrollPane = new ScrollPane(form);
@@ -1565,7 +1932,7 @@ public class EventManagementView {
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setPrefViewportHeight(450);
 
-        // Boutons
+        // ========== BOUTONS ==========
         HBox buttonBox = new HBox(15);
         buttonBox.setPadding(new Insets(15, 25, 25, 25));
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
@@ -1575,12 +1942,16 @@ public class EventManagementView {
         Button cancelBtn = new Button("Annuler");
         cancelBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + adminDashboard.getTextColor() +
                 "; -fx-border-color: " + adminDashboard.getBorderColor() + "; -fx-border-radius: 6; -fx-padding: 10 25; -fx-cursor: hand; -fx-font-weight: bold; -fx-font-size: 14px;");
-        cancelBtn.setOnAction(e -> dialog.close());
+        cancelBtn.setOnAction(e -> {
+            selectedImagePath = "";
+            dialog.close();
+        });
 
         Button saveBtn = new Button("💾 Enregistrer");
         saveBtn.setStyle("-fx-background-color: " + adminDashboard.getSuccessColor() +
                 "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 25; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-size: 14px;");
 
+        // ========== ACTION DU BOUTON ENREGISTRER ==========
         saveBtn.setOnAction(e -> {
             // Réinitialiser les messages d'erreur
             titreError.setVisible(false);
@@ -1657,9 +2028,32 @@ public class EventManagementView {
                 event.setCapacite_max(null);
             }
 
-            if (eventService.updateEvent(event)) {
+            // Mettre à jour l'image si elle a changé
+            if (!selectedImagePath.isEmpty() && !selectedImagePath.equals(event.getImage_evenement())) {
+                System.out.println("📸 Sauvegarde du nouveau chemin d'image: " + selectedImagePath);
+                event.setImage_evenement(selectedImagePath);
+            }
+            // Si selectedImagePath est vide, on garde l'image existante
+
+            // DEBUG - Afficher le contenu de l'événement avant enregistrement
+            System.out.println("\n🔍 DEBUG - Contenu de l'événement avant sauvegarde:");
+            System.out.println("   ID: " + event.getId_evenement());
+            System.out.println("   Titre: '" + event.getTitre() + "'");
+            System.out.println("   Description: '" + event.getDescription() + "'");
+            System.out.println("   Date: " + event.getDate_evenement());
+            System.out.println("   Lieu: '" + event.getLieu() + "'");
+            System.out.println("   Capacité: " + event.getCapacite_max());
+            System.out.println("   Image: '" + event.getImage_evenement() + "'");
+
+            System.out.println("🔄 Tentative de mise à jour de l'événement ID: " + event.getId_evenement());
+            boolean updated = eventService.updateEvent(event);
+
+            if (updated) {
                 adminDashboard.showAlert("Succès", "✅ Événement modifié avec succès !");
+
+                // Forcer le rafraîchissement des données
                 refreshData();
+
                 dialog.close();
             } else {
                 adminDashboard.showError("Erreur", "❌ Impossible de modifier l'événement");
@@ -1673,15 +2067,11 @@ public class EventManagementView {
         root.setCenter(scrollPane);
         root.setBottom(buttonBox);
 
-        Scene scene = new Scene(root, 650, 700);
+        Scene scene = new Scene(root, 650, 750);
         dialog.setScene(scene);
         dialog.showAndWait();
     }
 
-    /**
-     * Affiche la boîte de dialogue des détails de l'événement
-     * Format compact avec tous les détails bien organisés
-     */
     private void showEventDetails(Event event) {
         Stage dialog = new Stage();
         dialog.setTitle("Détails de l'événement");
@@ -1734,10 +2124,9 @@ public class EventManagementView {
 
         try {
             if (event.getImage_evenement() != null && !event.getImage_evenement().isEmpty()) {
-                String fileName = event.getImage_evenement().substring(event.getImage_evenement().lastIndexOf('/') + 1);
-                File imgFile = new File(FULL_IMAGE_PATH + fileName);
-                if (imgFile.exists()) {
-                    imageView.setImage(new Image(imgFile.toURI().toString()));
+                Image img = loadImageFromStorage(event.getImage_evenement());
+                if (img != null) {
+                    imageView.setImage(img);
                 } else {
                     imageView.setImage(new Image("https://via.placeholder.com/550x160/3182ce/ffffff?text=" + event.getTitre()));
                 }
@@ -1771,26 +2160,25 @@ public class EventManagementView {
         descBox.getChildren().addAll(descLabel, descArea);
 
         // Grille d'informations
-        GridPane infoGrid = new GridPane();
-        infoGrid.setHgap(20);
-        infoGrid.setVgap(15);
-        infoGrid.setPadding(new Insets(10, 0, 10, 0));
+        VBox infoBox = new VBox(15);
+        infoBox.setPadding(new Insets(10, 0, 10, 0));
 
         // Ligne 1: Date
+        HBox dateRow = new HBox(10);
+        dateRow.setAlignment(Pos.CENTER_LEFT);
         Label dateIcon = new Label("📅");
         dateIcon.setFont(Font.font("System", 16));
-        Label dateLabel = new Label("Date :");
-        dateLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        dateLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+        Label dateLabelTitle = new Label("Date :");
+        dateLabelTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        dateLabelTitle.setTextFill(Color.web(adminDashboard.getTextColor()));
         Label dateValue = new Label(event.getFormattedDate());
         dateValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         dateValue.setTextFill(Color.web(adminDashboard.getAccentColor()));
-
-        HBox dateRow = new HBox(10);
-        dateRow.setAlignment(Pos.CENTER_LEFT);
-        dateRow.getChildren().addAll(dateIcon, dateLabel, dateValue);
+        dateRow.getChildren().addAll(dateIcon, dateLabelTitle, dateValue);
 
         // Ligne 2: Lieu
+        HBox lieuRow = new HBox(10);
+        lieuRow.setAlignment(Pos.CENTER_LEFT);
         Label lieuIcon = new Label("📍");
         lieuIcon.setFont(Font.font("System", 16));
         Label lieuLabelTitle = new Label("Lieu :");
@@ -1800,13 +2188,12 @@ public class EventManagementView {
         lieuValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         lieuValue.setTextFill(Color.web(adminDashboard.getTextColor()));
         lieuValue.setWrapText(true);
-
-        HBox lieuRow = new HBox(10);
-        lieuRow.setAlignment(Pos.CENTER_LEFT);
         lieuRow.getChildren().addAll(lieuIcon, lieuLabelTitle, lieuValue);
 
         // Ligne 3: Organisateur
         User org = userService.getUserById(event.getId_organisateur());
+        HBox orgRow = new HBox(10);
+        orgRow.setAlignment(Pos.CENTER_LEFT);
         Label orgIcon = new Label("👤");
         orgIcon.setFont(Font.font("System", 16));
         Label orgLabelTitle = new Label("Organisateur :");
@@ -1815,12 +2202,11 @@ public class EventManagementView {
         Label orgValue = new Label(org != null ? org.getNomComplet() : "Inconnu");
         orgValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         orgValue.setTextFill(Color.web(adminDashboard.getSuccessColor()));
-
-        HBox orgRow = new HBox(10);
-        orgRow.setAlignment(Pos.CENTER_LEFT);
         orgRow.getChildren().addAll(orgIcon, orgLabelTitle, orgValue);
 
         // Ligne 4: Email
+        HBox emailRow = new HBox(10);
+        emailRow.setAlignment(Pos.CENTER_LEFT);
         Label emailIcon = new Label("📧");
         emailIcon.setFont(Font.font("System", 16));
         Label emailLabelTitle = new Label("Email :");
@@ -1829,12 +2215,11 @@ public class EventManagementView {
         Label emailValue = new Label(org != null ? org.getEmail() : "Inconnu");
         emailValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         emailValue.setTextFill(Color.web(adminDashboard.getTextColor()));
-
-        HBox emailRow = new HBox(10);
-        emailRow.setAlignment(Pos.CENTER_LEFT);
         emailRow.getChildren().addAll(emailIcon, emailLabelTitle, emailValue);
 
         // Ligne 5: Capacité
+        HBox capRow = new HBox(10);
+        capRow.setAlignment(Pos.CENTER_LEFT);
         Label capIcon = new Label("👥");
         capIcon.setFont(Font.font("System", 16));
         Label capLabelTitle = new Label("Capacité :");
@@ -1844,12 +2229,11 @@ public class EventManagementView {
         Label capValue = new Label(capacite + " (" + event.getParticipantsCount() + " inscrits)");
         capValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         capValue.setTextFill(Color.web(adminDashboard.getWarningColor()));
-
-        HBox capRow = new HBox(10);
-        capRow.setAlignment(Pos.CENTER_LEFT);
         capRow.getChildren().addAll(capIcon, capLabelTitle, capValue);
 
         // Ligne 6: Statut validation
+        HBox statutRow = new HBox(10);
+        statutRow.setAlignment(Pos.CENTER_LEFT);
         Label statutIcon = new Label("✅");
         statutIcon.setFont(Font.font("System", 16));
         Label statutLabelTitle = new Label("Validation :");
@@ -1859,12 +2243,11 @@ public class EventManagementView {
         statutValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         statutValue.setStyle("-fx-background-color: " + event.getStatutValidationColor() +
                 "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
-
-        HBox statutRow = new HBox(10);
-        statutRow.setAlignment(Pos.CENTER_LEFT);
         statutRow.getChildren().addAll(statutIcon, statutLabelTitle, statutValue);
 
         // Ligne 7: Publication
+        HBox pubRow = new HBox(10);
+        pubRow.setAlignment(Pos.CENTER_LEFT);
         Label pubIcon = new Label("📢");
         pubIcon.setFont(Font.font("System", 16));
         Label pubLabelTitle = new Label("Publication :");
@@ -1874,13 +2257,8 @@ public class EventManagementView {
         pubValue.setFont(Font.font("System", FontWeight.BOLD, 13));
         pubValue.setStyle("-fx-background-color: " +
                 (event.isEstPublie() ? "#2ecc71" : "#95a5a6") + "; -fx-text-fill: white; -fx-padding: 4 12; -fx-background-radius: 15;");
-
-        HBox pubRow = new HBox(10);
-        pubRow.setAlignment(Pos.CENTER_LEFT);
         pubRow.getChildren().addAll(pubIcon, pubLabelTitle, pubValue);
 
-        // Ajouter toutes les lignes à la grille
-        VBox infoBox = new VBox(15);
         infoBox.getChildren().addAll(dateRow, lieuRow, orgRow, emailRow, capRow, statutRow, pubRow);
 
         // Commentaire de validation (si existe)
@@ -1888,6 +2266,8 @@ public class EventManagementView {
             Separator sep = new Separator();
             sep.setPadding(new Insets(10, 0, 10, 0));
 
+            HBox commentRow = new HBox(10);
+            commentRow.setAlignment(Pos.TOP_LEFT);
             Label commentIcon = new Label("💬");
             commentIcon.setFont(Font.font("System", 16));
             Label commentLabelTitle = new Label("Commentaire :");
@@ -1897,66 +2277,57 @@ public class EventManagementView {
             commentValue.setWrapText(true);
             commentValue.setFont(Font.font("System", 13));
             commentValue.setTextFill(Color.web(adminDashboard.getTextColor()));
-
-            HBox commentRow = new HBox(10);
-            commentRow.setAlignment(Pos.TOP_LEFT);
             commentRow.getChildren().addAll(commentIcon, commentLabelTitle, commentValue);
-            VBox.setMargin(commentRow, new Insets(5, 0, 0, 0));
 
             infoBox.getChildren().addAll(sep, commentRow);
         }
 
         // Historique
-        Separator histoSep = new Separator();
-        histoSep.setPadding(new Insets(15, 0, 10, 0));
+        if (event.getDateSoumission() != null || event.getDateValidation() != null || event.getDatePublication() != null) {
+            Separator histoSep = new Separator();
+            histoSep.setPadding(new Insets(15, 0, 10, 0));
 
-        Label histoIcon = new Label("📋");
-        histoIcon.setFont(Font.font("System", 16));
-        Label histoLabel = new Label("Historique");
-        histoLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
-        histoLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+            HBox histoTitle = new HBox(10);
+            histoTitle.setAlignment(Pos.CENTER_LEFT);
+            Label histoIcon = new Label("📋");
+            histoIcon.setFont(Font.font("System", 16));
+            Label histoLabel = new Label("Historique");
+            histoLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+            histoLabel.setTextFill(Color.web(adminDashboard.getTextColor()));
+            histoTitle.getChildren().addAll(histoIcon, histoLabel);
 
-        HBox histoTitle = new HBox(10);
-        histoTitle.setAlignment(Pos.CENTER_LEFT);
-        histoTitle.getChildren().addAll(histoIcon, histoLabel);
+            VBox histoBox = new VBox(8);
+            histoBox.setPadding(new Insets(10, 0, 0, 25));
 
-        VBox histoBox = new VBox(8);
-        histoBox.setPadding(new Insets(10, 0, 0, 25));
+            if (event.getDateSoumission() != null) {
+                Label soumissionLabel = new Label("• Créé le: " + event.getDateSoumission().toLocalDateTime()
+                        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                soumissionLabel.setFont(Font.font("System", 12));
+                soumissionLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+                histoBox.getChildren().add(soumissionLabel);
+            }
+            if (event.getDateValidation() != null) {
+                String action = "approuve".equals(event.getStatutValidation()) ? "Approuvé" : "Refusé";
+                Label validationLabel = new Label("• " + action + " le: " + event.getDateValidation().toLocalDateTime()
+                        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                validationLabel.setFont(Font.font("System", 12));
+                validationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+                histoBox.getChildren().add(validationLabel);
+            }
+            if (event.getDatePublication() != null) {
+                Label publicationLabel = new Label("• Publié le: " + event.getDatePublication().toLocalDateTime()
+                        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                publicationLabel.setFont(Font.font("System", 12));
+                publicationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
+                histoBox.getChildren().add(publicationLabel);
+            }
 
-        if (event.getDateSoumission() != null) {
-            Label soumissionLabel = new Label("• Créé le: " + event.getDateSoumission().toLocalDateTime()
-                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
-            soumissionLabel.setFont(Font.font("System", 12));
-            soumissionLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
-            histoBox.getChildren().add(soumissionLabel);
-        }
-        if (event.getDateValidation() != null) {
-            String action = "approuve".equals(event.getStatutValidation()) ? "Approuvé" : "Refusé";
-            Label validationLabel = new Label("• " + action + " le: " + event.getDateValidation().toLocalDateTime()
-                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
-            validationLabel.setFont(Font.font("System", 12));
-            validationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
-            histoBox.getChildren().add(validationLabel);
-        }
-        if (event.getDatePublication() != null) {
-            Label publicationLabel = new Label("• Publié le: " + event.getDatePublication().toLocalDateTime()
-                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
-            publicationLabel.setFont(Font.font("System", 12));
-            publicationLabel.setTextFill(Color.web(adminDashboard.getTextColorMuted()));
-            histoBox.getChildren().add(publicationLabel);
+            infoBox.getChildren().addAll(histoSep, histoTitle, histoBox);
         }
 
         // Assemblage du contenu
         VBox mainContent = new VBox(15);
         mainContent.getChildren().addAll(imageContainer, descBox, infoBox);
-
-        if (event.getCommentaireValidation() != null && !event.getCommentaireValidation().isEmpty()) {
-            // Déjà ajouté dans infoBox
-        }
-
-        if (!histoBox.getChildren().isEmpty()) {
-            mainContent.getChildren().addAll(histoSep, histoTitle, histoBox);
-        }
 
         content.getChildren().add(mainContent);
 
