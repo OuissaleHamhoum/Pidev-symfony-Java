@@ -368,7 +368,7 @@ mvn javafx:run
 
 Developed with ❤️ by **Esprit Engineering Students - Class of 2026**
 
-© 2026 Esprit School of Engineering - All Rights Reserved
+© 2026 Esprit School of Engineering 
 
 <img src="src/main/resources/images/logo/esprit.png" width="100"/>
 
